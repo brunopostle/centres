@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "centres"
+version = "0.1.0"
+description = "Computable wholeness: a field of mutually reinforcing centres after Christopher Alexander"
+license = {file = "LICENSE"}
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.23",
+    "scipy>=1.9",
+    "opencv-python>=4.7",
+    "networkx>=3.1",
+    "scikit-image>=0.20",
+    "matplotlib>=3.7",
+]
+
+[project.scripts]
+centres = "centres.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["centres*"]
