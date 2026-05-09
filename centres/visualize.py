@@ -1,35 +1,32 @@
 import matplotlib.pyplot as plt
 
 
-def visualize(field, centers, G=None, image=None, save_path=None):
-    """
-    Diagnostic visualization of centers, hierarchy, and reinforcement graph.
-    """
+def draw_onto_ax(ax, field, centers, G=None, image=None):
+    """Draw field, centres, hierarchy, and graph onto an existing Axes.
 
-    plt.figure(figsize=(8, 8))
-
-    # Background
+    Suitable for embedding in Qt via FigureCanvasQTAgg as well as use in
+    standalone figures.  The caller is responsible for calling canvas.draw()
+    or plt.show() after this returns.
+    """
+    ax.clear()
     if image is not None:
-        plt.imshow(image[:, :, ::-1])  # BGR → RGB
-        plt.imshow(field, cmap="inferno", alpha=0.35)
+        ax.imshow(image[:, :, ::-1])  # BGR → RGB
+        ax.imshow(field, cmap="inferno", alpha=0.35)
     else:
-        plt.imshow(field, cmap="inferno")
+        ax.imshow(field, cmap="inferno")
 
-    # Draw centers
     for c in centers:
-        plt.scatter(c.x, c.y, c="cyan", s=25)
-        circle = plt.Circle(
-            (c.x, c.y), c.scale, color="cyan", fill=False, linewidth=0.6, alpha=0.6
+        ax.scatter(c.x, c.y, c="cyan", s=25)
+        ax.add_patch(
+            plt.Circle((c.x, c.y), c.scale, color="cyan", fill=False,
+                       linewidth=0.6, alpha=0.6)
         )
-        plt.gca().add_patch(circle)
 
-    # Hierarchy (parent relationships)
     for c in centers:
         if c.parent is not None:
             p = centers[c.parent]
-            plt.plot([c.x, p.x], [c.y, p.y], color="white", linewidth=0.8, alpha=0.5)
+            ax.plot([c.x, p.x], [c.y, p.y], color="white", linewidth=0.8, alpha=0.5)
 
-    # Reinforcement graph edges
     if G is not None:
         for i, j, data in G.edges(data=True):
             # Use the centre stored on the node, not centers[i], to avoid
@@ -37,19 +34,21 @@ def visualize(field, centers, G=None, image=None, save_path=None):
             c1 = G.nodes[i]["center"]
             c2 = G.nodes[j]["center"]
             w = data["weight"]
-            plt.plot(
-                [c1.x, c2.x],
-                [c1.y, c2.y],
-                color="lime",
-                linewidth=0.5 + 2 * w,
-                alpha=0.25,
+            ax.plot(
+                [c1.x, c2.x], [c1.y, c2.y],
+                color="lime", linewidth=0.5 + 2 * w, alpha=0.25,
             )
 
-    plt.title("Structural Centers and Reinforcement Graph")
-    plt.axis("off")
+    ax.axis("off")
 
+
+def visualize(field, centers, G=None, image=None, save_path=None):
+    """Diagnostic visualization of centers, hierarchy, and reinforcement graph."""
+    fig, ax = plt.subplots(figsize=(8, 8))
+    draw_onto_ax(ax, field, centers, G, image)
+    ax.set_title("Structural Centers and Reinforcement Graph")
     if save_path is not None:
-        plt.savefig(save_path, dpi=150, bbox_inches="tight")
+        fig.savefig(save_path, dpi=150, bbox_inches="tight")
     else:
         plt.show()
-    plt.close()
+    plt.close(fig)

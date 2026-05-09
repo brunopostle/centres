@@ -6,13 +6,33 @@ The theory formalises Alexander's claim that living structure — in carpets, pa
 
 ## Installation
 
+Command-line tool only:
+
 ```
 pip install -e .
 ```
 
+Desktop GUI (requires PyQt6):
+
+```
+pip install -e ".[gui]"
+```
+
+Pre-built Windows executables are available on the [releases page](../../releases).
+
 ## Usage
 
-### Analyse an image
+### Desktop GUI
+
+Launch the graphical application:
+
+```
+centres-gui
+```
+
+Use **File → Open Image** (or the toolbar button) to load an image, then click **Analyse**. The structural field and centres are shown on the left; the 15 Alexander property scores appear in a colour-coded table on the right. Use **File → Save Visualisation** or **File → Export JSON** to save results.
+
+### Analyse an image (command line)
 
 ```
 centres analyse path/to/image.jpg
