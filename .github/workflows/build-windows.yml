@@ -3,8 +3,7 @@ name: Build Windows Installer
 on:
   push:
     branches: [main]
-  release:
-    types: [published]
+    tags: ["v*"]
   workflow_dispatch:
 
 jobs:
@@ -40,8 +39,9 @@ jobs:
           name: centres-gui-windows-installer
           path: installer\centres-gui-setup.exe
 
-      - name: Upload to GitHub Release
-        if: github.event_name == 'release'
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: installer\centres-gui-setup.exe
+          generate_release_notes: true
