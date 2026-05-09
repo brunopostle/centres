@@ -1,4 +1,4 @@
-name: Build Windows EXE
+name: Build Windows Installer
 
 on:
   push:
@@ -18,7 +18,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
           pip install --upgrade pip
           pip install ".[gui]"
@@ -27,14 +27,21 @@ jobs:
       - name: Build EXE
         run: pyinstaller centres-gui.spec
 
-      - name: Upload build artifact
+      - name: Install InnoSetup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer
+        run: '& "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe" centres-gui.iss'
+        shell: pwsh
+
+      - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: centres-gui-windows
-          path: dist/centres-gui.exe
+          name: centres-gui-windows-installer
+          path: installer\centres-gui-setup.exe
 
       - name: Upload to GitHub Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/centres-gui.exe
+          files: installer\centres-gui-setup.exe
