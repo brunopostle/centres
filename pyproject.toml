@@ -17,8 +17,12 @@ dependencies = [
     "matplotlib>=3.7",
 ]
 
+[project.optional-dependencies]
+gui = ["PyQt6>=6.4"]
+
 [project.scripts]
-centres = "centres.cli:main"
+centres     = "centres.cli:main"
+centres-gui = "centres.gui:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
