@@ -1,15 +1,18 @@
 # PyInstaller spec for centres-gui Windows executable.
 # Build with: pyinstaller centres-gui.spec
 
-from PyInstaller.utils.hooks import collect_data_files
+from PyInstaller.utils.hooks import collect_all, collect_data_files
 
 block_cipher = None
 
-# Collect only what's genuinely needed rather than collect_all for every package.
-# collect_all pulls in test suites, unused backends, and all Qt modules (~100MB+ overhead).
+# collect_data_files covers fonts/matplotlibrc/style sheets for matplotlib.
+# collect_all('PyQt6') is required to bundle the Qt6 DLLs and platform plugins
+# (qwindows.dll etc.) — hiddenimports alone only traces Python modules, not binaries.
 # PyInstaller's built-in cv2 hook handles OpenCV DLLs automatically.
 datas = collect_data_files('matplotlib')  # fonts, matplotlibrc, style sheets
-binaries = []
+_qt_datas, _qt_binaries, _qt_hidden = collect_all('PyQt6')
+datas += _qt_datas
+binaries = _qt_binaries
 
 hiddenimports = [
     # scipy — only the two submodules actually used
