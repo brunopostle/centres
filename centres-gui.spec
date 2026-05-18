@@ -28,10 +28,8 @@ hiddenimports = [
     'scipy.ndimage._ni_support',
     'scipy.spatial',
     'scipy.spatial.distance',
-    'scipy._lib.messagestream',
     # skimage — only blob detection
     'skimage.feature',
-    'skimage.feature._blob',
     'skimage._shared',
     'skimage._shared.utils',
     'skimage.transform',
