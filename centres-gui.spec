@@ -3,23 +3,37 @@
 
 import glob
 import os
+import sys
 
 from PyInstaller.utils.hooks import collect_all, collect_data_files
 
 block_cipher = None
 
 # collect_data_files covers fonts/matplotlibrc/style sheets for matplotlib.
-# collect_all('PyQt6') bundles Qt6 DLLs and platform plugins, but misses the
-# ICU DLLs (icudt/icuin/icuuc with version suffix) that Qt6Core depends on —
-# they live in PyQt6/Qt6/bin/ with numeric suffixes collect_all doesn't match.
+# collect_all('PyQt6') bundles Qt6 DLLs and platform plugins.
 # PyInstaller's built-in cv2 hook handles OpenCV DLLs automatically.
+#
+# Qt6Core.dll depends on ICU. Two cases:
+#   a) PyQt6 ships versioned ICU (icuuc73.dll etc.) in Qt6/bin/ — glob catches them.
+#   b) Qt6Core was built against the Windows 10+ system ICU (icuuc.dll in System32) —
+#      glob finds nothing, so fall back to System32. Without this, the app crashes
+#      under Wine (which doesn't provide the system ICU) with "icuuc.dll not found".
 import PyQt6 as _PyQt6
 _qt6_bin = os.path.join(os.path.dirname(_PyQt6.__file__), 'Qt6', 'bin')
 
 datas = collect_data_files('matplotlib')  # fonts, matplotlibrc, style sheets
 _qt_datas, _qt_binaries, _qt_hidden = collect_all('PyQt6')
 datas += _qt_datas
+
 _icu_dlls = [(p, 'PyQt6/Qt6/bin') for p in glob.glob(os.path.join(_qt6_bin, 'icu*.dll'))]
+if not _icu_dlls and sys.platform == 'win32':
+    _sys32 = os.path.join(os.environ.get('SystemRoot', r'C:\Windows'), 'System32')
+    _icu_dlls = [
+        (os.path.join(_sys32, n), 'PyQt6/Qt6/bin')
+        for n in ('icuuc.dll', 'icudt.dll', 'icuin.dll')
+        if os.path.exists(os.path.join(_sys32, n))
+    ]
+
 binaries = _qt_binaries + _icu_dlls
 
 hiddenimports = [
