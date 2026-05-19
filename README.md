@@ -18,7 +18,7 @@ Desktop GUI (requires PyQt6):
 pip install -e ".[gui]"
 ```
 
-Pre-built Windows executables are available on the [releases page](../../releases).
+An experimental Windows installer is available at the [v0.0.3 release](https://github.com/brunopostle/centres/releases/tag/v0.0.3).
 
 ## Usage
 
@@ -31,6 +31,8 @@ centres-gui
 ```
 
 Use **File → Open Image** (or the toolbar button) to load an image, then click **Analyse**. The structural field and centres are shown on the left; the 15 Alexander property scores appear in a colour-coded table on the right. Use **File → Save Visualisation** or **File → Export JSON** to save results.
+
+![Centres GUI analysing a Ghashghai carpet](screenshot-ghashghai.png)
 
 ### Analyse an image (command line)
 
