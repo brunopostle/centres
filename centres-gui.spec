@@ -27,10 +27,12 @@ datas += _qt_datas
 
 _icu_dlls = [(p, 'PyQt6/Qt6/bin') for p in glob.glob(os.path.join(_qt6_bin, 'icu*.dll'))]
 if not _icu_dlls and sys.platform == 'win32':
+    # Qt6Core.dll on Windows 10+ forwards ICU calls through icuuc.dll → icu.dll.
+    # Bundle both; without icu.dll Wine fails with "module not found for forward".
     _sys32 = os.path.join(os.environ.get('SystemRoot', r'C:\Windows'), 'System32')
     _icu_dlls = [
         (os.path.join(_sys32, n), 'PyQt6/Qt6/bin')
-        for n in ('icuuc.dll', 'icudt.dll', 'icuin.dll')
+        for n in ('icu.dll', 'icuuc.dll', 'icudt.dll', 'icuin.dll')
         if os.path.exists(os.path.join(_sys32, n))
     ]
 
@@ -108,7 +110,7 @@ excludes = [
 ]
 
 a = Analysis(
-    ['centres/gui.py'],
+    ['centres_gui_main.py'],
     pathex=['.'],
     binaries=binaries,
     datas=datas,
