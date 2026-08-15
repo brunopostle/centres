@@ -130,7 +130,6 @@ Independent of everything else. Each is small and self-contained.
 
 ### [B1](https://github.com/brunopostle/centres/issues/14) · Make the energy terms consistently intensive
 
-
 `total_energy` in `centres/energy.py` mixes sums over centres (`hierarchy_energy`,
 `coverage_energy`, `alignment_energy`) with means (`reinforcement_energy`,
 `locality_energy`), so the total scales with N and correlates with centre count at
@@ -145,7 +144,6 @@ plus the synthetic controls.
 
 ### [B2](https://github.com/brunopostle/centres/issues/15) · Return "undefined" for the degenerate case, not 10/10
 
-
 A featureless grey canvas detects zero centres, the deviation-based measures
 return 0, and `normalize_all` maps 0 to a perfect 10 — for levels of scale,
 boundaries, positive space, local symmetries, gradients, echoes and the void.
@@ -158,7 +156,6 @@ GUI and JSON output render that as `—` rather than a number.
 whose inputs are empty. Add as a test.
 
 ### [B3](https://github.com/brunopostle/centres/issues/16) · Clamp the normalisers and re-derive the reference constants
-
 
 `rise(x, 0.02)` for not-separateness pins three of six carpets at exactly 10.0;
 `rise(x, 0.2)` for alternating repetition pins four of six. `boundaries` uses
