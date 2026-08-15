@@ -33,25 +33,64 @@ def build_graph(centers):
     return G
 
 
-def propagate_strength(G, steps=10, alpha=0.2, beta=0.05):
-    """Diffuse strength through the reinforcement graph.
+def propagate_strength(G, steps=50, alpha=0.2, tol=1e-9):
+    """Reinforce centre strengths through the graph, to a stationary point.
 
-    Update rule: s ← (1 - β)s + α(Ws)
-    where W is the row-normalised adjacency matrix.
+    Update rule: s ← s₀ + α(Ŵs),  Ŵ = W / max_i Σ_j W_ij
 
-    Previously the pre-computed reinforcement vector was discarded and W@s
-    recomputed on the same line; now the cached value is used.
+    where s₀ is the intrinsic strength each centre carries in from the
+    structural field, W is the raw edge-weight matrix, and Ŵ is W scaled by
+    its largest row sum. Iterated to convergence; `steps` is a maximum
+    iteration cap rather than a tuning constant.
+
+    This is Katz/Bonacich reinforcement seeded by the field: a centre's
+    strength is its own evidence plus a geometrically discounted sum of the
+    strength reaching it along every walk in the graph,
+
+        s* = (I - αŴ)⁻¹ s₀ = s₀ + αŴs₀ + α²Ŵ²s₀ + …
+
+    Because ‖αŴ‖_∞ = α < 1 the map is a contraction, so the fixed point
+    exists, is unique, and is reached geometrically at rate α — roughly 13
+    iterations for α = 0.2 to reach tol = 1e-9. Strengths are bounded by
+    max(s₀)/(1 - α), so nothing can run away and no clip is needed.
+
+    The previous rule, s ← (1 - β)s + α(Ws) against a row-stochastic W, had
+    gain (1 - β) + α = 1.15 per step on a uniform vector. It had no fixed
+    point: strengths grew as 1.15^t until they saturated the clip at 10, which
+    made strong_centres, contrast, alternating_repetition, simplicity and the
+    E_R energy term readouts of the iteration counter rather than of the image.
+
+    Note that a plain row-stochastic diffusion cannot be repaired by setting
+    α + (1 - β) = 1, nor by renormalising after each step. Both do give a fixed
+    point, but it is the *consensus* vector — the leading right eigenvector of
+    a row-stochastic matrix is uniform, so every centre converges to the same
+    strength and contrast collapses to zero. Retaining the s₀ source term is
+    what keeps the stationary distribution informative, and leaving W
+    un-normalised (scaled globally rather than per row) is what lets density
+    matter: row normalisation would erase degree, so a centre with ten strong
+    neighbours would score the same as one with a single strong neighbour.
+
+    Isolated centres keep their intrinsic strength exactly: with no edges their
+    row of Ŵ is zero, so s* = s₀. They are neither reinforced nor penalised,
+    which is the honest reading of "no neighbours to reinforce with". Under the
+    old rule they decayed as 0.95^t while connected centres grew as 1.15^t, so
+    the gap between isolated and connected centres was itself a function of the
+    step count.
     """
     if len(G.nodes) == 0:
         return G
-    strengths = np.array([G.nodes[n]["center"].strength for n in G.nodes])
+    s0 = np.array([G.nodes[n]["center"].strength for n in G.nodes], dtype=float)
     W = nx.to_numpy_array(G)
-    row_sum = W.sum(axis=1, keepdims=True) + 1e-8
-    W = W / row_sum
+    scale = W.sum(axis=1).max()
+    if scale > 0:
+        W = W / scale
+    strengths = s0.copy()
     for _ in range(steps):
-        reinforcement = W @ strengths
-        strengths = (1 - beta) * strengths + alpha * reinforcement
-        strengths = np.clip(strengths, 0, 10)
+        updated = s0 + alpha * (W @ strengths)
+        delta = np.abs(updated - strengths).max()
+        strengths = updated
+        if delta < tol:
+            break
     for i, n in enumerate(G.nodes):
-        G.nodes[n]["center"].strength = strengths[i]
+        G.nodes[n]["center"].strength = float(strengths[i])
     return G

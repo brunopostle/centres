@@ -115,8 +115,21 @@ def evolve(
     else:
         centers = random_centers(n_centers, shape)
     centers = assign_hierarchy(centers)
-    G = build_graph(centers)
-    G = propagate_strength(G)
+    # propagate_strength maps intrinsic strengths to their stationary point, so
+    # it must always be fed the intrinsic values. Only x, y and scale are
+    # annealed below; strength is a fixed input, not part of the search state.
+    # Re-seeding each time keeps every iteration's propagation a pure function
+    # of the current geometry. (Without this, feeding a propagated vector back
+    # in amplifies it by up to 1/(1 - alpha) per iteration and the strengths
+    # drift geometrically across the anneal.)
+    intrinsic = [c.strength for c in centers]
+
+    def _propagate(centers):
+        for c, s in zip(centers, intrinsic):
+            c.strength = s
+        return propagate_strength(build_graph(centers))
+
+    G = _propagate(centers)
     field = reconstruct_field(shape, centers)
     current_energy = total_energy(field, centers, G)
 
@@ -130,8 +143,7 @@ def evolve(
             c.scale = float(np.clip(c.scale * np.exp(np.random.normal(0, 0.02)), 2, 80))
 
         centers = assign_hierarchy(centers)
-        G_new = build_graph(centers)
-        G_new = propagate_strength(G_new)
+        G_new = _propagate(centers)
         field_new = reconstruct_field(shape, centers)
         new_energy = total_energy(field_new, centers, G_new)
 

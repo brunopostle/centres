@@ -86,15 +86,27 @@ Edges with W_ij < 0.1 are dropped.
 
 ## 6. Strength Propagation
 
-Centre strengths evolve by diffusion through the reinforcement graph:
+Centre strengths are reinforced through the graph until they reach a stationary point:
 
 ```
-s^(t+1) = (1 - β) s^t + α (W_norm s^t)
+s^(t+1) = s⁰ + α (Ŵ s^t),      Ŵ = W / max_i Σ_j W_ij
 ```
 
-where W_norm is the row-normalised adjacency matrix, α = 0.2, β = 0.05, run for 10 steps.
+where s⁰ is the intrinsic strength each centre carries in from the structural field (§2), W is the raw edge-weight matrix of §5, and Ŵ is W scaled by its largest row sum. α = 0.2. The iteration is run to convergence rather than for a fixed number of steps.
 
-This is a damped random walk: each centre decays slightly (factor 1-β) and is reinforced by its neighbours (factor α). Centres embedded in clusters of strong, scale-similar neighbours grow stronger; isolated or weakly-connected centres decay. Strengths are clipped to [0, 10].
+This is Katz–Bonacich reinforcement seeded by the field. A centre's final strength is its own evidence plus a geometrically discounted sum of the strength reaching it along every walk in the graph:
+
+```
+s* = (I - αŴ)⁻¹ s⁰ = s⁰ + αŴs⁰ + α²Ŵ²s⁰ + …
+```
+
+Because ‖αŴ‖_∞ = α < 1 the update is a contraction, so this fixed point exists, is unique, and is approached geometrically at rate α — about 13 iterations for α = 0.2 to settle to 1e-9. Strengths are therefore bounded above by max(s⁰)/(1 - α) = 1.25 on the normalised field, and no clipping is required.
+
+Centres embedded in clusters of strong, scale-similar neighbours end up stronger, because both the number of incident edges and the strength arriving along them enter the sum. Isolated centres keep their intrinsic strength exactly: with no edges their row of Ŵ is zero, so s* = s⁰. They are neither reinforced nor penalised, which is the honest reading of having no neighbours to be reinforced by.
+
+**Why not a plain diffusion.** Earlier versions used `s ← (1 - β)s + α(W_norm s)` with α = 0.2, β = 0.05 for a fixed 10 steps. Against a row-stochastic W_norm this has gain (1 - β) + α = 1.15 per step on a uniform vector, so strengths grew as 1.15^t without bound until they saturated a clip at 10. There was no fixed point, and the properties that read absolute strengths — strong centres, contrast, alternating repetition, simplicity and E_R — were consequently readouts of the iteration counter rather than of the image: with the centre set held fixed, strong centres ran 1.0 → 1.9 → 7.4 → 10.0 for 5, 10, 20 and 40 steps, and at 40 steps every strength saturated and contrast collapsed to zero.
+
+Setting α + (1 - β) = 1, or renormalising after each step, does produce a fixed point but the wrong one. The leading right eigenvector of a row-stochastic matrix is uniform, so any pure diffusion of that kind converges to *consensus*: every centre ends at the same strength and contrast collapses to zero again. Retaining the s⁰ source term is what keeps the stationary distribution informative, and leaving W scaled globally rather than normalised per row is what lets density matter — row normalisation erases degree, so a centre with ten strong neighbours would score the same as one with a single strong neighbour.
 
 ---
 
