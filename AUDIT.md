@@ -12,7 +12,7 @@ Two headline results:
 1. **On synthetic images where the answer is known by construction, four of five
    measures fail to track the quantity they were built to detect** — one of them
    in the wrong direction. See §12, which is the most important section here.
-2. **The centre detector reports a single circle as five to seventeen centres.**
+2. **The centre detector reports a single circle as five to seventeen centres** — not through duplication, as first supposed, but through figure/ground conflation and a saturating distance cap (§1).
    Every measure is computed over a centre set that is not a stable estimate of
    anything, and they faithfully report its instability.
 
@@ -32,20 +32,77 @@ The most elementary possible stimulus, a single dark circle on a blank canvas:
 | 4 circles, r=60px | 20 | 33–68 px |
 | 9 circles, r=40px | 33 | 24–68 px |
 
-One visually unambiguous centre is reported as between 5 and 17. The comment in
-`detect_centers` claims a single `blob_log` call "avoids duplicate detections";
-it does not — `blob_log`'s default overlap pruning still admits many detections
-per feature across adjacent scales.
+One visually unambiguous centre is reported as between 5 and 17.
 
-The r=120px case is worse than duplication. Every one of its 17 blobs sits at
-68 px, which is `max_sigma * sqrt(2)` — the ceiling of the scale ladder. **The
-detector cannot represent a centre larger than the ladder maximum, and reports
-the excess as multiplicity instead.** The Ardabil's central medallion, the single
-most important centre in that image, is exactly this case.
+*This section originally attributed the inflation to duplicate detections of the
+same feature. That was wrong, and the correction matters because it changes the
+fix. Investigation on a controlled lattice (see below) shows there is no
+per-feature duplication at all.*
 
-Everything downstream inherits this. The hierarchy, the reinforcement graph and
-all fifteen properties are computed over a centre set whose cardinality is
-dominated by duplication rather than by structure.
+### The count is inflated by two mechanisms, neither of them duplication
+
+**Figure/ground conflation.** On `jittered_lattice(0.0)` — 225 identical circles
+on a lattice, with no background plateau — the detector finds 481 centres. But
+every circle is detected *exactly once*: the per-circle histogram is `{1: 225}`,
+with no circle missed. The other 256 detections are not near any circle. They sit
+in the gaps *between* motifs, at coarser scales.
+
+They cannot be thresholded away. Scale-normalised LoG response:
+
+| | n | response (min / median / max) | field value (median) |
+|---|---:|---|---:|
+| on a motif | 225 | 0.0847 / 0.0847 / 0.0847 | 0.206 |
+| in a gap | 256 | 0.1343 / 0.1343 / 0.3104 | 0.392 |
+
+**Every gap detection responds more strongly than every motif detection.** By
+response strength the gaps are *more* centre-like than the motifs. Worse,
+`skimage`'s `_prune_blobs` discards the smaller blob of an overlapping pair, so
+aggressive overlap pruning would delete the motifs and keep the gaps.
+
+The cause is that the structural field is a distance transform from edges and so
+**has no notion of figure versus ground**. The space between motifs is by
+construction as much a local maximum as the motifs, and where motifs are small
+and gaps wide it is a larger one. This is arguably correct Alexander —
+interstitial space genuinely is a centre, which is what *positive space* means.
+The defect is that the two populations are never distinguished, so every measure
+that assumes a centre is a motif silently averages over both, and their ratio
+shifts with lattice geometry, crop and scale. It also explains why `regular_grid`
+scores roughness 9.6 and echoes 10.0 in §12: its "centres" are two interleaved
+lattices, so nearest-neighbour statistics are meaningless.
+
+**Plateau detections.** Separately, the cap `min(h, w) / 10` saturates the
+distance transform wherever nothing is nearby, and `peak_local_max` returns many
+degenerate maxima across the resulting flat region:
+
+| image | plateau % of canvas | centres | on the plateau | at ladder ceiling |
+|---|---:|---:|---:|---:|
+| ardabil | 0.10% | 154 | 3 | 2 |
+| bidjar | 0.87% | 122 | 6 | 0 |
+| ghashghai | 0.00% | 156 | 0 | 1 |
+| **pazyryk** | **27.19%** | **47** | **22** | **11** |
+| sanguszko | 0.20% | 147 | 4 | 0 |
+| varamin | 0.00% | 205 | 1 | 1 |
+
+Negligible on five carpets, and **nearly half of the Pazyryk's centres** — which
+bears on §11, since `images/README.md` builds its headline narrative on the
+Pazyryk scoring highest on nine of fifteen properties.
+
+Unlike gap centres, plateau detections are not centres under any definition:
+there is no enclosing boundary within the cap radius. They can simply be
+suppressed — but only once the cap is fixed, because a circle of radius 120
+exceeds the cap of 102, so its own interior saturates too.
+
+### The scale ceiling
+
+Independent of both. Every one of the r=120px case's 17 blobs sits at 68 px,
+which is `max_sigma * sqrt(2)` — the ceiling of the scale ladder. **The detector
+cannot represent a centre larger than the ladder maximum.** The Ardabil's central
+medallion, the single most important centre in that image, is exactly this case.
+
+Everything downstream inherits all three. The hierarchy, the reinforcement graph
+and all fifteen properties are computed over a centre set whose cardinality is
+governed by the cap, the ladder and the figure/ground ambiguity rather than by
+the structure of the artwork.
 
 ## 2. Structural energy is centre count
 
