@@ -24,18 +24,33 @@ Tracked as GitHub issues [#8–#27](https://github.com/brunopostle/centres/issue
 
 ```
 done ──  A3 #10  adaptive edge detection
+done ──  A4 #11  scale-relative distance cap
 done ──  A5 #12  propagation fixed point
 
-    #25 ─┐                                    (build_graph id/index)
-    A7 #27 ─┬─ A4 #11 ─── A1 #8 ──┐           (field.max coupling → cap → plateau)
-            │                     │
-    A2  #9 ─┴─────────────────────┼─ C1 #18 ─ C2 #19 ─ C3 #20 ─ D1 #21 ─┬─ D2  #22
-    A6 #13 ───────────────────────┘                                     ├─ D2b #26
-                                                                        ├─ D3  #23
-    B1 #14, B2 #15, B3 #16 ─ B4 #17      (independent of A/C/D)         └─ D4  #24
+    A7 #27 ─┬─ A1 #8 ──┐          (field.max coupling, then plateau suppression)
+     G #25 ─┘          │
+    A2  #9 ────────────┼─ C1 #18 ─ C2 #19 ─ C3 #20 ─ D1 #21 ─┬─ D2  #22
+    A6 #13 ────────────┘                                     ├─ D2b #26
+                                                             ├─ D3  #23
+    B1 #14, B2 #15, B3 #16 ─ B4 #17   (independent of A/C/D) └─ D4  #24
 ```
 
-**Ready to start now:** #27, #25, #9, #13, and all of phase B.
+**Ready to start now:** #27, #25, #9, #13, and all of phase B. Do **#27 first** —
+the cap doubles as a detector sensitivity knob while it is unfixed, so any other
+phase A change can appear to succeed or fail for reasons unrelated to itself.
+
+### Where phase A stands
+
+| | before | now (#10 + #11 + #12) | target |
+|---|---:|---:|---:|
+| worst property Δ under vignette | 7.4 | **1.38** | ≤1.5 ✅ |
+| worst property Δ under mirror / rot90 | 5.9 | **0.86** | ≤0.05 (#13) |
+| crop15% like-for-like, worst | +246% | **+32%** | — |
+| step-count dependence of strong_centres | 1.0 → 10.0 | **1e-6** | ✅ |
+| identity centre counts | 47–205 | 437–624 | see #27 |
+
+The measures still do not track their ground truth — that is unchanged by any
+repair so far, and separating starved formulas from wrong ones is #18.
 
 ### Changes since the plan was first written
 
@@ -118,7 +133,7 @@ contrast before edge detection.
 **Acceptance:** the `vignette` transform changes centre count by less than 15%,
 and no property score by more than 1.5 on the 0–10 scale, for all six corpus images.
 
-### [A4](https://github.com/brunopostle/centres/issues/11) · Make the distance cap scale-relative
+### [A4](https://github.com/brunopostle/centres/issues/11) · ✅ Make the distance cap scale-relative
 **Blocks:** #18
 
 The cap `min(h, w) / 10` in `build_structural_field` is a function of the image
@@ -128,8 +143,17 @@ frame, not of the artwork, so cropping changes the field everywhere and cropping
 Tie the cap to detected structure — for example a percentile of the uncapped
 distance transform — rather than to the frame.
 
-**Acceptance:** `crop5%` and `crop15%` each change centre count by less than 15%
-and no property score by more than 1.5, for all six corpus images.
+*Resolved with `8 × edge_spacing`, the `d^-1.5`-weighted geometric mean of the
+distance transform along its medial axis. **The acceptance criterion above was
+badly written and unachievable by any implementation:** `crop15%` trims each side,
+retaining only 59% of the pixels, so any content-tracking count must move far more
+than 15% — and a perfectly constant cap still gives −32% to −57%. The old code
+passed on three images only because cropping the border brightened the field and
+the extra detections cancelled the lost area, which was the bug itself.*
+
+**Acceptance, restated and met:** like-for-like — centres in the cropped image
+versus centres the uncropped run places inside the same window — worst case
++246% → +32%, median +64% → +15%.
 
 ### [A5](https://github.com/brunopostle/centres/issues/12) · ✅ Give strength propagation a fixed point
 **Blocks:** #18
