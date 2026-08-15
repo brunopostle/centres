@@ -20,17 +20,44 @@ acceptance check passes.
 
 ## Dependency graph
 
-Tracked as GitHub issues [#8–#24](https://github.com/brunopostle/centres/issues). Task IDs below link to them; statuses live on the issues, and this file is the overview.
+Tracked as GitHub issues [#8–#27](https://github.com/brunopostle/centres/issues). Task IDs below link to them; statuses live on the issues, and this file is the overview and the rationale.
 
 ```
-A1 ─┬─ A2 ─┬────────────────┐
-    └─ A6 ─┘                │
-A3 ─┬──────────────────────┤
-A4 ─┘                      ├─ C1 ─ C2 ─ C3 ─ D1 ─┬─ D2
-A5 ────────────────────────┘                     ├─ D3
-                                                 └─ D4
-B1, B2, B3 ─ B4          (independent of A/C/D)
+done ──  A3 #10  adaptive edge detection
+done ──  A5 #12  propagation fixed point
+
+    #25 ─┐                                    (build_graph id/index)
+    A7 #27 ─┬─ A4 #11 ─── A1 #8 ──┐           (field.max coupling → cap → plateau)
+            │                     │
+    A2  #9 ─┴─────────────────────┼─ C1 #18 ─ C2 #19 ─ C3 #20 ─ D1 #21 ─┬─ D2  #22
+    A6 #13 ───────────────────────┘                                     ├─ D2b #26
+                                                                        ├─ D3  #23
+    B1 #14, B2 #15, B3 #16 ─ B4 #17      (independent of A/C/D)         └─ D4  #24
 ```
+
+**Ready to start now:** #27, #25, #9, #13, and all of phase B.
+
+### Changes since the plan was first written
+
+The audit's own diagnosis of the front end was wrong in one place, and two tasks
+turned out to be misattributed. Recorded here so the history is legible:
+
+- **#8 was rewritten.** It asked for deduplication of blob detections. There is no
+  duplication — on a lattice of 225 identical circles the detector finds each
+  exactly once. The count inflation comes from figure/ground conflation (split out
+  as **#26**) and from plateau detections, which is all #8 now covers. It is
+  consequently **blocked by #11**, since the cap is what creates the plateau.
+- **#13 was re-pointed** from #8 to #10. The isometry failure is not detection
+  ordering: `cv2.Canny` is not mirror-equivariant (2907 edge pixels differ, 0.5%),
+  and the distance transform amplifies that to 8.6% of the field. Greyscale
+  conversion and Gaussian blur are exact.
+- **#9 was unblocked** — it was waiting on the deduplication premise.
+- **#27 is new and constrains most of phase A.** `field / field.max()` against an
+  absolute `blob_log` threshold makes every local change act globally. This turned
+  out to be the actual mechanism by which vignetting destroyed the results.
+- **#25 is new** — `build_graph` adds nodes by `c.id` but edges by list index, so
+  any task that filters a centre list (#8, #26) will silently corrupt the graph
+  until it is fixed.
 
 ---
 
@@ -40,7 +67,7 @@ Nothing downstream is trustworthy until these land. Re-run `python -m audit`
 after each one; record the before/after in the commit message.
 
 ### [A1](https://github.com/brunopostle/centres/issues/8) · Deduplicate blob detections per feature
-**Blocks:** #9, #13, #18
+**Blocked by:** #11, #25 · **Blocks:** #18
 
 `detect_centers` in `centres/pipeline.py` reports a single circle as 5–17
 centres. The docstring claims a single `blob_log` call avoids duplicates; it does
@@ -56,7 +83,7 @@ strongest LoG response, discard the rest.
 `tests/test_pipeline.py`.
 
 ### [A2](https://github.com/brunopostle/centres/issues/9) · Make the scale ladder relative to image size and remove the ceiling
-**Blocked by:** #8 · **Blocks:** #18
+**Blocks:** #18 — no longer blocked by #8, see above
 
 `min_sigma=2, max_sigma=48` is absolute in pixels, so a 120 px circle is detected
 as many blobs all pinned at 68 px (`max_sigma × √2`). Large centres cannot be
@@ -70,7 +97,7 @@ same artwork at 512 px and 1024 px yields the same structure.
 r ∈ {30, 60, 120, 200} px. Scores for a corpus image at `--max-size` 512 vs 1024
 agree within 1.0 on the 0–10 scale for every property.
 
-### [A3](https://github.com/brunopostle/centres/issues/10) · Replace fixed Canny thresholds with locally adaptive edge detection
+### [A3](https://github.com/brunopostle/centres/issues/10) · ✅ Replace fixed Canny thresholds with locally adaptive edge detection
 **Blocks:** #18
 
 `build_structural_field` in `centres/field.py` uses `cv2.Canny(…, 50, 150)` —
@@ -97,7 +124,7 @@ distance transform — rather than to the frame.
 **Acceptance:** `crop5%` and `crop15%` each change centre count by less than 15%
 and no property score by more than 1.5, for all six corpus images.
 
-### [A5](https://github.com/brunopostle/centres/issues/12) · Give strength propagation a fixed point
+### [A5](https://github.com/brunopostle/centres/issues/12) · ✅ Give strength propagation a fixed point
 **Blocks:** #18
 
 `propagate_strength` in `centres/graph.py` has gain `(1 − β) + α = 1.15` per step
@@ -112,7 +139,7 @@ or renormalise after each step, or iterate to convergence instead of a fixed cou
 scale across `steps ∈ {5, 10, 20, 40, 100}`. Add as a test.
 
 ### [A6](https://github.com/brunopostle/centres/issues/13) · Make the pipeline exactly invariant under isometries
-**Blocked by:** #8 · **Blocks:** #18
+**Blocked by:** #10 (done) · **Blocks:** #18
 
 A mirror flip currently moves roughness by 3.4 points out of 10 — further than the
 entire spread across all six carpets — because which duplicate detections survive
