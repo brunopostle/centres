@@ -7,6 +7,33 @@ from a regression.
 
 Everything below is reproducible with `python -m audit`.
 
+> ### ⚠ Measured before the phase A repairs — do not quote these numbers as current
+>
+> Every table in this document was measured against the pipeline as it stood when
+> the audit was written. Two repairs have since landed and moved the baseline:
+>
+> - **#10** replaced the fixed Canny thresholds with flat-field division plus
+>   percentile hysteresis. Edge density is now uniform at ~8–10% across the corpus
+>   where it ranged 0.9–9.7%, so **identity centre counts changed substantially** —
+>   bidjar 122 → 520, sanguszko 147 → 380, ghashghai 156 → 240, varamin 205 → 136.
+>   Vignette damage fell from a worst case of 7.4 points to 1.62.
+> - **#12** replaced the strength diffusion with a contraction that has a fixed
+>   point. §6 below **no longer applies**: `strong_centres` and `contrast` now vary
+>   by ~1e-6 across `steps ∈ {5,…,100}` rather than 1.0 → 10.0. Raw strengths now
+>   lie in [0, 1.25], so the normalised values in §5 and §9 have all shifted.
+>
+> Known changes not yet reflected: white noise now yields 397 centres rather than 0
+> (and scores ≥9.5 on 1 property rather than 7); random blobs score ≥9.5 on 1
+> property rather than 5; the effective rank in §9 moved from 3 to 4.
+>
+> **§1's diagnosis, §11's documentation findings, and the §12 result that the
+> measures do not track their ground truth are unaffected in kind** — the specific
+> ρ values need re-measuring, but no repair so far addresses what they show.
+>
+> Refreshing every table is [#18](https://github.com/brunopostle/centres/issues/18),
+> which is the pivotal task in the plan: it is what distinguishes a formula that was
+> starved by a bad centre set from one that is wrong on its own terms.
+
 Two headline results:
 
 1. **On synthetic images where the answer is known by construction, four of five
