@@ -66,21 +66,28 @@ turned out to be misattributed. Recorded here so the history is legible:
 Nothing downstream is trustworthy until these land. Re-run `python -m audit`
 after each one; record the before/after in the commit message.
 
-### [A1](https://github.com/brunopostle/centres/issues/8) · Deduplicate blob detections per feature
+### [A1](https://github.com/brunopostle/centres/issues/8) · Suppress detections in structureless saturated regions
 **Blocked by:** #11, #25 · **Blocks:** #18
 
-`detect_centers` in `centres/pipeline.py` reports a single circle as 5–17
-centres. The docstring claims a single `blob_log` call avoids duplicates; it does
-not, because the default overlap pruning still admits many detections per feature
-across adjacent scales.
+*Rewritten. This task originally asked for deduplication; there is none — see the
+note above and §1 of AUDIT.md.*
 
-Add a proper cross-scale non-maximum suppression: group detections whose centres
-lie within some fraction of the larger blob's radius, keep the one with the
-strongest LoG response, discard the rest.
+The cap `min(h, w) / 10` saturates the distance transform wherever nothing is
+nearby, and `peak_local_max` returns many degenerate maxima across the resulting
+flat plateau. None are centres under any definition: there is no enclosing
+boundary within the cap radius. Negligible on five carpets (0–0.9% of canvas) and
+**27% of the Pazyryk, where 22 of its 47 centres sit on the plateau**.
 
-**Acceptance:** `python -m audit` — a single circle on a blank canvas yields
-1 centre (tolerance ±1); 9 circles yield 9 (tolerance ±2). Add these as a test in
-`tests/test_pipeline.py`.
+Blocked by #11 because the cap creates the plateau: a circle of radius 120 px
+exceeds the cap of 102 px, so its own interior saturates and suppression applied
+to today's field would delete the true centre along with the spurious ones. Also
+blocked by #25 — filtering a centre list with preserved ids corrupts the graph.
+
+**Acceptance:** a single circle on a blank canvas yields exactly 1 centre; 9
+circles yield 9 (±2); the Pazyryk's on-plateau count drops to ~0 with no carpet
+losing centres that sit on genuine structure. Add as a test in
+`tests/test_pipeline.py`. Re-check bidjar/roughness under vignette, the one cell
+#10 left at 1.62 against a threshold of 1.5.
 
 ### [A2](https://github.com/brunopostle/centres/issues/9) · Make the scale ladder relative to image size and remove the ceiling
 **Blocks:** #18 — no longer blocked by #8, see above
@@ -132,22 +139,74 @@ against a row-stochastic matrix, so strengths grow as 1.15^t until they hit the
 clip at 10. "Strong centres" is therefore a readout of the iteration counter:
 1.0 → 1.9 → 7.4 → 10.0 for 5, 10, 20, 40 steps with the image held fixed.
 
-Make the update a contraction with a stationary distribution — set `α + (1 − β) = 1`,
-or renormalise after each step, or iterate to convergence instead of a fixed count.
+*Resolved with Katz/Bonacich reinforcement, `s ← s₀ + α(Ŵs)` with `Ŵ = W / max row
+sum`. Note for the record that the two fixes originally suggested here — setting
+`α + (1 − β) = 1`, or renormalising each step — are **both wrong**: the leading
+right eigenvector of a row-stochastic matrix is uniform, so both converge to
+consensus and contrast collapses to zero. They would have passed the acceptance
+criterion while destroying the measure. Keeping the `s₀` source term is what makes
+the fixed point informative; scaling `W` globally rather than per row is what lets
+density matter.*
 
-**Acceptance:** `strong_centres` and `contrast` vary by less than 0.5 on the 0–10
-scale across `steps ∈ {5, 10, 20, 40, 100}`. Add as a test.
+**Acceptance:** met — spread 1e-6 for `strong_centres` and 1.2e-5 for `contrast`
+across `steps ∈ {5, 10, 20, 40, 100}`, against a threshold of 0.5.
 
 ### [A6](https://github.com/brunopostle/centres/issues/13) · Make the pipeline exactly invariant under isometries
 **Blocked by:** #10 (done) · **Blocks:** #18
 
 A mirror flip currently moves roughness by 3.4 points out of 10 — further than the
-entire spread across all six carpets — because which duplicate detections survive
-pruning is order-dependent. A1 may fix this on its own; verify, and if not, make
-tie-breaking and suppression order deterministic and orientation-independent.
+entire spread across all six carpets.
+
+*The cause was originally attributed to order-dependent overlap pruning. It is
+not.* Measured per stage on the Ardabil: greyscale conversion and Gaussian blur
+are **exactly** mirror-equivariant; `cv2.Canny` is **not** (2907 edge pixels
+differ, 0.536%), almost certainly through its hysteresis edge-tracking, whose
+traversal order decides which weak edges get promoted; the distance transform then
+amplifies that into 8.6% of the field. 24 of 154 centres fail to survive a mirror
+flip, and only one of them is on a plateau.
+
+#10 has replaced the thresholds but retains OpenCV's hysteresis, so this is
+probably still open — verify first. If so, either symmetrise explicitly (compute
+the edge map over the dihedral group and combine) or use an edge operator with no
+order-dependent tracking stage.
 
 **Acceptance:** `mirror` and `rot90` reproduce the `identity` scores for every
 property to within 0.05 on the 0–10 scale. Add as a test.
+
+### [A7](https://github.com/brunopostle/centres/issues/27) · Decouple field normalisation from the absolute detection threshold
+**Blocks:** #8, #9, #11
+
+`build_structural_field` ends with `field / (field.max() + 1e-8)`, and
+`detect_centers` then applies an absolute `threshold=0.08`. Those do not compose:
+`field.max()` is one scalar set by whichever pixel is furthest from an edge, so
+**any change anywhere rescales the whole field** and the fixed threshold then
+admits or rejects centres everywhere.
+
+This is the actual mechanism by which vignetting did its damage, discovered during
+#10: when corners lose edges the distance transform there runs to the cap,
+`field.max()` jumps (varamin 32 → 69), and every centre count moves. The three
+corpus images that failed worst were exactly the three whose `dist.max()` moved.
+
+Make the threshold relative to the field's own distribution, normalise by a robust
+percentile rather than the max, or drop normalisation entirely and keep the field
+in pixel units with the ladder and threshold in the same units. The last is most
+principled — the field is a distance transform, distances have units, and
+normalising them away is what created the coupling.
+
+**Acceptance:** masking a 5% corner patch changes centre count in the rest of the
+image by less than 2%; `field.max()` no longer divides a field read by an absolute
+threshold.
+
+### [G](https://github.com/brunopostle/centres/issues/25) · Fix build_graph node/edge key mismatch
+**Blocks:** #8, #26
+
+`build_graph` adds nodes keyed by `c.id` but edges keyed by list index. Two
+centres with ids 5 and 7 produce **four** nodes, the only edge joining two
+phantoms, and both real centres isolated. Harmless today because every production
+path assigns `id=i`, but a direct trap for any task that filters a centre list.
+
+**Acceptance:** `build_graph` on a list with arbitrary unique ids produces exactly
+`len(centers)` nodes, all carrying a `center` attribute. Add as a test.
 
 ---
 
@@ -275,6 +334,24 @@ needs periodicity (autocorrelation or spectral); contrast is tonal.
 
 Add region segmentation with shape descriptors alongside the centre set, rather
 than replacing it.
+
+### [D2b](https://github.com/brunopostle/centres/issues/26) · Give centres figure/ground polarity
+**Blocked by:** #21 · groups with #22
+
+The field is a distance transform from edges and has **no notion of figure versus
+ground**. On a lattice of 225 identical circles the detector finds each motif
+exactly once — and 256 further centres in the *gaps between* them, every one of
+which responds more strongly to the LoG (0.134–0.310) than every motif does
+(0.0847). No threshold separates them, and `skimage`'s overlap pruning discards the
+*smaller* blob, so it would delete the motifs and keep the empty space.
+
+This is not simply a bug: interstitial space genuinely is a centre, which is what
+*positive space* means. The defect is that the populations are never distinguished,
+so every measure assuming "centre = motif" averages over both, and their ratio
+shifts with motif-to-gap ratio, crop and scale.
+
+**Acceptance:** on `jittered_lattice(0.0)` the 225 motif and 256 gap detections are
+labelled with ≥95% accuracy; each property declares which population it consumes.
 
 ### [D3](https://github.com/brunopostle/centres/issues/23) · Report error bars, and score as a median over benign transforms
 **Blocked by:** #21
