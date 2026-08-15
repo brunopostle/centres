@@ -2,6 +2,51 @@ import cv2
 import numpy as np
 from scipy.ndimage import gaussian_filter
 
+#: 3x3 structuring element; dilating by it gives the local maximum of a field.
+_RIDGE_KERNEL = np.ones((3, 3), np.uint8)
+
+
+#: Weight exponent for the spacing estimate. Medial-axis samples are weighted by
+#: d**-SPACING_WEIGHT so that one large empty area — whose medial axis is both
+#: long and deep — cannot outvote the many small regions that make up the
+#: artwork. See edge_spacing.
+SPACING_WEIGHT = 1.5
+
+#: The distance transform is capped at this many typical inter-edge spacings.
+CAP_SPACINGS = 8.0
+
+
+def edge_spacing(dist):
+    """Estimate the typical spacing between edges from their distance transform.
+
+    The local maxima of ``dist`` form the medial axis of the edge map, and the
+    value at each such point is the half-width of the region it sits in. The
+    estimate is the weighted geometric mean of those half-widths, doubled.
+
+    Weighting is what makes this a property of the artwork rather than of the
+    frame it is photographed in. Unweighted, a large blank area contributes a
+    medial axis that is both long (many samples) and deep (large values), so
+    adding a museum mount raises the estimate several-fold — on the Pazyryk
+    carpet, whose ground is already plain, by 5x. Weighting each sample by
+    ``d**-1.5`` counts regions rather than pixels, which brings that worst case
+    down to 21% and the rest of the corpus to within 10%.
+
+    Returns 0.0 when there is no usable medial axis: when every pixel is an edge,
+    and when none is — an image with no edges at all has no structure to measure
+    and distanceTransform fills it with FLT_MAX, which the diagonal bound rejects.
+    """
+    limit = float(np.hypot(*dist.shape))  # no distance within the frame exceeds it
+    ridge = dist[
+        (dist > 0)
+        & (dist <= limit)
+        & (dist >= cv2.dilate(dist, _RIDGE_KERNEL) - 1e-6)
+    ]
+    if ridge.size == 0:
+        return 0.0
+    weights = ridge**-SPACING_WEIGHT
+    half_width = np.exp((weights * np.log1p(ridge)).sum() / weights.sum()) - 1.0
+    return float(2.0 * half_width)
+
 
 #: Width of the illumination estimate, as a fraction of the short image side.
 #: Large enough to pass over the artwork's own motifs, small enough to follow a
@@ -92,17 +137,30 @@ def build_structural_field(image):
          roughly constant from image to image and the field is unchanged by
          any monotone change of overall contrast.
 
-    2. Distance cap — the distance transform is capped at min(h,w)/10 pixels.
-       This prevents large smooth background areas (museum mounts, white borders)
-       from accumulating arbitrarily high distance values that dominate the field
-       and draw centres to the image boundary rather than the carpet interior.
+    2. Distance cap — the distance transform is capped at CAP_SPACINGS times the
+       typical spacing between edges (see edge_spacing). Beyond that distance a
+       region carries no more structural information than one at exactly that
+       distance, so the values are flattened. This is what stops large smooth
+       background areas (museum mounts, white borders) from accumulating
+       arbitrarily high distance values that dominate the field and draw centres
+       to the image boundary rather than the carpet interior.
+
+       The cap was previously min(h,w)/10, a function of the image frame rather
+       than of the artwork. Because the field is normalised by its maximum, and
+       that maximum is the cap wherever the cap bites, a frame-derived cap
+       rescaled the whole field whenever the image was recropped: cropping 15%
+       off the Ardabil moved it from 154 detected centres to 242 and its
+       gradients score from 6.9 to 1.8. A cap in units of the artwork's own
+       edge spacing leaves the field on the retained region essentially
+       unchanged (see AUDIT.md and the A4 notes in PLAN.md).
     """
-    h, w = image.shape[:2]
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     edges = _detect_edges(gray)
     # distanceTransform expects 0 = obstacle; Canny gives 255 on edges
     dist = cv2.distanceTransform(255 - edges, cv2.DIST_L2, 5)
-    dist = np.minimum(dist, min(h, w) / 10.0)
+    spacing = edge_spacing(dist)
+    if spacing > 0:
+        dist = np.minimum(dist, CAP_SPACINGS * spacing)
     blur = gaussian_filter(gray.astype(float) / 255.0, sigma=3)
     field = dist + 0.1 * blur
     field = field / (field.max() + 1e-8)
