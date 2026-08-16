@@ -85,11 +85,17 @@ def load_and_rescale(path: str, max_size: int):
 
 
 def properties_json(n_centers, energy, raw_scores):
-    """Serialisable summary. Undefined properties emit JSON ``null``, not 0."""
+    """Serialisable summary. Undefined properties emit JSON ``null``, not 0.
+
+    ``energy`` is what ``analyze`` returns — the quantity ``evolve()``
+    minimises. What is *reported* is the degree of life, L = -E: zero for a
+    configuration with no structure, higher for more. See ``centres/energy.py``
+    and issue #28 for why the energy framing was the wrong one to report.
+    """
     norm = normalize_all(raw_scores)
     return {
         "centres": n_centers,
-        "structural_energy": round(energy, 4),
+        "degree_of_life": round(-energy, 4),
         "properties": {
             key: {
                 "score": None if norm[key] is None else round(norm[key], 2),
@@ -106,7 +112,7 @@ def _emit(args, n_centers, energy, raw_scores):
         print(json.dumps(properties_json(n_centers, energy, raw_scores), indent=2))
     else:
         print(f"Centers: {n_centers}")
-        print(f"Structural energy: {energy:.4f}")
+        print(f"Degree of life: {-energy:.4f}")
         print_properties(raw_scores)
 
 
@@ -142,7 +148,7 @@ def cmd_evolve(args):
             return
         mark = "+" if accepted else " "
         print(
-            f"\r  [{mark}] {t:4d}/{total}  T={T:.3f}  E={energy:+.2f}",
+            f"\r  [{mark}] {t:4d}/{total}  T={T:.3f}  L={-energy:+.4f}",
             end="",
             flush=True,
         )
@@ -180,7 +186,7 @@ def main():
     # --- analyse ---
     p_analyse = subparsers.add_parser(
         "analyse",
-        help="Detect centres and measure structural energy of an existing image.",
+        help="Detect centres and measure the degree of life of an existing image.",
     )
     p_analyse.add_argument("image", help="Path to input image")
     p_analyse.add_argument(

@@ -353,6 +353,20 @@ def test_json_emits_null_not_zero():
         assert reloaded["properties"][k] == {"score": None, "raw": None}
 
 
+def test_json_reports_degree_of_life_not_structural_energy():
+    """The reported quantity is L = -E (#28).
+
+    ``analyze`` still returns the energy, because that is what ``evolve()``
+    minimises, but nothing user-facing reports it: an energy whose minimum is
+    the absence of structure is the wrong quantity to put in front of a reader.
+    """
+    from centres.cli import properties_json
+
+    payload = properties_json(3, -0.3859, {k: None for k in KEYS})
+    assert payload["degree_of_life"] == 0.3859
+    assert "structural_energy" not in payload
+
+
 def test_json_still_emits_numbers_when_defined():
     from centres.cli import properties_json
 

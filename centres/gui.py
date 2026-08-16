@@ -245,7 +245,7 @@ class CentresMainWindow(QMainWindow):
         self._canvas.update_field(field, centers, G, self._image)
         self._update_table(raw)
         self._lbl_summary.setText(
-            f"<b>{len(centers)}</b> centres  |  energy <b>{energy:.4f}</b>"
+            f"<b>{len(centers)}</b> centres  |  degree of life <b>{-energy:.4f}</b>"
         )
         self._set_idle()
 

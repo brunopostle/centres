@@ -22,14 +22,20 @@ IMAGES = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))
 
 
 def score(img, max_size=1024):
-    """Run the full pipeline and return (n_centres, energy, raw, normalised)."""
+    """Run the full pipeline and return (n_centres, life, raw, normalised).
+
+    ``analyze`` returns the energy E, which is what ``evolve()`` minimises. The
+    reported quantity is the degree of life L = -E — zero for a configuration
+    with no structure, higher for more (#28) — so the sign is flipped here, once,
+    at the point where the harness reads it.
+    """
     h, w = img.shape[:2]
     s = min(max_size / max(h, w), 1.0)
     if s < 1.0:
         img = cv2.resize(img, (int(w * s), int(h * s)), interpolation=cv2.INTER_AREA)
     field, centers, G, energy = analyze(img)
     raw = compute_all(field, centers, G)
-    return len(centers), energy, raw, normalize_all(raw)
+    return len(centers), -energy, raw, normalize_all(raw)
 
 
 def _header(title):
@@ -67,10 +73,12 @@ def null_controls():
     _cols()
     out = {}
     for name, fn in stimuli.NULL_CONTROLS.items():
-        n, _, _, norm = score(fn())
-        out[name] = norm
+        n, life, _, norm = score(fn())
+        out[name] = (n, life, norm)
         _row(name, n, norm)
-    blank = out["flat_grey"]
+    print("\n  degree of life:  " + "  ".join(
+        f"{k} {v[1]:+.4f}" for k, v in out.items()))
+    blank = out["flat_grey"][2]
     perfect = [k for k in KEYS if blank[k] is not None and blank[k] >= 9.5]
     undefined = [k for k in KEYS if blank[k] is None]
     if perfect:
@@ -81,22 +89,40 @@ def null_controls():
     return out
 
 
-def corpus():
-    """Baseline scores for the reference images."""
+def corpus(controls=None):
+    """Baseline scores for the reference images.
+
+    The correlation between the reported score and the centre count is reported
+    over the corpus alone and over the corpus plus the synthetic controls. The
+    acceptance criterion on #14, restated on #28, is |r| < 0.5 over the second
+    of those: a score that tracks the centre count is a readout of the
+    detector's sensitivity, not a measure of the image, and the corpus on its
+    own spans too narrow a range of counts to show it.
+    """
     _header("Reference corpus")
     _cols()
     out = {}
     for f in sorted(os.listdir(IMAGES)):
         if not f.endswith((".jpg", ".png")):
             continue
-        n, e, _, norm = score(cv2.imread(os.path.join(IMAGES, f)))
-        out[f] = (n, e, norm)
+        n, life, _, norm = score(cv2.imread(os.path.join(IMAGES, f)))
+        out[f] = (n, life, norm)
         _row(f, n, norm)
+    print("\n  degree of life:  " + "  ".join(
+        f"{k.split('.')[0]} {v[1]:+.4f}" for k, v in out.items()))
     ns = [v[0] for v in out.values()]
-    es = [v[1] for v in out.values()]
+    ls = [v[1] for v in out.values()]
     if len(ns) > 2:
-        print(f"\n  Pearson r(structural energy, centre count) = "
-              f"{np.corrcoef(ns, es)[0, 1]:.4f}")
+        print(f"\n  Pearson r(degree of life, centre count), corpus       = "
+              f"{np.corrcoef(ns, ls)[0, 1]:+.4f}")
+    if controls:
+        # flat_grey detects nothing at all, so it carries no centre count to
+        # correlate against and is excluded rather than imputed as zero.
+        extra = [(v[0], v[1]) for v in controls.values() if v[0] > 0]
+        ns2 = ns + [x[0] for x in extra]
+        ls2 = ls + [x[1] for x in extra]
+        print(f"  Pearson r(degree of life, centre count), + controls   = "
+              f"{np.corrcoef(ns2, ls2)[0, 1]:+.4f}   (target |r| < 0.5)")
     return out
 
 
@@ -224,8 +250,8 @@ def main():
                         "to validate a change — see the notice printed at the end.")
     args = p.parse_args()
 
-    null_controls()
-    cs = corpus()
+    nulls = null_controls()
+    cs = corpus(nulls)
     generators()
     if not args.quick:
         imgs = [os.path.join(IMAGES, f) for f in sorted(os.listdir(IMAGES))

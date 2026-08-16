@@ -1,13 +1,62 @@
+"""Degree of life, and the energy the generative mode minimises.
+
+The reported quantity is the **degree of life** L — Alexander's own term — with
+the semantics the theory needs: **zero for nothing, higher for more**. `E = -L`
+is retained as the quantity `evolve()` minimises, because simulated annealing is
+written to descend.
+
+Why the sign was wrong before. Every term here began as a *penalty for
+deviation* evaluated only over the objects it applies to, and every one of them
+is 0 when its set is empty: no parent-child pairs, no parents, no graph edges,
+no overlapping pairs. So the global minimum of the old functional was the
+*absence of structure* — 36 centres at one scale, spaced far apart, scored
+E = +0.081 against +1.40 for random and +0.95..+1.74 for the six carpets. The
+energy analogy is only sound with a constraint: a catenary minimises energy
+*subject to fixed endpoints*, and without the constraint every such minimum is
+trivial. Nothing here constrained how much structure existed. Issue #28.
+
+The repair, per the repository owner on #28:
+
+1. the empty case must score exactly **zero**, so the optimiser has a neutral
+   baseline rather than an attractor;
+2. structure must be **rewarded**;
+3. the reward must **not** be a sum over centres — that would simply cram in as
+   many centres as the optimiser can fit, contradicting *the void*.
+
+Every descriptive term is therefore factored into **participation x quality**:
+
+    L_term = participation * quality
+
+*Participation* is the fraction of the centres that take part in that kind of
+structure — 0 when none do, 1 when all do. *Quality* maps the term's existing
+per-object mean deviation onto [0, 1], ideal = 1 and poor = 0. The three
+constraints then hold by construction:
+
+- **Empty is exactly zero**, because participation is zero — not because a sum
+  has no terms, but because nothing participates.
+- **Structure is rewarded**, because participation and quality are both
+  non-negative and only structure makes them positive.
+- **Cramming does not pay**, because participation is a fraction and quality is
+  a mean. Adding weak centres raises the denominator of both. Twenty
+  well-related centres beat a hundred badly-related ones, and a deliberately
+  empty region costs nothing at all — participation is measured over the centres
+  that exist, so *the void* survives.
+"""
+
 import numpy as np
 from collections import defaultdict
 
 
 def hierarchy_energy(centers):
-    """Penalise deviation from a scale ratio of ~3 between parent and child.
+    """Total deviation from a scale ratio of ~3 between parent and child.
 
     Natural hierarchies (Alexander's 'levels of scale') follow approximately
     constant ratios between successive scales. The target ratio of 3 is the
     midpoint of the empirically observed range of 2-4.
+
+    Summed over parent-child pairs. `total_energy` divides by the pair count and
+    turns the result into a quality; on its own this is a raw deviation, and
+    `properties.py` reads it as one.
     """
     E = 0
     for c in centers:
@@ -32,12 +81,15 @@ def reinforcement_energy(G):
     Dividing by the edge count makes this "the typical reinforcement across a
     connection", which is the quantity that is comparable between images.
 
-    Bounds. After propagate_strength every strength satisfies
-    s <= max(s0)/(1 - alpha), and edge weights lie in (0.1, 1], so
-    E_R in [-(max(s0)/(1-alpha))^2, 0). The lower bound is attained only by the
-    degenerate cluster in which all centres coincide at one scale (every pair an
-    edge, every weight 1, every strength maximally reinforced). That bound is
-    what fixes the weight on locality_energy in total_energy.
+    This is the one term that was already a reward rather than a deviation, and
+    it is the one that is turned into a quality by ``_quality_of_reward`` rather
+    than by ``_quality_of_deviation``. It is returned negative for backwards
+    compatibility with ``properties.py``, which reads it directly.
+
+    Note that it can no longer be made arbitrarily negative by collapsing every
+    centre onto one point: since the kernel in ``graph.build_graph`` peaks at
+    *adjacency* rather than at coincidence, coincident centres share no edge at
+    all. See that function for the measurement.
     """
     m = G.number_of_edges()
     if m == 0:
@@ -51,28 +103,54 @@ def reinforcement_energy(G):
 
 
 def locality_energy(centers):
-    """Penalise spatial overlap between centres.
+    """Mean pairwise Gaussian overlap exp(-d²/(r_i+r_j)²).
 
-    Computes mean pairwise Gaussian overlap exp(-d²/(r_i+r_j)²).
-    Value is 1.0 when all centres are coincident, ~0 when well-separated.
-    This prevents the degenerate minimum where all centres cluster at one point.
+    1.0 when all centres are coincident, ~0 when well-separated, ~1e-3 on real
+    images.
 
-    This is the one term of the six that is not intensive, and the mean is a
-    mean in name only: it divides by all N(N-1)/2 pairs while the pairs that
-    contribute anything number O(N), so for a fixed centre density the value
-    decays as 1/N. Its magnitude is roughly 7 * r_rms^2 / area, which is
-    N-independent when the frame is fixed and more centres are found in it —
-    the regime the corpus varies over — but not when the whole scene is scaled
-    up. On real images it sits near 1e-3 and contributes ~0.3% of the total, so
-    the residual is small in practice.
+    This is the one term that is subtracted from the degree of life rather than
+    added to it, and it remains a barrier rather than a descriptor. With the
+    reinforcement kernel now peaking at adjacency, coincident centres share no
+    edges and score 0 on every participation-weighted term — so a *plain*
+    collapse is no longer an attractor and needs no barrier. What still needs
+    one is the **concentric** collapse: centres stacked at a single point but at
+    scales in a 3:1 ladder do have parent-child pairs, and would otherwise
+    collect the full hierarchy and coverage reward for a configuration with no
+    spatial extent at all.
 
-    It is left as it is because the alternatives trade one defect for another.
-    Any normalisation that is genuinely intensive — total overlap per centre, or
-    each centre's largest overlap — is O(1) on real centre sets, whose measured
-    overlap load is 0.35 to 1.8 neighbours per centre, so it could not carry a
-    barrier-sized weight without dominating the descriptive terms. Making this
-    both a barrier and an intensive descriptor needs the two roles separated
-    into two terms, which is a larger change than issue #14.
+    It enters the degree of life **squared**, with weight
+    ``sum(PRIORITY) = 1``. Both follow from what a barrier is for.
+
+    The weight is what the new bound makes of it: the descriptive terms are each
+    a product of two numbers in [0, 1] weighted by priorities that sum to 1, so
+    they can contribute at most 1, and a unit weight at full coincidence is
+    exactly enough to cancel the best score any configuration could earn. The
+    old value of 5.54 — the reinforcement lower bound plus the worst ensemble
+    energy — belonged to the additive framing and no longer applies.
+
+    The square is what keeps the barrier *flat where the constraint is not
+    active*. This term is the one quantity here that is not intensive: it
+    divides by all N(N-1)/2 pairs while only O(N) of them overlap at all, so at
+    fixed spatial density it decays as 1/N. Entering linearly, it therefore
+    smuggles the centre-count dependence that #14 removed back into the total —
+    measured over random configurations at fixed density with N = 32..256, it
+    took r(L, N) from +0.11 to +0.55, and that rise was the barrier alone, not
+    the descriptive terms. Squaring concentrates the barrier where it belongs:
+    it still costs the full 1.0 at coincidence and 0.51 for a tight cluster
+    (E_L = 0.71), while costing 1e-6 on a real image where E_L is about 1e-3.
+    r(L, N) returns to +0.14.
+
+    Two genuinely intensive alternatives were measured and rejected. Mean
+    largest-overlap-per-centre is N-independent, but it reads 0.20-0.26 on the
+    six carpets and 0.56-0.62 on random configurations at fixed density, so at
+    barrier weight it would push every random configuration below the empty one
+    — it is a descriptor, not a barrier, and it belongs to step 3 of #28 as one.
+    Its square has the same character, more weakly.
+
+    Re-deriving E_L as a *descriptor* — Alexander's *deep interlock and
+    ambiguity* says centres should interpenetrate, so a term whose minimum is
+    maximal separation arguably has the theory backwards — is left to the third
+    step of #28, after this one.
     """
     n = len(centers)
     if n < 2:
@@ -90,10 +168,11 @@ def locality_energy(centers):
 
 
 def coverage_energy(centers):
-    """Penalise deviation from ideal child-area coverage of a parent (~0.65).
+    """Total deviation from ideal child-area coverage of a parent (~0.65).
 
     Coverage C_i = sum(r_child^2) / r_parent^2. Values near 0.65 indicate
-    children fill their parent region without overcrowding it.
+    children fill their parent region without overcrowding it. Summed over
+    parents.
     """
     children = defaultdict(list)
     for c in centers:
@@ -109,10 +188,11 @@ def coverage_energy(centers):
 
 
 def alignment_energy(centers):
-    """Penalise children whose radial distance from parent deviates from 0.5 * r_parent.
+    """Total deviation of child radial distance from 0.5 * r_parent.
 
     Alexander observed that child centres tend to lie at roughly 0.3-0.7 of the
-    parent radius from the parent centre. Target is the midpoint, 0.5.
+    parent radius from the parent centre. Target is the midpoint, 0.5. Summed
+    over parent-child pairs.
     """
     E = 0
     d_target = 0.5
@@ -133,87 +213,62 @@ def field_energy(field):
     return np.mean(gx**2 + gy**2)
 
 
-#: Relative priority of each descriptive term in the total, summing to 1. These
-#: are the only free numbers in total_energy. They are the emphasis the original
+#: Relative priority of each descriptive term, summing to 1. These are the only
+#: free numbers in the degree of life. They are the emphasis the original
 #: weights were trying to express — hierarchy and reinforcement first, coverage
-#: second, alignment and field smoothness third — carried over unchanged. What
-#: has changed is that they are now *only* priorities: the conversion into
-#: commensurable units is done separately, by SCALE below.
+#: second, alignment and field smoothness third — carried over unchanged.
+#:
+#: Because every term is now a product of a participation in [0, 1] and a
+#: quality in [0, 1], and these sum to 1, the descriptive part of the degree of
+#: life is bounded in [0, 1]: 0 is "no structure of any kind", 1 is "every
+#: centre participates in every kind of structure, perfectly". Neither end is
+#: reachable by a real image, and the six carpets sit at 0.32 to 0.41.
 PRIORITY = {"H": 0.3, "R": 0.3, "C": 0.2, "A": 0.1, "F": 0.1}
 
-#: Unit of each term: its standard deviation over a fixed reference ensemble.
+#: Deviation scale of each term: the value at which its quality has fallen to
+#: 1/e (or, for the reinforcement reward, risen to 1 - 1/e).
 #:
-#: The five descriptive terms are measured in unrelated units — squared log
-#: ratios, weight-times-strength products, squared area fractions, squared
-#: radius fractions, squared field gradients — and their empirical spreads span
-#: two orders of magnitude (0.0097 to 1.18). Adding them directly means the
-#: weights are doing two incompatible jobs at once: unit conversion and
-#: prioritisation. Dividing each term by its own spread does the unit conversion
-#: on its own, after which PRIORITY does nothing but prioritise, and each term
-#: contributes exactly its priority share of the variation of the total.
+#: Purpose. Under the old additive total these constants were unit conversions —
+#: the five terms are measured in unrelated units (squared log ratios,
+#: weight-times-strength products, squared area fractions, squared radius
+#: fractions, squared field gradients) whose spreads span two orders of
+#: magnitude, so each was divided by its own standard deviation before being
+#: added. Nothing is added across units any more: each term is mapped through
+#: exp(-D/S) into a dimensionless quality first. The constant's job is therefore
+#: no longer "one unit of this term" but "the deviation at which this term stops
+#: counting as good", and the statistic that fixes it changes accordingly, from
+#: the ensemble standard deviation to the **ensemble median**. Anchoring on the
+#: median puts the typical measured artwork at a quality of 1/e = 0.37, which is
+#: where the map has its steepest response and so discriminates best between
+#: real images. Anchoring on the standard deviation instead would have put the
+#: corpus at a quality of 0.003 to 0.05 for three of the five terms — every real
+#: image indistinguishably bad.
 #:
-#: The reference ensemble is the 33 non-degenerate cases of the audit corpus:
-#: the six carpets in images/, the four null controls in audit/stimuli.py that
-#: yield centres, and every frame of the five parametric sweeps, each at
-#: --max-size 1024. "Non-degenerate" excludes the four cases that produce no
-#: parent-child pair at all, for which H, C and A are not defined. Measured
-#: 2026-08-16; re-measure with the same ensemble if the front end changes.
+#: The reference ensemble is unchanged: the 33 non-degenerate cases of the audit
+#: corpus — the six carpets in images/, the null controls in audit/stimuli.py
+#: that yield centres, and every frame of the five parametric sweeps, each at
+#: --max-size 1024. "Non-degenerate" excludes the cases that produce no
+#: parent-child pair at all, for which H, C and A are not defined. Re-measured
+#: 2026-08-16 against the adjacency-peaked reinforcement kernel, which
+#: invalidated the previous values; re-measure with the same ensemble if the
+#: front end changes.
 SCALE = {
-    "H": 0.139057,  # (log(r_parent/r_child) - log 3)^2, per parent-child pair
-    "R": 0.125571,  # -W_ij s_i s_j, per graph edge
-    "C": 0.133911,  # (coverage - 0.65)^2, per parent
-    "A": 1.178729,  # (d/r_parent - 0.5)^2, per parent-child pair
-    "F": 0.009658,  # r_rms^2 * mean|grad phi|^2, dimensionless
+    "H": 0.316774,  # (log(r_parent/r_child) - log 3)^2, per parent-child pair
+    "R": 0.086566,  # W_ij s_i s_j, per graph edge
+    "C": 0.140928,  # (coverage - 0.65)^2, per parent
+    "A": 3.447728,  # (d/r_parent - 0.5)^2, per parent-child pair
+    "F": 0.025169,  # r_rms^2 * mean|grad phi|^2, dimensionless
 }
 
-#: Contraction factor of propagate_strength: strengths are bounded above by
-#: max(s0)/(1 - PROPAGATION_ALPHA). Mirrors `alpha` in graph.propagate_strength.
-PROPAGATION_ALPHA = 0.2
+#: Weight on the locality barrier. The descriptive terms sum to at most
+#: sum(PRIORITY) = 1, so a unit weight is exactly enough for full coincidence to
+#: cancel the best score any configuration could otherwise earn. See
+#: locality_energy for why a barrier is still wanted at all.
+WEIGHT_LOCALITY = float(sum(PRIORITY.values()))
 
-#: Upper bound on an intrinsic centre strength. build_structural_field
-#: normalises the field to a maximum of 1 and detect_centers samples strengths
-#: from it, so no centre enters the pipeline with s0 > 1.
-MAX_INTRINSIC_STRENGTH = 1.0
-
-#: Largest value the five descriptive terms sum to over the reference ensemble
-#: (attained by contrast_field(1.0)). Their minimum there is -0.21 and their
-#: mean 1.19.
-REFERENCE_ENERGY_MAX = 1.8089
-
-#: Weight on the locality barrier.
-#:
-#: locality_energy is not a descriptor of an image — on real inputs it is three
-#: orders of magnitude below the descriptive terms and carries no information
-#: about them. It is a barrier, and its weight follows from the one thing it has
-#: to do: make the collapsed configuration, in which every centre sits at the
-#: same point and the same scale, cost more than any real configuration.
-#:
-#: At full collapse locality_energy is exactly 1, and two things happen that
-#: lower the rest of the total:
-#:
-#: 1. Reinforcement reaches its minimum — every pair is an edge, every weight is
-#:    1, every strength is maximally reinforced. It is bounded below by
-#:    -(max(s0)/(1 - alpha))^2 (see reinforcement_energy), so this is worth at
-#:    most w_R * (max(s0)/(1 - alpha))^2 = 3.73.
-#: 2. Hierarchy, coverage and alignment all go to *zero*, because
-#:    assign_hierarchy needs a strictly larger centre to make a parent and there
-#:    is none. Collapse does not merely score well on those three terms, it
-#:    exempts itself from them.
-#:
-#: Point 2 is why a barrier sized only against reinforcement is not enough: at
-#: w_L = 3.73 the collapsed configuration comes out 0.03 *below* a random one.
-#: Requiring instead that collapse cost more than the worst configuration in the
-#: reference ensemble gives
-#:
-#:     w_L = w_R * (max(s0)/(1 - alpha))^2 + max_ensemble(E_descriptive)
-#:
-#: which is the smallest weight for which collapse is uphill of every image
-#: measured. The old value of 50.0 was nine times this.
-WEIGHT_LOCALITY = (
-    PRIORITY["R"] / SCALE["R"]
-    * (MAX_INTRINSIC_STRENGTH / (1.0 - PROPAGATION_ALPHA)) ** 2
-    + REFERENCE_ENERGY_MAX
-)
+#: Exponent on the locality barrier. 2 rather than 1, so the barrier is flat
+#: where the constraint is not active; see locality_energy for the measurement.
+LOCALITY_EXPONENT = 2.0
 
 
 def _rms_scale(centers):
@@ -223,47 +278,134 @@ def _rms_scale(centers):
     return float(np.sqrt(np.mean([c.scale**2 for c in centers])))
 
 
-def total_energy(field, centers, G):
-    """Structural energy: a weighted sum of six dimensionless terms.
+def _quality_of_deviation(deviation, scale):
+    """Map a mean deviation onto a quality in (0, 1]: ideal = 1, poor -> 0.
 
-    Every term is a mean over the objects it is defined on — parent-child pairs
-    for hierarchy and alignment, parents for coverage, graph edges for
-    reinforcement, centre pairs for locality, pixels for the field term — so the
-    total does not grow with the number of detected centres and energies are
-    comparable between images. The five descriptive terms are intensive;
-    locality is a barrier whose contribution on real inputs is about 0.3% of the
-    total, and the one respect in which it is not intensive is set out in its
-    own docstring.
-
-    Previously hierarchy, coverage and alignment entered as *sums* over centres
-    while reinforcement and locality entered as means. The total therefore
-    tracked the centre count almost exactly (r = 0.99 across the audit corpus,
-    E/n ~ 0.27), which made it a readout of the detector's sensitivity rather
-    than a measure of the image. properties.py had already divided three of
-    these by their pair counts; this is the same fix applied to the energy.
-
-    The field term is additionally multiplied by the squared rms centre radius.
-    Every other term is dimensionless, but mean|grad phi|^2 has units of
-    1/pixel^2, so without this the total changes under a pure resize of the
-    image — halving the resolution quadruples it. Scaling by the square of a
-    length taken from the centre set itself removes the dependence on pixel
-    size, leaving the shape of the reconstructed field. field_energy itself is
-    left in raw units because properties.gradients reports it directly and has
-    its own normaliser.
-
-    The result is measured in units of the reference-ensemble standard
-    deviation of a single term (see SCALE), so a change of 1 in the total is a
-    change of about one ensemble standard deviation of the whole index. Over the
-    six-carpet corpus it spans roughly 0.95 to 1.75.
+    exp(-D/S) rather than max(0, 1 - D/S): a clamped map is flat above S, and a
+    flat region of the objective is a region the annealer cannot descend. The
+    exponential is strictly monotone everywhere, so every configuration has a
+    direction of improvement.
     """
-    npairs = sum(1 for c in centers if c.parent is not None)
+    return float(np.exp(-deviation / scale))
+
+
+def _quality_of_reward(reward, scale):
+    """Map a non-negative reward onto a quality in [0, 1): none = 0, large -> 1.
+
+    The mirror image of _quality_of_deviation, for reinforcement, which is the
+    one term that was already a reward rather than a deviation.
+    """
+    return float(-np.expm1(-reward / scale)) + 0.0  # + 0.0 normalises -0.0
+
+
+def life_terms(field, centers, G):
+    """Per-term (participation, quality) of the degree of life.
+
+    Returned as a dict of term key -> (participation, quality, contribution),
+    where contribution is PRIORITY * participation * quality. Exposed so the
+    audit and the tests can see which half of a term moved.
+
+    Participation is, for every term, "the fraction of the centres that this
+    term's per-object mean was actually taken over":
+
+    ============ ================================================ ============
+    term         mean is over                                     participants
+    ============ ================================================ ============
+    H hierarchy  parent-child pairs, one per child                children
+    A alignment  parent-child pairs, one per child                children
+    C coverage   parents                                          parents
+    R reinforce. graph edges                                      non-isolated
+    F field      pixels of the reconstructed field                non-isolated
+    ============ ================================================ ============
+
+    The field term is the awkward one: it is a property of the reconstructed
+    field rather than of any set of centres, so there is no set to take a
+    fraction of. It is given the reinforcement participation because that is the
+    honest reading of what it measures — the smoothness of the field *between*
+    centres. A lone centre's Gaussian bump has a gradient, but that gradient is
+    an artefact of the reconstruction and not evidence of structure, and an
+    isolated centre is exactly a centre with no neighbour whose field meets its
+    own. Without this the field term alone would keep a spread-out,
+    unconnected, equal-scale configuration off zero, which is the defect #28
+    reports.
+    """
+    n = len(centers)
+    if n == 0:
+        return {k: (0.0, 0.0, 0.0) for k in PRIORITY}
+
+    nchildren = sum(1 for c in centers if c.parent is not None)
     nparents = len({c.parent for c in centers if c.parent is not None})
-    w = {k: PRIORITY[k] / SCALE[k] for k in PRIORITY}
-    return (
-        w["H"] * (hierarchy_energy(centers) / npairs if npairs else 0.0)
-        + w["R"] * reinforcement_energy(G)
-        + w["C"] * (coverage_energy(centers) / nparents if nparents else 0.0)
-        + w["A"] * (alignment_energy(centers) / npairs if npairs else 0.0)
-        + w["F"] * field_energy(field) * _rms_scale(centers) ** 2
-        + WEIGHT_LOCALITY * locality_energy(centers)
-    )
+    nconnected = sum(1 for i in G.nodes if G.degree(i) > 0)
+
+    p = {
+        "H": nchildren / n,
+        "A": nchildren / n,
+        "C": nparents / n,
+        "R": nconnected / n,
+        "F": nconnected / n,
+    }
+    q = {
+        "H": _quality_of_deviation(hierarchy_energy(centers) / nchildren, SCALE["H"])
+        if nchildren else 0.0,
+        "A": _quality_of_deviation(alignment_energy(centers) / nchildren, SCALE["A"])
+        if nchildren else 0.0,
+        "C": _quality_of_deviation(coverage_energy(centers) / nparents, SCALE["C"])
+        if nparents else 0.0,
+        "R": _quality_of_reward(-reinforcement_energy(G), SCALE["R"]),
+        "F": _quality_of_deviation(
+            field_energy(field) * _rms_scale(centers) ** 2, SCALE["F"]
+        ),
+    }
+    return {k: (p[k], q[k], PRIORITY[k] * p[k] * q[k]) for k in PRIORITY}
+
+
+def degree_of_life(field, centers, G):
+    """Degree of life L: zero for nothing, higher for more.
+
+    L = sum_k PRIORITY_k * participation_k * quality_k  -  WEIGHT_LOCALITY * E_L^2
+
+    The five descriptive terms are each a fraction times a mean, so the sum lies
+    in [0, 1] and is intensive: it does not grow with the number of detected
+    centres, and neither the empty configuration nor a crammed one can win.
+    Locality is subtracted as a barrier against the concentric collapse; on real
+    images it costs about 1e-6 of a score around 0.35.
+
+    Measured (2026-08-16, --max-size 1024):
+
+    ==========================  ========
+    empty canvas, 0 centres      +0.0000
+    36 equal scales, far apart   -0.0000
+    40 centres collapsed         -1.0000
+    concentric 3:1 ladder        -0.8041
+    lattice of 36                +0.2994
+    six carpets                  +0.3237 .. +0.4047
+    white noise / random blobs   +0.4957 / +0.4833
+    ==========================  ========
+
+    The first four lines are the point of the change: emptiness and collapse are
+    no longer the optimum, they are the floor. **The last line is a failure, and
+    it is not one this change caused** — it is the underlying measures, and it
+    is equally present in the functional this replaces. See THEORY.md section 8
+    and issue #28.
+
+    The field term is multiplied by the squared rms centre radius before its
+    quality is taken. Every other deviation is dimensionless, but
+    mean|grad phi|^2 has units of 1/pixel^2, so without this the result would
+    change under a pure resize of the image. Scaling by the square of a length
+    taken from the centre set itself removes the dependence on pixel size,
+    leaving the shape of the reconstructed field. field_energy itself is left in
+    raw units because properties.gradients reports it directly and has its own
+    normaliser.
+    """
+    terms = life_terms(field, centers, G)
+    barrier = WEIGHT_LOCALITY * locality_energy(centers) ** LOCALITY_EXPONENT
+    return sum(t[2] for t in terms.values()) - barrier
+
+
+def total_energy(field, centers, G):
+    """Structural energy, E = -L: what ``evolve()`` minimises.
+
+    Kept as an energy only because simulated annealing descends. Everything the
+    tool *reports* is the degree of life; see ``degree_of_life``.
+    """
+    return -degree_of_life(field, centers, G)

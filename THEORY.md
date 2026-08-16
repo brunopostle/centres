@@ -19,10 +19,11 @@ This document sets out the mathematical theory implemented in this codebase. The
 >
 > | § | Claim | Status |
 > |---|---|---|
-> | 8 | "Lower energy = greater wholeness" | **False.** The functional's minimum is the *absence* of structure ([#28](https://github.com/brunopostle/centres/issues/28)) |
-> | 8 | The stated weights, incl. `50·E_L` | **Superseded.** Terms were not intensive; the total was centre count × 0.27 ([#14](https://github.com/brunopostle/centres/issues/14)) |
-> | 8.4 | Child coverage of 0.65 | **Unsourced.** Attributed to Alexander with no citation ([#24](https://github.com/brunopostle/centres/issues/24)) |
-> | 8.5 | Radial band of 0.3–0.7 | **Unsourced.** Attributed to Alexander with no citation ([#24](https://github.com/brunopostle/centres/issues/24)) |
+> | 8 | "Lower energy = greater wholeness" | **Was false, now corrected.** The functional's minimum was the *absence* of structure. Replaced by the degree of life L = −E, participation × quality, zero for nothing ([#28](https://github.com/brunopostle/centres/issues/28)) |
+> | 8 | The reported score orders artwork above noise | **False.** White noise (+0.50) and random blobs (+0.48) outscore all six carpets (+0.32…+0.40). Equally true of the functional this replaced. Not fixable by re-weighting these five terms ([#21](https://github.com/brunopostle/centres/issues/21)) |
+> | 8 | The stated weights, incl. `50·E_L` | **Superseded twice.** Terms were not intensive; the total was centre count × 0.27 ([#14](https://github.com/brunopostle/centres/issues/14)). The weights they became belonged to the additive framing and are gone with it ([#28](https://github.com/brunopostle/centres/issues/28)) |
+> | 8.5 | Child coverage of 0.65 | **Unsourced.** Attributed to Alexander with no citation ([#24](https://github.com/brunopostle/centres/issues/24)) |
+> | 8.6 | Radial band of 0.3–0.7 | **Unsourced.** Attributed to Alexander with no citation ([#24](https://github.com/brunopostle/centres/issues/24)) |
 > | 9 | "All 15 properties arise as stable patterns when E is minimised" | **Unsupported.** Never demonstrated; four of five measures tested fail to track their own ground truth |
 > | 11 | 15 levels of scale "follows mathematically" | **Circular.** Assumes 3¹⁴ in order to conclude 14 |
 > | 11 | Wholeness as a renormalisation fixed point | **Unsupported.** Nothing in the implementation bears on it |
@@ -98,14 +99,14 @@ The result is a forest T = (C, P) where roots are the largest centres with no co
 Edge weight between centres i and j:
 
 ```
-W_ij = exp( -dist(i,j)² / (2 · (3 · r̄_ij)²) ) · exp( -(log r_i - log r_j)² )
+W_ij = exp( -log(d_ij / (r_i + r_j))² / (2 · 0.5²) ) · exp( -(log r_i - log r_j)² )
 ```
 
-where r̄_ij = (r_i + r_j)/2 is the mean scale of the pair.
-
-The first factor is spatial proximity with a radius that scales with centre size (σ_spatial = 3 · r̄). This is critical: using a fixed pixel threshold (as in an earlier version with σ=50px) makes the graph too sparse for large images and too dense for small ones. Scale-relative interaction is consistent with the theory's multi-scale character.
+The first factor is a Gaussian in *log* separation, measured in units of the pair's own combined radius, so it **peaks where the two centres touch** and falls to zero both as they coincide and as they separate. Working in log separation rather than in pixels does two things: it sends the weight to zero as d → 0, and it makes the kernel depend only on separation relative to the pair's own size, per the scale invariant of §2.
 
 The second factor rewards scale similarity: centres of similar size reinforce each other more strongly than centres of very different sizes.
+
+*Note on the previous formulation, and why it mattered.* The weight was `exp(-d² / (2·(3·r̄)²))`, a Gaussian in raw distance, which is **maximal at d = 0**. It rewarded two centres for being the same centre, and made the collapsed configuration — every centre at one point, at one scale — the global optimum of the energy: measured on 40 centres in 300×300, collapse had the most negative reinforcement of any configuration tested (−0.391 against −0.154 for a lattice), and only a large locality penalty held it up. Alexander's centres reinforce one another by adjacency, nesting and interlock; two superimposed centres are one centre, and there is nothing there to reinforce. With the peak at contact, a lattice earns more reinforcement than a collapse (−0.216 against −0.161), which is what the term was always meant to express.
 
 Edges with W_ij < 0.1 are dropped.
 
@@ -149,17 +150,21 @@ This is a superposition of Gaussian kernels, one per centre, weighted by strengt
 
 ---
 
-## 8. The Energy Functional
+## 8. The Degree of Life, and the Energy It Negates
 
-Structural energy E is a scalar measuring how far a configuration departs from Alexander's ideal.
+The reported quantity is the **degree of life** L — Alexander's own term — and it has
+the semantics the theory needs: **zero for a configuration with no structure, higher
+for more**. `E = −L` is retained as the quantity `evolve()` minimises, because
+simulated annealing descends. Nothing else in the tool reports E.
 
-> **⚠ FALSIFIED — "Lower energy = greater wholeness" is the wrong framing.**
+> **Corrected — "lower energy = greater wholeness" was false, and is no longer the
+> framing.** [#28](https://github.com/brunopostle/centres/issues/28)
 >
-> The functional's global minimum is the *absence* of structure. 36 centres at
+> The old functional's global minimum was the *absence* of structure. 36 centres at
 > identical scale, spaced far apart, have no parent-child pairs (identical scales
 > admit no parent), no graph edges (spacing beyond the weight threshold) and no
-> overlap. Every term is a deviation penalty evaluated only over the objects it
-> applies to, so all of them are zero:
+> overlap. Every term was a deviation penalty evaluated only over the objects it
+> applies to, so all of them were zero:
 >
 > ```
 > equal scales, far apart:  E = +0.081   edges = 0   pairs = 0   overlap = 0
@@ -167,82 +172,158 @@ Structural energy E is a scalar measuring how far a configuration departs from A
 > real carpets:             E = +0.95 .. +1.74
 > ```
 >
-> **Nothing in the functional rewards structure existing**, so emptiness scores
-> better than any artwork. `evolve()` does not collapse to this only because its
-> move set is too weak to reach it — the generative mode works by failing to
-> optimise its own objective.
+> **Nothing in the functional rewarded structure existing**, so emptiness scored
+> better than any artwork. `evolve()` did not collapse to it only because its move
+> set — ±2 px, ×exp(N(0, 0.02)) — is too weak to reach it: the generative mode
+> worked by failing to optimise its own objective.
 >
-> The intended framing, per the repository owner on
-> [#28](https://github.com/brunopostle/centres/issues/28): the empty case should
-> score **zero**, structure should be **rewarded** (negative), and the reward must
-> not be a sum over centres — that would simply cram in as many centres as possible,
-> which contradicts *the void*.
+> The energy analogy is sound only *with a constraint*. A catenary minimises energy
+> subject to fixed endpoints; a soap film minimises area subject to a fixed boundary.
+> Without the constraint every such minimum is trivial, and nothing here constrained
+> how much structure existed. That is why the sign, not merely the offset, was wrong.
+
+### 8.1 Participation × quality
+
+Three constraints, set by the repository owner on #28: the empty case must score
+**zero**, for the optimiser's sake; structure must be **rewarded**; and the reward
+must **not** be a sum over centres, since that would cram in as many centres as the
+optimiser can fit, contradicting *the void*.
+
+Constraints 2 and 3 together rule out the obvious moves. A sum over centres violates
+3. A plain mean over centres satisfies 3 but violates 2, because a mean over an empty
+set is undefined rather than zero — and one perfect pair would then score as well as
+two hundred.
+
+Each descriptive term is therefore factored into two halves:
+
+```
+L_term = participation × quality
+L      = Σ_k w_k · p_k · q_k  −  w_L · E_L²
+```
+
+**Participation** `p_k ∈ [0, 1]` is the fraction of the centres taking part in that
+kind of structure — the fraction whose per-object mean the term is actually taken
+over.
+
+| term | the mean is over | participants |
+|---|---|---|
+| E_H hierarchy | parent-child pairs, one per child | centres with a parent |
+| E_A alignment | parent-child pairs, one per child | centres with a parent |
+| E_C coverage | parents | centres that are a parent |
+| E_R reinforcement | graph edges | centres with at least one edge |
+| E_φ field | pixels of the reconstructed field | centres with at least one edge |
+
+**Quality** `q_k ∈ [0, 1]` maps the term's per-object mean deviation D so that ideal
+is 1 and poor is 0, as `q = exp(−D / S_k)`; reinforcement, the one term that was
+already a reward rather than a deviation, uses the mirror image `q = 1 − exp(−m/S_R)`.
+The exponential rather than a clamped `max(0, 1 − D/S)` because a clamp is flat above
+S, and a flat region of the objective is one the annealer cannot descend.
+
+The three constraints then hold by construction:
+
+- **Empty scores exactly zero** — participation is zero, so the product is zero. Not
+  because a sum has no terms, but because nothing participates.
+- **Structure is rewarded** — only structure makes p and q positive.
+- **Cramming does not pay** — p is a fraction and q is a mean, so adding weak centres
+  raises the denominator of both. Measured over random configurations at *fixed
+  spatial density* with N = 32…256, r(L, N) = **+0.14**.
+- ***The void* survives** — participation is measured over the centres that exist, so
+  a deliberately empty region costs nothing. Only failing to relate the centres you
+  *do* have costs.
+
+Because every term is a product of two numbers in [0, 1] and the priorities sum to 1,
+**L is bounded in [0, 1]** before the barrier: 0 is "no structure of any kind", 1 is
+"every centre participates in every kind of structure, perfectly". Neither end is
+reachable by a real image; the six carpets sit at 0.32–0.41.
+
+The priorities `w = {H: 0.3, R: 0.3, C: 0.2, A: 0.1, φ: 0.1}` are the emphasis the
+original weights were trying to express and are carried over unchanged. The scale
+constants `S_k` are measured, not chosen: each is the **median** of that term over a
+fixed 33-case reference ensemble — the six carpets, the null controls that yield
+centres, and every frame of the five parametric sweeps, at `--max-size 1024`. Under
+the old additive total these constants were the ensemble *standard deviation*, because
+their job was unit conversion before addition. Nothing is added across units any more,
+so their job is now "the deviation at which this term stops counting as good", and the
+median is what fixes that: it puts the typical measured artwork at q = 1/e, where the
+map is steepest and discriminates best. The standard deviation would have put the
+corpus at q = 0.003–0.05 on three of the five terms — every real image
+indistinguishably bad.
+
+> **Measured ordering, and one part of it fails.**
 >
-> **The reported quantity becomes the *degree of life*, L = −E** — Alexander's own
-> term, and the semantics required: zero for nothing, higher for more. `E` is kept
-> as the quantity `evolve()` minimises, where the energy analogy is sound: a
-> catenary or a minimal surface minimises an energy *subject to a constraint*, and
-> without the constraint every such minimum is trivial. That is precisely the bug
-> — nothing here constrains how much structure exists.
+> ```
+> empty canvas, 0 centres      L = +0.0000
+> 36 equal scales, far apart   L = −0.0000
+> 40 centres collapsed         L = −1.0000
+> concentric 3:1 ladder        L = −0.8041
+> lattice of 36                L = +0.2994
+> six carpets                  L = +0.3237 .. +0.4047
+> white noise                  L = +0.4957
+> random blobs                 L = +0.4833
+> ```
 >
-> The rename lands with the participation change, not before. Flipping the sign
-> today would report the Ardabil at −1.4 life and a blank canvas at 0: the
-> *ordering* is wrong, not merely the offset. Open.
+> The first four lines are what #28 asked for: emptiness and collapse are the floor,
+> not the optimum, and collapse now loses to a lattice by 1.30 rather than by 0.004.
+>
+> **The last two are a failure. Noise outscores every carpet.** It is not a failure
+> this change introduced: read the functional it replaces as −E, and white noise
+> (−0.79) and random blobs (−0.83) also beat all six carpets (−1.71…−0.92). The cause
+> is in the measures, not in the framing. Term by term, the carpets beat white noise
+> on exactly one of the five — field smoothness — and lose on the other four, chiefly
+> because `assign_hierarchy` gives 91% of white-noise centres a parent against 67–83%
+> for a carpet, and because dense noise earns more reinforcement per edge. No
+> re-weighting of these five terms can order art above noise. That is
+> [#21](https://github.com/brunopostle/centres/issues/21)'s territory, not #28's, and
+> it is recorded here so the claim is not left standing.
 
-The total is a weighted sum of six terms. The weights are derived, not chosen: each
-is `PRIORITY / SCALE`, where `SCALE` is that term's standard deviation over a fixed
-33-case reference ensemble, so each term contributes its intended share of the
-total's variation. Locality is sized separately, as a barrier rather than a
-descriptor.
+### 8.2 Hierarchy Energy E_H
 
-> **⚠ SUPERSEDED — the previously stated weights.** This document gave
-> `E = 0.3·E_H + 0.3·E_R + 0.2·E_C + 0.1·E_A + 0.1·E_φ + 50·E_L`. Three of those
-> terms were sums over centres and two were means, so the total scaled with N and
-> correlated with centre count at **r = 0.993** — the reported energy was the centre
-> count times 0.27. The `50` on E_L had no traceable derivation; the claim that it
-> existed to dominate an O(N²) reinforcement term was wrong, since E_R has been
-> normalised since the initial commit. See
-> [#14](https://github.com/brunopostle/centres/issues/14).
-
-### 8.1 Hierarchy Energy E_H
-
-Penalises deviation from a constant scale ratio between parent and child:
+The deviation from a constant scale ratio between parent and child:
 
 ```
 E_H = Σ_i (log(r_p(i) / r_i) - log 3)²
+D_H = E_H / (number of parent-child pairs)     q_H = exp(-D_H / 0.317)
 ```
 
 Natural hierarchies (trees, cities, traditional architecture) exhibit approximately constant scale ratios of 2–4 between successive levels. The target ratio of 3 is the midpoint of this range. Minimising E_H produces the power-law distribution of centre sizes P(r) ∝ r^{-γ} that Alexander repeatedly observed. This term encodes his property *levels of scale*.
 
-### 8.2 Reinforcement Energy E_R
+### 8.3 Reinforcement Energy E_R
 
-Rewards mutual strength between connected centres, normalised by the total number of possible pairs:
+Rewards mutual strength between connected centres, normalised by the number of edges:
 
 ```
-E_R = -(1 / (N(N-1)/2)) · Σ_{ij} W_ij · s_i · s_j
+E_R = -(1 / |edges|) · Σ_{ij ∈ edges} W_ij · s_i · s_j
+q_R = 1 - exp(-|E_R| / 0.0866)
 ```
 
-Lower (more negative) E_R means pairs of strongly connected centres both have high strength. This is the correct measure of *strong centres*: the energy is minimised by configurations where spatially clustered, scale-similar centres are all strong together.
+This is the one term that was already a reward rather than a deviation, so its quality map is the mirror image of the others: no reinforcement gives 0, strong reinforcement approaches 1. Higher q_R means pairs of connected centres are both strong. This is the intended measure of *strong centres*: configurations where spatially adjacent, scale-similar centres are all strong together.
 
-Normalisation is essential: without it E_R scales as O(N²) and the global minimum is a degenerate cluster where all centres coincide. It is now divided by the **edge count** rather than by N(N-1)/2 — both kill the O(N²) sum, but a spatially local graph has O(N) edges, so the old denominator left the term decaying as O(1/N).
+Normalisation is essential: without it E_R scales as O(N²). It is divided by the **edge count** rather than by N(N-1)/2 — both kill the O(N²) sum, but a spatially local graph has O(N) edges, so the old denominator left the term decaying as O(1/N).
+
+E_R can no longer be made arbitrarily large by collapsing every centre onto one point, because the kernel of §5 peaks at adjacency rather than at coincidence and coincident centres share no edge at all.
 
 *Note on an earlier formulation.* A previous version used E_R = Σ W_ij (s_i - s_j)², which is minimised by equal but arbitrarily weak strengths — rewarding uniformity and blandness rather than coherent strength. The product formulation corrects this.
 
-### 8.3 Locality Energy E_L
+### 8.4 Locality Energy E_L — the one barrier
 
-Penalises spatial overlap between centres, preventing the degenerate cluster minimum:
+Mean pairwise Gaussian overlap:
 
 ```
 E_L = (1 / (N(N-1)/2)) · Σ_{i<j} exp( -d_ij² / (r_i + r_j)² )
 ```
 
-E_L = 1 when all centres are coincident; E_L ≈ 0 when centres are well-separated relative to their scales.
+E_L = 1 when all centres are coincident, ≈ 0 when centres are well-separated relative to their scales, and about 1e-3 on a real image. It is the one term subtracted from the degree of life rather than added to it, and the one term that is not a participation × quality descriptor.
 
-Its weight is **5.54**, not the 50 previously stated, and is derived from what the barrier has to do rather than chosen. The sizing turns on a point that is easy to miss: at full collapse E_H, E_C and E_A all go to *zero*, because assigning a parent requires a strictly larger centre. A barrier sized only against the reinforcement gain leaves the collapsed configuration marginally *below* a random one. Requiring collapse to cost more than the worst configuration in the reference ensemble gives 5.54.
+It enters **squared, with weight 1**:
 
-E_L is also the one term that is not intensive: it divides by all N(N-1)/2 pairs while only O(N) contribute, so it decays as 1/N when a whole scene is scaled up. Every intensive overlap measure tried was O(1) on real centre sets and so could not carry a barrier-sized weight without swamping the descriptive terms. Splitting the barrier from the descriptor is open, and entangled with [#28](https://github.com/brunopostle/centres/issues/28).
+- The weight is what the new bound makes of it. The descriptive terms are products of two numbers in [0, 1] weighted by priorities summing to 1, so they contribute at most 1; a unit weight at full coincidence is exactly enough to cancel the best score any configuration could earn. The 5.54 that preceded it — the reinforcement lower bound plus the worst ensemble energy — belonged to the additive framing and went with it, as the 50 before that went with the framing before.
+- The square is what keeps the barrier flat where the constraint is not active. E_L divides by all N(N−1)/2 pairs while only O(N) of them overlap, so at fixed spatial density it decays as 1/N. Entering linearly it therefore smuggles the centre-count dependence that #14 removed back into the total: measured over random configurations at fixed density with N = 32…256 it took r(L, N) from +0.11 to **+0.55**, and that was the barrier alone. Squared, it still costs the full 1.0 at coincidence and 0.51 for a tight cluster (E_L = 0.71), but 1e-6 on a real image, and r(L, N) returns to +0.14.
 
-### 8.4 Coverage Energy E_C
+**Why a barrier is still needed at all.** Since the reinforcement kernel was moved from coincidence to adjacency (§5), coincident centres share no edge, so a *plain* collapse earns nothing from any term and needs no barrier. What still needs one is the **concentric** collapse: centres stacked on one point at scales in a 3:1 ladder do have parent-child pairs, and would otherwise collect hierarchy and alignment reward for a configuration with no spatial extent at all — +0.196 barrier-free against a lattice's +0.299, and inside the corpus range once slightly jittered.
+
+**What it should probably become.** E_L as a penalty is arguably backwards theory: Alexander's *deep interlock and ambiguity* says centres should interpenetrate, so a term whose minimum is maximal separation encodes the opposite. Two intensive alternatives were measured as candidate descriptors — mean largest-overlap-per-centre reads 0.20–0.26 on the carpets and 0.56–0.62 on random configurations at fixed density, so it is N-independent and informative, but at barrier weight it would push every random configuration below the empty one. Re-deriving E_L as a descriptor rather than a barrier is the third and last step of [#28](https://github.com/brunopostle/centres/issues/28).
+
+### 8.5 Coverage Energy E_C
 
 Penalises deviation from ideal child-coverage of a parent region:
 
@@ -255,7 +336,7 @@ C_i ≈ 0.65 means children collectively occupy about 65% of the parent's area �
 
 > **⚠ UNSOURCED.** The value 0.65 is not Alexander's and has no citation. It appears to have been invented and then attributed. Either source it or derive it from the corpus and say so. [#24](https://github.com/brunopostle/centres/issues/24)
 
-### 8.5 Alignment Energy E_A
+### 8.6 Alignment Energy E_A
 
 Penalises children whose radial distance from their parent deviates from the preferred range:
 
@@ -269,15 +350,18 @@ The target 0.5 is the midpoint of a supposed 0.3–0.7 range.
 > **⚠ UNSOURCED.** "Alexander observed that child centres tend to lie at 0.3–0.7 of the parent radius" carries no citation and appears to be invented. [#24](https://github.com/brunopostle/centres/issues/24)
  Too close to the parent's centre (d << 0.3) produces concentric but weakly differentiated structure; too far (d >> 0.7) breaks containment. This encodes *local symmetries* and *deep interlock*.
 
-### 8.6 Field Energy E_φ
+### 8.7 Field Energy E_φ
 
-Penalises abrupt transitions in the reconstructed wholeness field:
+Abrupt transitions in the reconstructed wholeness field:
 
 ```
 E_φ = mean(|∇φ|²)
+D_φ = E_φ · r_rms²      q_φ = exp(-D_φ / 0.0252)
 ```
 
-Minimising E_φ encourages *gradients* — smooth transitions between regions of varying strength — rather than hard discontinuities.
+High q_φ means *gradients* — smooth transitions between regions of varying strength — rather than hard discontinuities. The multiplication by the squared rms centre radius is a units correction: every other deviation here is dimensionless, but mean(|∇φ|²) carries units of 1/pixel², so without it the score would change under a pure resize of the image.
+
+This is the awkward term in the participation × quality scheme, because it is a property of the reconstructed field rather than of any set of centres, and so has no set to take a fraction of. It is given the *reinforcement* participation — the fraction of centres with at least one graph edge. That is the honest reading of what it measures: a lone centre's Gaussian bump has a gradient, but that gradient is an artefact of the reconstruction rather than evidence of structure, and an isolated centre is exactly one with no neighbour whose field meets its own. Without this, the field term alone would keep #28's spread-out, unconnected, equal-scale configuration off zero.
 
 ---
 
