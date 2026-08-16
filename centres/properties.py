@@ -85,8 +85,14 @@ def levels_of_scale(centers):
     ratio of 2.381 — inside the sourced band — so it was being scored against a
     target that was itself incorrect.
     """
+    from .pipeline import _extent
+
+    # The ratio is between *extents*, the same quantity the hierarchy is built
+    # on. Blob scale understates a centre's true size by about 28%, and using two
+    # different notions of size for containment and for the ratio would make the
+    # measure disagree with the structure it reads.
     ratios = [
-        centers[c.parent].scale / (c.scale + 1e-8)
+        _extent(centers[c.parent]) / (_extent(c) + 1e-8)
         for c in centers
         if c.parent is not None
     ]
