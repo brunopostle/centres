@@ -73,7 +73,7 @@ def test_strong_centres_high_when_top_quartile_strong():
 
 
 def test_strong_centres_empty():
-    assert strong_centres([]) == 0.0
+    assert strong_centres([]) is None
 
 
 # --- boundaries ---
@@ -89,12 +89,12 @@ def test_boundaries_low_when_field_drops_between_centres():
         assert score < 1.0  # midpoint weaker than peaks
 
 
-def test_boundaries_no_edges_returns_zero():
+def test_boundaries_no_edges_is_undefined():
     centers = [c(0, 0, 0, 3.0), c(1, 500, 0, 3.0)]
     field = reconstruct_field((100, 100), centers)
     G = build_graph(centers)
     assert not G.has_edge(0, 1)
-    assert boundaries(field, centers, G) == 0.0
+    assert boundaries(field, centers, G) is None
 
 
 # --- alternating_repetition ---
@@ -112,10 +112,10 @@ def test_alternating_repetition_high_with_varied_neighbours():
     assert score >= 0.0
 
 
-def test_alternating_repetition_zero_no_edges():
+def test_alternating_repetition_no_edges_is_undefined():
     centers = [c(0, 0, 0, 3), c(1, 500, 0, 3)]
     G = build_graph(centers)
-    assert alternating_repetition(G) == 0.0
+    assert alternating_repetition(G) is None
 
 
 # --- positive_space ---
@@ -162,17 +162,27 @@ def test_deep_interlock_one_when_all_edges_overlap():
     assert deep_interlock(centers, G) == pytest.approx(1.0, abs=1e-6)
 
 
-def test_deep_interlock_zero_when_no_edges_overlap():
-    # Two centres far apart: d=100 > r1+r2=5+5=10
+def test_deep_interlock_no_edges_is_undefined():
+    # Two centres far apart: d=100 > r1+r2=5+5=10. They do not even form an
+    # edge, so the fraction-of-edges has no denominator and is undefined.
     centers = [c(0, 0, 0, 5.0, strength=1.0), c(1, 100, 0, 5.0, strength=1.0)]
     G = connected_graph(centers)
-    # They won't even form an edge (too far), so deep_interlock is 0
+    assert not G.edges
+    assert deep_interlock(centers, G) is None
+
+
+def test_deep_interlock_zero_when_edges_exist_but_none_overlap():
+    # An edge exists (scale-similar and within the graph radius) but the two
+    # radii do not reach each other: a genuine zero, not an undefined.
+    centers = [c(0, 0, 0, 6.0, strength=1.0), c(1, 30, 0, 6.0, strength=1.0)]
+    G = connected_graph(centers)
+    assert G.edges
     assert deep_interlock(centers, G) == 0.0
 
 
-def test_deep_interlock_empty_graph():
+def test_deep_interlock_empty_graph_is_undefined():
     assert (
-        deep_interlock([c(0, 0, 0, 10.0)], connected_graph([c(0, 0, 0, 10.0)])) == 0.0
+        deep_interlock([c(0, 0, 0, 10.0)], connected_graph([c(0, 0, 0, 10.0)])) is None
     )
 
 
@@ -192,29 +202,30 @@ def test_contrast_zero_equal_strengths():
     assert contrast(G) == pytest.approx(0.0, abs=1e-6)
 
 
-def test_contrast_zero_no_edges():
+def test_contrast_no_edges_is_undefined():
     G = build_graph([c(0, 0, 0, 3), c(1, 500, 0, 3)])
-    assert contrast(G) == 0.0
+    assert contrast(G) is None
 
 
 # --- gradients ---
 
 
 def test_gradients_zero_uniform():
-    assert gradients(np.ones((50, 50))) == pytest.approx(0.0, abs=1e-10)
+    centers = [c(0, 25, 25, 5.0)]
+    assert gradients(np.ones((50, 50)), centers) == pytest.approx(0.0, abs=1e-10)
 
 
 def test_gradients_positive_step():
     field = np.zeros((50, 50))
     field[:, 25:] = 1.0
-    assert gradients(field) > 0
+    assert gradients(field, [c(0, 25, 25, 5.0)]) > 0
 
 
 # --- roughness ---
 
 
-def test_roughness_zero_single_centre():
-    assert roughness([c(0, 0, 0, 5)]) == 0.0
+def test_roughness_single_centre_is_undefined():
+    assert roughness([c(0, 0, 0, 5)]) is None
 
 
 def test_roughness_low_for_regular_grid():
@@ -263,8 +274,8 @@ def test_the_void_low_for_uniform_field():
     assert score >= 0.0
 
 
-def test_the_void_zero_no_centers():
-    assert the_void(np.ones((50, 50)), []) == 0.0
+def test_the_void_no_centers_is_undefined():
+    assert the_void(np.ones((50, 50)), []) is None
 
 
 # --- simplicity ---
@@ -282,8 +293,8 @@ def test_simplicity_low_equal_strengths():
     assert simplicity(centers) < 0.2
 
 
-def test_simplicity_empty():
-    assert simplicity([]) == 0.0
+def test_simplicity_empty_is_undefined():
+    assert simplicity([]) is None
 
 
 # --- not_separateness ---
@@ -296,15 +307,17 @@ def test_not_separateness_positive_connected():
         assert not_separateness(G) > 0
 
 
-def test_not_separateness_zero_disconnected():
+def test_not_separateness_disconnected_is_undefined():
+    # Two isolated nodes: the largest connected component has one node, so
+    # there is no second Laplacian eigenvalue to read.
     G = build_graph([c(0, 0, 0, 3), c(1, 500, 0, 3)])
     assert not G.has_edge(0, 1)
-    assert not_separateness(G) == pytest.approx(0.0, abs=1e-8)
+    assert not_separateness(G) is None
 
 
-def test_not_separateness_single_node():
+def test_not_separateness_single_node_is_undefined():
     G = build_graph([c(0, 0, 0, 5)])
-    assert not_separateness(G) == 0.0
+    assert not_separateness(G) is None
 
 
 # --- compute_all ---
@@ -341,4 +354,5 @@ def test_compute_all_values_finite():
     G = connected_graph(centers)
     field = reconstruct_field((100, 100), centers)
     for key, val in compute_all(field, centers, G).items():
+        assert val is not None, f"{key} is undefined for a well-formed hierarchy"
         assert np.isfinite(val), f"{key} is not finite"

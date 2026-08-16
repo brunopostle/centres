@@ -36,8 +36,23 @@ def _header(title):
     print(f"\n{title}\n" + "=" * len(title))
 
 
+def _cell(v):
+    """A measure may be None — undefined for these inputs, not zero."""
+    return "   -" if v is None else f"{v:4.1f}"
+
+
+def _defined(values):
+    return [v for v in values if v is not None]
+
+
+def _spread(values):
+    """Range over the defined values; 0 when fewer than two are defined."""
+    d = _defined(values)
+    return float(np.ptp(d)) if len(d) > 1 else 0.0
+
+
 def _row(label, n, norm, width=18):
-    print(f"  {label:<{width}}{n:>6}  " + " ".join(f"{norm[k]:4.1f}" for k in KEYS))
+    print(f"  {label:<{width}}{n:>6}  " + " ".join(_cell(norm[k]) for k in KEYS))
 
 
 def _cols(width=18):
@@ -56,10 +71,13 @@ def null_controls():
         out[name] = norm
         _row(name, n, norm)
     blank = out["flat_grey"]
-    perfect = [k for k in KEYS if blank[k] >= 9.5]
+    perfect = [k for k in KEYS if blank[k] is not None and blank[k] >= 9.5]
+    undefined = [k for k in KEYS if blank[k] is None]
     if perfect:
         print(f"\n  A featureless grey canvas scores >= 9.5/10 on {len(perfect)} of 15 "
               f"properties:\n    {', '.join(perfect)}")
+    print(f"\n  flat_grey: {len(undefined)} of 15 properties undefined, "
+          f"{15 - len(undefined)} scored")
     return out
 
 
@@ -86,6 +104,7 @@ def invariance(images, group=transforms.BENIGN, label="benign"):
     """Spread of each measure under transformations that preserve structure."""
     _header(f"Invariance under {label} transformations  (spread, 0-10 scale)")
     noise = {k: 0.0 for k in KEYS}
+    flaky = set()
     for path in images:
         img = cv2.imread(path)
         vals = {k: [] for k in KEYS}
@@ -94,15 +113,20 @@ def invariance(images, group=transforms.BENIGN, label="benign"):
             for k in KEYS:
                 vals[k].append(norm[k])
         for k in KEYS:
-            noise[k] = max(noise[k], float(np.ptp(vals[k])))
+            noise[k] = max(noise[k], _spread(vals[k]))
+            if 0 < len(_defined(vals[k])) < len(vals[k]):
+                flaky.add(k)
         _row(os.path.basename(path), 0, {k: noise[k] for k in KEYS})
+    if flaky:
+        print(f"\n  defined for some transforms and undefined for others: "
+              f"{', '.join(sorted(flaky))}")
     return noise
 
 
 def triage(corpus_scores, noise):
     """Compare between-image signal against within-image noise."""
     _header("Triage: is the spread between artworks larger than the measurement noise?")
-    signal = {k: float(np.ptp([v[2][k] for v in corpus_scores.values()])) for k in KEYS}
+    signal = {k: _spread([v[2][k] for v in corpus_scores.values()]) for k in KEYS}
     print(f"  {'property':<24}{'signal':>8}{'noise':>8}{'SNR':>8}   verdict")
     print("  " + "-" * 62)
     for k in KEYS:
@@ -114,9 +138,14 @@ def triage(corpus_scores, noise):
 def redundancy(corpus_scores):
     """Are the 15 measures 15 independent quantities?"""
     _header("Redundancy")
-    M = np.array([[v[2][k] for k in KEYS] for v in corpus_scores.values()])
+    rows = [[v[2][k] for k in KEYS] for v in corpus_scores.values()]
+    complete = [r for r in rows if all(x is not None for x in r)]
+    if len(complete) < len(rows):
+        print(f"  ({len(rows) - len(complete)} of {len(rows)} images dropped: "
+              f"some properties undefined)")
+    M = np.array(complete, dtype=float)
     if len(M) < 4:
-        print("  (needs at least 4 images)")
+        print("  (needs at least 4 images with all 15 properties defined)")
         return
     C = np.corrcoef(M.T)
     pairs = sorted(((abs(C[i, j]), KEYS[i], KEYS[j])
@@ -139,9 +168,18 @@ def sweeps():
         for v in values:
             _, _, raw, _ = score(fn(v))
             got.append(raw[target])
-        rho = spearmanr(values, got).statistic
+        # A sweep point where the measure is undefined carries no rank
+        # information, so it is dropped rather than imputed.
+        pairs = [(v, g) for v, g in zip(values, got) if g is not None]
+        dropped = len(values) - len(pairs)
+        if len(pairs) < 3:
+            print(f"  {name:<14} -> {target:<24} undefined at "
+                  f"{dropped}/{len(values)} sweep points; no rho")
+            continue
+        rho = spearmanr([p[0] for p in pairs], [p[1] for p in pairs]).statistic
         flag = "" if abs(rho) > 0.9 else "   <-- does not track its own ground truth"
-        print(f"  {name:<14} -> {target:<24} rho = {rho:+.3f}{flag}")
+        note = f"  ({dropped} undefined)" if dropped else ""
+        print(f"  {name:<14} -> {target:<24} rho = {rho:+.3f}{flag}{note}")
 
 
 def main():

@@ -46,6 +46,7 @@ _PROPERTY_LABELS = [
 ]
 
 _MAX_SIZE = 1024
+_UNDEFINED = "—"
 
 
 def _load_and_rescale(path: str, max_size: int = _MAX_SIZE) -> np.ndarray:
@@ -229,15 +230,9 @@ class CentresMainWindow(QMainWindow):
         if not path:
             return
         _, centers, _, energy, raw = self._last_result
-        norm = normalize_all(raw)
-        out = {
-            "centres": len(centers),
-            "structural_energy": round(energy, 4),
-            "properties": {
-                key: {"score": round(norm[key], 2), "raw": round(raw[key], 6)}
-                for key, _ in _PROPERTY_LABELS
-            },
-        }
+        from .cli import properties_json
+
+        out = properties_json(len(centers), energy, raw)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(out, f, indent=2)
 
@@ -263,20 +258,31 @@ class CentresMainWindow(QMainWindow):
     # ------------------------------------------------------------------
 
     def _update_table(self, raw: dict):
+        """Fill the table. A ``None`` score means the property is undefined for
+        this image; it is shown as an em dash on a neutral grey ground, never as
+        a number and never coloured on the red/amber/green scale."""
         norm = normalize_all(raw)
         for row, (key, _) in enumerate(_PROPERTY_LABELS):
             score = norm[key]
             raw_val = raw[key]
-            score_item = QTableWidgetItem(f"{score:.1f}")
+            undefined = score is None
+            score_item = QTableWidgetItem(
+                _UNDEFINED if undefined else f"{score:.1f}")
             score_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            color = (
-                QColor("#c8e6c9") if score >= 7
-                else QColor("#fff9c4") if score >= 4
-                else QColor("#ffcdd2")
-            )
-            score_item.setBackground(color)
+            if undefined:
+                score_item.setBackground(QColor("#e0e0e0"))
+                score_item.setToolTip(
+                    "Undefined: this image does not contain the centres, graph "
+                    "edges or parent-child pairs this measure needs.")
+            else:
+                score_item.setBackground(
+                    QColor("#c8e6c9") if score >= 7
+                    else QColor("#fff9c4") if score >= 4
+                    else QColor("#ffcdd2")
+                )
             self._table.setItem(row, 1, score_item)
-            raw_item = QTableWidgetItem(f"{raw_val:.4g}")
+            raw_item = QTableWidgetItem(
+                _UNDEFINED if raw_val is None else f"{raw_val:.4g}")
             raw_item.setTextAlignment(Qt.AlignmentFlag.AlignRight |
                                       Qt.AlignmentFlag.AlignVCenter)
             self._table.setItem(row, 2, raw_item)

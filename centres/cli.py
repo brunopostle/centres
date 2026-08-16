@@ -29,10 +29,18 @@ _PROPERTY_LABELS = [
 
 _BAR_WIDTH = 10
 _BAR_CHARS = " ▏▎▍▌▋▊▉█"
+_UNDEFINED = "—"
 
 
 def _bar(score):
-    """Render a score in [0, 10] as a fixed-width block bar."""
+    """Render a score in [0, 10] as a fixed-width block bar.
+
+    ``None`` — the property is undefined for this image — renders as a rule
+    rather than as a bar. A blank would be indistinguishable from a score of 0,
+    which is precisely the confusion this is here to avoid.
+    """
+    if score is None:
+        return "┄" * _BAR_WIDTH
     score = max(0.0, min(10.0, score))
     total_eighths = round(score * _BAR_WIDTH * 8 / 10)
     full = total_eighths // 8
@@ -47,9 +55,19 @@ def print_properties(raw_scores):
     print("  Alexander's 15 structural properties  (0–10, higher = more present)")
     print(f"  {'':>2}  {'property':<24}  {'score':>5}  {'':10}  raw value")
     print("  " + "─" * 68)
+    n_undefined = 0
     for n, (key, label) in enumerate(_PROPERTY_LABELS, 1):
         s = norm[key]
-        print(f"  {n:>2}  {label:<24}  {s:>5.1f}  {_bar(s)}  {raw_scores[key]:.4g}")
+        if s is None:
+            n_undefined += 1
+            score_txt, raw_txt = f"{_UNDEFINED:>5}", "undefined"
+        else:
+            score_txt, raw_txt = f"{s:>5.1f}", f"{raw_scores[key]:.4g}"
+        print(f"  {n:>2}  {label:<24}  {score_txt}  {_bar(s)}  {raw_txt}")
+    if n_undefined:
+        print()
+        print(f"  {n_undefined} of 15 undefined — the centres, graph edges or")
+        print("  parent-child pairs those measures need are not present here.")
     print()
 
 
@@ -66,19 +84,26 @@ def load_and_rescale(path: str, max_size: int):
     return img
 
 
+def properties_json(n_centers, energy, raw_scores):
+    """Serialisable summary. Undefined properties emit JSON ``null``, not 0."""
+    norm = normalize_all(raw_scores)
+    return {
+        "centres": n_centers,
+        "structural_energy": round(energy, 4),
+        "properties": {
+            key: {
+                "score": None if norm[key] is None else round(norm[key], 2),
+                "raw": None if raw_scores[key] is None else round(raw_scores[key], 6),
+            }
+            for key, _ in _PROPERTY_LABELS
+        },
+    }
+
+
 def _emit(args, n_centers, energy, raw_scores):
     """Print or emit JSON results depending on --json flag."""
-    norm = normalize_all(raw_scores)
     if args.json:
-        out = {
-            "centres": n_centers,
-            "structural_energy": round(energy, 4),
-            "properties": {
-                key: {"score": round(norm[key], 2), "raw": round(raw_scores[key], 6)}
-                for key, _ in _PROPERTY_LABELS
-            },
-        }
-        print(json.dumps(out, indent=2))
+        print(json.dumps(properties_json(n_centers, energy, raw_scores), indent=2))
     else:
         print(f"Centers: {n_centers}")
         print(f"Structural energy: {energy:.4f}")
