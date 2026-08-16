@@ -131,6 +131,49 @@ and all fifteen properties are computed over a centre set whose cardinality is
 governed by the cap, the ladder and the figure/ground ambiguity rather than by
 the structure of the artwork.
 
+## 2a. The energy functional is minimised by the absence of structure
+
+*Added after the original audit. This is the most serious finding about the
+theory rather than about an implementation of it, and it is present in the
+initial commit.*
+
+`THEORY.md` §8 states: *"Lower energy = greater wholeness."*
+
+Take 36 centres at identical scale, spaced far apart on a large canvas. Identical
+scales mean `assign_hierarchy` can never assign a parent, so there are no
+parent-child pairs; spacing well beyond `3 × scale` puts every edge weight below
+the 0.1 admission threshold, so the graph has no edges; and nothing overlaps:
+
+```
+equal scales, spacing 220 vs scale 10:
+   E = +0.0809   graph edges = 0   parent-child pairs = 0   locality = 0.0000
+
+random, same canvas:
+   E = +1.3963   graph edges = 23   parent-child pairs = 12   locality = 0.0034
+```
+
+**A configuration with no hierarchy, no reinforcement and no interaction of any
+kind scores 1.32 below a random one**, and below every real artwork (corpus range
+0.953–1.737). Against the original weights the same configuration gives E = 0.000,
+below everything.
+
+Every term is a penalty for deviation, evaluated only over the objects it applies
+to, so every one of them is 0 when its set is empty. **Nothing in the functional
+rewards structure existing.** `E_R` is the only term that can go negative and so
+the only candidate for that job, but it vanishes rather than penalising when the
+graph is empty.
+
+This is AUDIT §3's defect — absence scoring as perfection — appearing in the
+energy rather than in the property normalisers. #15 fixed the property side by
+returning "undefined"; the energy has no equivalent, because a sum with no terms
+is genuinely zero.
+
+`evolve()` does not collapse to this configuration, but that is a property of the
+annealer rather than of the objective: its move set perturbs positions by ±2 px
+and scales by `×exp(N(0, 0.02))`, far too weak to reach it. **The generative mode
+works by failing to find the optimum of what it is optimising.** Tracked as
+[#28](https://github.com/brunopostle/centres/issues/28).
+
 ## 2. Structural energy is centre count
 
 Across the reference corpus and the synthetic controls, `total_energy` correlates

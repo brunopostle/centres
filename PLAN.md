@@ -43,6 +43,9 @@ done ──  A4 #11  scale-relative distance cap
 done ──  A5 #12  propagation fixed point
 done ──  A7 #27  field scaled by the cap, not by its own max
 done ──   G #25  graph nodes keyed by position
+done ──  B1 #14  intensive energy terms, re-derived weights
+done ──  B2 #15  undefined scores instead of a perfect 10
+open ──  A7 #27  REVERTED - broke the synthetic generators, re-scoped
 
     A1  #8 ──┐                                     ┌─ D2  #22
     A2  #9 ──┼─ C1 #18 ─ C2 #19 ─ C3 #20 ─ D1 #21 ─┼─ D2b #26
@@ -52,6 +55,16 @@ done ──   G #25  graph nodes keyed by position
 ```
 
 **Ready to start now:** #8, #9, #13, and all of phase B.
+
+### Open questions for the repository owner
+
+- **#28 — the energy functional is minimised by the absence of structure.** 36
+  equal-scale centres spaced far apart give zero edges, zero parent-child pairs
+  and zero overlap, scoring 1.32 *below* random and below every real artwork.
+  Every term is a deviation penalty that vanishes when its set is empty, so
+  nothing rewards structure existing. `evolve()` avoids it only because its move
+  set is too weak to reach it. This is a theory-level question and wants settling
+  before #21.
 
 ### Where phase A stands
 
@@ -221,7 +234,7 @@ order-dependent tracking stage.
 **Acceptance:** `mirror` and `rot90` reproduce the `identity` scores for every
 property to within 0.05 on the 0–10 scale. Add as a test.
 
-### [A7](https://github.com/brunopostle/centres/issues/27) · ✅ Decouple field normalisation from the absolute detection threshold
+### [A7](https://github.com/brunopostle/centres/issues/27) · Fix the field's scale and the detection threshold together, or not at all
 **Blocks:** #8
 
 `build_structural_field` ends with `field / (field.max() + 1e-8)`, and
@@ -235,15 +248,21 @@ This is the actual mechanism by which vignetting did its damage, discovered duri
 `field.max()` jumps (varamin 32 → 69), and every centre count moves. The three
 corpus images that failed worst were exactly the three whose `dist.max()` moved.
 
-Make the threshold relative to the field's own distribution, normalise by a robust
-percentile rather than the max, or drop normalisation entirely and keep the field
-in pixel units with the ladder and threshold in the same units. The last is most
-principled — the field is a distance transform, distances have units, and
-normalising them away is what created the coupling.
+*Attempted and reverted.* Dividing by the cap rather than by `field.max()` is a
+0.0–0.7% no-op on the corpus, where the cap always bites, and catastrophic where
+it does not: on a sparse lattice `8 × spacing` is 270 px against a largest actual
+distance of 74, so the field peaks at 0.27 and the absolute 0.08 threshold rejects
+nearly everything. Generator counts collapsed from 481 to 4. **The instrument the
+whole validation approach depends on was broken by a change that looked clean on
+the corpus alone.**
 
-**Acceptance:** masking a 5% corner patch changes centre count in the rest of the
-image by less than 2%; `field.max()` no longer divides a field read by an absolute
-threshold.
+The scope is therefore both halves at once: the field's scale and the detection
+threshold have to be expressed in the same quantity, and `CAP_SPACINGS` re-derived
+against the generators as well as the corpus.
+
+**Acceptance:** the corpus *and* every generator in `audit/stimuli.py` keep
+comparable centre counts; `field.max()` no longer divides a field read by an
+absolute threshold. Run the full `python -m audit`, not `--quick`.
 
 ### [G](https://github.com/brunopostle/centres/issues/25) · ✅ Fix build_graph node/edge key mismatch
 **Blocks:** #8, #26
@@ -262,7 +281,7 @@ path assigns `id=i`, but a direct trap for any task that filters a centre list.
 
 Independent of everything else. Each is small and self-contained.
 
-### [B1](https://github.com/brunopostle/centres/issues/14) · Make the energy terms consistently intensive
+### [B1](https://github.com/brunopostle/centres/issues/14) · ✅ Make the energy terms consistently intensive
 
 `total_energy` in `centres/energy.py` mixes sums over centres (`hierarchy_energy`,
 `coverage_energy`, `alignment_energy`) with means (`reinforcement_energy`,
@@ -276,7 +295,7 @@ N-scaling total and will not be right once it is fixed.
 **Acceptance:** `|r(structural_energy, centre_count)| < 0.5` across the corpus
 plus the synthetic controls.
 
-### [B2](https://github.com/brunopostle/centres/issues/15) · Return "undefined" for the degenerate case, not 10/10
+### [B2](https://github.com/brunopostle/centres/issues/15) · ✅ Return "undefined" for the degenerate case, not 10/10
 
 A featureless grey canvas detects zero centres, the deviation-based measures
 return 0, and `normalize_all` maps 0 to a perfect 10 — for levels of scale,
