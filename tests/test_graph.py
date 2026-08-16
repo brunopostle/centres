@@ -210,3 +210,34 @@ def test_strengths_bounded_by_contraction():
     s = np.array([G.nodes[n]["center"].strength for n in G.nodes])
     assert s.max() <= 1.0 / (1 - 0.2) + 1e-9
     assert s.min() >= 1.0 - 1e-9
+
+
+def test_nodes_keyed_by_position_not_id():
+    """Regression for #25: node keys must not depend on Center.id.
+
+    build_graph previously added nodes by c.id but edges by list index, so a
+    list whose ids were not 0..n-1 produced phantom nodes carrying the edges
+    while every real centre was left isolated.
+    """
+    centers = [
+        Center(id=5, x=0.0, y=0.0, scale=10.0, strength=1.0),
+        Center(id=7, x=5.0, y=0.0, scale=10.0, strength=1.0),
+    ]
+    G = build_graph(centers)
+    assert len(G.nodes) == len(centers)
+    assert all("center" in G.nodes[n] for n in G.nodes)
+    assert list(G.edges) == [(0, 1)]
+    assert {G.nodes[n]["center"].id for n in G.nodes} == {5, 7}
+
+
+def test_nodes_keyed_by_position_survives_filtering():
+    """A filtered centre list keeps working — the case #8 and #26 will hit."""
+    centers = [
+        Center(id=i, x=float(i * 12), y=0.0, scale=10.0, strength=1.0) for i in range(6)
+    ]
+    kept = [c for i, c in enumerate(centers) if i % 2 == 0]  # ids 0, 2, 4
+    G = build_graph(kept)
+    assert len(G.nodes) == 3
+    assert all("center" in G.nodes[n] for n in G.nodes)
+    G = propagate_strength(G)
+    assert all(G.nodes[n]["center"].strength > 0 for n in G.nodes)

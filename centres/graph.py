@@ -13,10 +13,22 @@ def build_graph(centers):
       - log-scale similarity: centres of similar scale reinforce each other more.
 
     Edges with weight < 0.1 are dropped.
+
+    Nodes are keyed by **list position**, not by ``Center.id``. Everything else
+    in the pipeline already addresses centres positionally — ``Center.parent`` is
+    an index, and ``energy.py`` and ``properties.py`` both resolve it with
+    ``centers[c.parent]`` — so position is the codebase's actual convention and
+    ``Center.id`` is informational only.
+
+    Keying nodes by ``c.id`` while keying edges by position was a latent bug: any
+    centre list whose ids were not exactly ``0..n-1`` in order produced phantom
+    nodes carrying the edges, with every real centre left isolated. It never fired
+    in production because ``detect_centers`` and ``random_centers`` both assign
+    ``id=i``, but it would have fired the moment a caller filtered the list.
     """
     G = nx.Graph()
-    for c in centers:
-        G.add_node(c.id, center=c)
+    for i, c in enumerate(centers):
+        G.add_node(i, center=c)
     if len(centers) < 2:
         return G
     positions = np.array([[c.x, c.y] for c in centers])
