@@ -27,8 +27,10 @@ Everything below is reproducible with `python -m audit`.
 > property rather than 5; the effective rank in §9 moved from 3 to 4.
 >
 > **§1's diagnosis, §11's documentation findings, and the §12 result that the
-> measures do not track their ground truth are unaffected in kind** — the specific
-> ρ values need re-measuring, but no repair so far addresses what they show.
+> measures do not track their ground truth are unaffected in kind** — no repair so
+> far addresses what they show. §12 has since been fully re-measured against all
+> fifteen properties at 12–13 sweep points each and is current; §2a, §2b and the
+> banner below are also current. Sections 3–11 still carry pre-repair numbers.
 >
 > **Since that banner was written**, the reinforcement kernel has also been
 > corrected (#28): it peaked at coincidence, rewarding two centres for being the
@@ -45,15 +47,20 @@ Everything below is reproducible with `python -m audit`.
 
 Two headline results:
 
-1. **On synthetic images where the answer is known by construction, four of five
-   measures fail to track the quantity they were built to detect** — one of them
-   in the wrong direction. See §12, which is the most important section here.
-2. **The centre detector reports a single circle as five to seventeen centres** — not through duplication, as first supposed, but through figure/ground conflation and a saturating distance cap (§1).
-   Every measure is computed over a centre set that is not a stable estimate of
-   anything, and they faithfully report its instability.
+1. **On synthetic images where the answer is known by construction, one of the
+   fifteen measures tracks the quantity it is named for.** Five run backwards.
+   `contrast` is not merely backwards but *flat* — figure/ground contrast more
+   than triples while the measure moves 0.2%. See §12, which is the most
+   important section here.
+2. **Noise scores a higher degree of life than any of the six carpets** (§2b).
+   Structure is not scarce in noise, it is abundant: 91% of white-noise centres
+   are assigned a parent against the Ardabil's 83%.
 
-These point at the front end rather than at the fifteen formulas, but the audit
-cannot yet fully separate the two — see §12 for what would.
+A distinction that organises everything since: the repairs so far have improved
+the instrument's **precision** — its scores are now stable under isometries,
+bounded, independent of frame, resolution and iteration count — and **none has
+improved its validity**. A precise instrument is a precondition for asking
+validity questions, not an answer to them.
 
 ---
 
