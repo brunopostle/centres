@@ -28,31 +28,26 @@ def test_range_zero_to_one():
     assert field.max() <= 1.0 + 1e-6
 
 
-def test_field_is_bounded_in_units_of_the_cap():
-    """The field is expressed as a fraction of the distance cap.
+def test_max_is_one():
+    """Weak by construction: dividing by the maximum makes this tautological.
 
-    This replaces a test asserting field.max() == 1.0, which was tautological
-    while the field was divided by its own maximum. Dividing by the cap instead
-    (#27) means 1.0 is a fixed structural quantity — CAP_SPACINGS times the
-    typical edge spacing — so the maximum is only reached when some region is
-    actually that large, and the value carries meaning.
+    Kept as a guard on the normalisation actually applied, not as evidence that
+    the scale is meaningful. Dividing by the cap instead would give this test
+    content, but was reverted in #27 — see build_structural_field.
     """
     field = build_structural_field(make_bgr_with_rect())
-    assert field.min() >= 0.0
-    # 0.1 * blur, itself in [0, 1], is added before dividing by the cap
-    assert field.max() <= 1.0 + 0.1
+    assert field.max() == pytest.approx(1.0, abs=1e-6)
 
 
-def test_region_wider_than_the_cap_saturates():
-    """A region far larger than the cap reaches the top of the scale."""
-    from centres.field import CAP_SPACINGS, edge_spacing
-    import cv2
+def test_no_usable_medial_axis_gives_an_empty_field():
+    """An image with no edges at all has no structure and no scale to express.
 
-    img = make_bgr(600, 600, value=20)
-    img[2:598, 2:598] = 20
-    img[0:2, :] = 200  # a thin frame is the only structure
-    field = build_structural_field(img)
-    assert field.max() == pytest.approx(1.0, abs=0.15)
+    distanceTransform fills such an image with FLT_MAX; the old code normalised
+    that to a constant 1.0, which is indistinguishable from a field saturated
+    with structure. Zero is the honest answer.
+    """
+    field = build_structural_field(make_bgr(100, 100, value=128))
+    assert field.max() == 0.0
 
 
 def test_field_peaks_inside_bounded_region():
