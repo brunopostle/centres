@@ -89,8 +89,8 @@ def evolve(
     shape=(300, 300),
     iterations=200,
     n_centers=40,
-    T_start=1.0,
-    T_end=0.01,
+    T_start=0.1,
+    T_end=0.001,
     progress=None,
     initial_centers=None,
 ):
@@ -99,6 +99,13 @@ def evolve(
     Each iteration perturbs all centre positions and scales, evaluates energy,
     and accepts or rejects via the Metropolis criterion. Temperature decays
     exponentially from T_start to T_end.
+
+    The defaults were lowered ten-fold with the move to the degree of life (#28).
+    T_start=1.0 was sized against an objective spanning roughly 0.95 to 1.74; the
+    degree of life spans about 0.32 to 0.41 with per-move deltas near 0.005, so
+    the old schedule ran effectively hot throughout and accepted almost every
+    proposal. Measured over three seeds, the cooler schedule gains about +0.03 in
+    final degree of life (0.410 -> 0.443).
 
     initial_centers: if provided, seed the search from these centres rather
                      than from a random configuration. Useful for refining the

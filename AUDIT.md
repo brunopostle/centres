@@ -30,6 +30,15 @@ Everything below is reproducible with `python -m audit`.
 > measures do not track their ground truth are unaffected in kind** — the specific
 > ρ values need re-measuring, but no repair so far addresses what they show.
 >
+> **Since that banner was written**, the reinforcement kernel has also been
+> corrected (#28): it peaked at coincidence, rewarding two centres for being the
+> same centre. That moved two ground-truth sweeps substantially — scale ratio to
+> levels of scale from **−0.100 to +0.800**, void size to the void from +0.500 to
+> +0.700 — and took both measures previously classified as NOISE (levels of scale,
+> roughness) into the usable band. The reported scalar is now the **degree of
+> life**, L = −E, and §2a's structureless minimum is fixed: empty scores exactly
+> zero and collapse loses by 1.26.
+>
 > Refreshing every table is [#18](https://github.com/brunopostle/centres/issues/18),
 > which is the pivotal task in the plan: it is what distinguishes a formula that was
 > starved by a bad centre set from one that is wrong on its own terms.
@@ -130,6 +139,39 @@ Everything downstream inherits all three. The hierarchy, the reinforcement graph
 and all fifteen properties are computed over a centre set whose cardinality is
 governed by the cap, the ladder and the figure/ground ambiguity rather than by
 the structure of the artwork.
+
+## 2b. Noise scores a higher degree of life than any artwork
+
+*The headline finding as of the phase A/B repairs. Not introduced by them — the
+same ordering held under the original energy functional, hidden by a sign
+convention.*
+
+Degree of life (higher = more life, 0 = no structure), full audit:
+
+| | n | degree of life |
+|---|---:|---:|
+| **smooth_noise** | 397 | **+0.5207** |
+| **white_noise** | 956 | **+0.4965** |
+| **random_blobs** | 380 | **+0.4852** |
+| sanguszko | 550 | +0.4054 |
+| ardabil | 444 | +0.3868 |
+| ghashghai | 613 | +0.3791 |
+| regular_grid | 481 | +0.3747 |
+| bidjar | 618 | +0.3580 |
+| varamin | 624 | +0.3428 |
+| pazyryk | 437 | +0.3245 |
+| flat_grey | 0 | +0.0000 |
+
+Every noise control outscores every artwork. Mechanically, **structure is not
+scarce in noise, it is abundant**: 91.3% of white-noise centres are assigned a
+parent against the Ardabil's 82.7%, and white noise carries 4278 graph edges
+against the Ardabil's 1051. The terms reward *having* relationships and do not
+distinguish *which*. Term by term the carpets win on one of five.
+
+No re-weighting fixes it — art loses on four of the five terms, so only giving
+the field term essentially all the weight would flip the order, making the score
+a synonym for `gradients`. Tracked as
+[#29](https://github.com/brunopostle/centres/issues/29).
 
 ## 2a. The energy functional is minimised by the absence of structure
 
