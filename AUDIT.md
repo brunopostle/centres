@@ -776,6 +776,82 @@ transform, so these cannot be computed from it at all, which is the architectura
 finding of §10 arriving independently from the source.
 
 
+## 16. The centre count is not the common driver
+
+§14 found every measure responding more strongly to some other generator than to
+its own, with two generators — `dominance` and `void_size` — driving most of them.
+Both make large changes to gross composition, and gross composition changes the
+number of detected centres, which swings from 0 to 1169 across the stimuli. The
+obvious hypothesis was that there is one underlying quantity, the count, and the
+fifteen measures are fifteen views of it.
+
+**That hypothesis is wrong**, and it is worth recording as a prediction that
+failed. Pooled rank correlation of each measure against the count over all 181
+generator stimuli:
+
+| measure | ρ vs count | | measure | ρ vs count |
+|---|---:|---|---|---:|
+| gradients | +0.580 | | positive space | +0.262 |
+| not-separateness | −0.426 | | levels of scale | −0.182 |
+| alternating repetition | +0.379 | | simplicity | +0.167 |
+| the void | +0.310 | | good shape | +0.163 |
+| contrast | +0.302 | | boundaries | +0.155 |
+| | | | echoes, strong centres, deep interlock, roughness, local symmetries | \|ρ\| ≤ 0.13 |
+
+Only `gradients` exceeds 0.5. Eleven of fifteen are below 0.35. **The measures do
+not track the centre count**, so the leakage in §14 has some other cause — most
+likely that the generators which move gross composition genuinely move many
+structural statistics at once, which is partly legitimate coupling rather than
+purely a defect.
+
+### Partialling the count out, one casualty and one reprieve
+
+Each generator against its own target, before and after holding the count fixed:
+
+| generator → measure | raw | partial | change |
+|---|---:|---:|---:|
+| dominance → strong centres | +0.99 | **+0.99** | −0.00 |
+| shape_vocabulary → echoes | +0.79 | **+0.80** | +0.01 |
+| element_kinds → simplicity | +0.70 | **+0.75** | +0.05 |
+| border_band → boundaries | +0.45 | **+0.62** | +0.17 |
+| symmetry_order → local symmetries | −0.60 | −0.58 | −0.02 |
+| ground_solidity → positive space | −0.40 | −0.38 | −0.02 |
+| scale_ratio → levels of scale | +0.14 | +0.15 | +0.00 |
+| jitter → roughness | +0.63 | +0.44 | −0.19 |
+| interlock_depth → deep interlock | −0.51 | −0.34 | −0.17 |
+| bleed → not-separateness | +0.41 | +0.24 | −0.16 |
+| motif_circularity → good shape | −0.48 | **+0.16** | **−0.32** |
+| **void_size → the void** | **+0.80** | **−0.04** | **−0.77** |
+| tonal_delta → contrast | −0.88 | −0.88 | *count constant* |
+| zone_width → gradients | +0.52 | +0.52 | *count constant* |
+
+**Eight of fifteen diagonals survive** (lose less than 0.1).
+
+**`the_void` is the casualty, and it is a serious one.** Its ρ = +0.804 was among
+the best in §12 and it is **entirely a centre-count effect**: partial the count out
+and it is −0.04, which is nothing. Clearing a growing central region removes
+centres, and `the_void` was reading that removal, not the void. Its §13 verdict
+must change from STARVED to **SPURIOUS** — it was never tracking its ground truth
+at all.
+
+**`good_shape` gets a partial reprieve.** Its −0.48 was also a count artefact;
+partialled it is +0.16 — still not tracking, but not running backwards either.
+
+**`contrast` and `gradients` are strengthened.** Both generators hold the centre
+count exactly constant by construction, so their figures were never confounded.
+`contrast`'s −0.88 stands unqualified: it is flat, and the reason is that the
+field carries no tone (§12, §15).
+
+### Revised verdict for the void
+
+| | §13 | after §16 |
+|---|---|---|
+| the void | STARVED (ρ +0.80, SNR 0.84) | **SPURIOUS** — ρ +0.80 is a count artefact, partial −0.04 |
+
+That leaves **one measure with a defensible ground-truth result**, `strong_centres`
+at +0.99 raw and +0.99 partial — though §14 still shows it is not isolating.
+
+
 ## Recommended order of work
 
 1. **Keep the harness in front of every change.** `python -m audit` turns "this

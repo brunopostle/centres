@@ -426,7 +426,16 @@ def count_confound(measured):
         print(f"  {k:<24}{r:+14.3f}{flag}")
 
     def _partial(x, y, z):
-        """Spearman partial correlation of x and y controlling for z."""
+        """Spearman partial correlation of x and y controlling for z.
+
+        Returns the raw correlation when z is constant: there is nothing to
+        control for, because the generator already holds the count fixed by
+        construction. That is the strongest possible position for a sweep to be
+        in, not a failure -- ``tonal_delta`` and ``zone_width`` both hold the
+        count exactly constant, so their figures are count-free already.
+        """
+        if len(set(z)) < 2:
+            return spearmanr(x, y).statistic
         rx = spearmanr(x, y).statistic
         rz1 = spearmanr(x, z).statistic
         rz2 = spearmanr(y, z).statistic
@@ -448,10 +457,11 @@ def count_confound(measured):
         ns = [t[2] for t in trip]
         raw_r = spearmanr(xs, ys).statistic
         par_r = _partial(xs, ys, ns)
+        fixed = "  (count constant)" if len(set(ns)) < 2 else ""
         if abs(par_r) >= abs(raw_r) - 0.1:
             survived += 1
         print(f"  {gname + ' -> ' + target:<40}{raw_r:+8.2f}{par_r:+10.2f}"
-              f"{abs(par_r) - abs(raw_r):+9.2f}")
+              f"{abs(par_r) - abs(raw_r):+9.2f}{fixed}")
     print(f"\n  {survived} of {len(measured)} diagonals survive partialling out the "
           f"count (lose < 0.1).")
 
