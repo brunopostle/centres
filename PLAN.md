@@ -11,6 +11,21 @@ being fed a bad centre set, and phase C is what separates them.
 
 Phase B is independent and can proceed in parallel with A at any time.
 
+## Project invariant
+
+**Every threshold is expressed in units of the artwork's own characteristic scale
+— `edge_spacing` — never in pixels, and never as a fraction of an observed
+maximum.** Pixels are a property of the photograph: how much mount or wall was in
+shot, and what the file was resized to. `edge_spacing` is a property of the thing
+photographed.
+
+Every frame-derived constant this pipeline has carried turned out to be a bug:
+Canny's absolute 50/150 thresholds (#10), the `min(h, w) / 10` distance cap (#11),
+and dividing by `field.max()` (#27). A *global* scale estimate is correct and
+intended — the characteristic scale of an artwork is a global property of it, so
+measures in those units move in proportion when the artwork changes. What is not
+acceptable is a scale set by the frame or by a single outlier pixel.
+
 ## How to pick up work
 
 Open issues are the source of truth for status; this file is the overview and the
@@ -26,28 +41,29 @@ Tracked as GitHub issues [#8–#27](https://github.com/brunopostle/centres/issue
 done ──  A3 #10  adaptive edge detection
 done ──  A4 #11  scale-relative distance cap
 done ──  A5 #12  propagation fixed point
+done ──  A7 #27  field scaled by the cap, not by its own max
+done ──   G #25  graph nodes keyed by position
 
-    A7 #27 ─┬─ A1 #8 ──┐          (field.max coupling, then plateau suppression)
-     G #25 ─┘          │
-    A2  #9 ────────────┼─ C1 #18 ─ C2 #19 ─ C3 #20 ─ D1 #21 ─┬─ D2  #22
-    A6 #13 ────────────┘                                     ├─ D2b #26
-                                                             ├─ D3  #23
-    B1 #14, B2 #15, B3 #16 ─ B4 #17   (independent of A/C/D) └─ D4  #24
+    A1  #8 ──┐                                     ┌─ D2  #22
+    A2  #9 ──┼─ C1 #18 ─ C2 #19 ─ C3 #20 ─ D1 #21 ─┼─ D2b #26
+    A6 #13 ──┘                                     ├─ D3  #23
+                                                   └─ D4  #24
+    B1 #14, B2 #15, B3 #16 ─ B4 #17   (independent of A/C/D)
 ```
 
-**Ready to start now:** #27, #25, #9, #13, and all of phase B. Do **#27 first** —
-the cap doubles as a detector sensitivity knob while it is unfixed, so any other
-phase A change can appear to succeed or fail for reasons unrelated to itself.
+**Ready to start now:** #8, #9, #13, and all of phase B.
 
 ### Where phase A stands
 
-| | before | now (#10 + #11 + #12) | target |
+| | before | now | target |
 |---|---:|---:|---:|
 | worst property Δ under vignette | 7.4 | **1.38** | ≤1.5 ✅ |
 | worst property Δ under mirror / rot90 | 5.9 | **0.86** | ≤0.05 (#13) |
 | crop15% like-for-like, worst | +246% | **+32%** | — |
 | step-count dependence of strong_centres | 1.0 → 10.0 | **1e-6** | ✅ |
-| identity centre counts | 47–205 | 437–624 | see #27 |
+| identity centre counts | 47–205 | 437–624 | recalibrate in #18 |
+
+Merged so far: #10, #11, #12, #25, #27.
 
 The measures still do not track their ground truth — that is unchanged by any
 repair so far, and separating starved formulas from wrong ones is #18.
@@ -82,21 +98,18 @@ Nothing downstream is trustworthy until these land. Re-run `python -m audit`
 after each one; record the before/after in the commit message.
 
 ### [A1](https://github.com/brunopostle/centres/issues/8) · Suppress detections in structureless saturated regions
-**Blocked by:** #11, #25 · **Blocks:** #18
+**Blocks:** #18 — blockers #11 and #25 are both done, so this is ready
 
 *Rewritten. This task originally asked for deduplication; there is none — see the
 note above and §1 of AUDIT.md.*
 
-The cap `min(h, w) / 10` saturates the distance transform wherever nothing is
-nearby, and `peak_local_max` returns many degenerate maxima across the resulting
-flat plateau. None are centres under any definition: there is no enclosing
-boundary within the cap radius. Negligible on five carpets (0–0.9% of canvas) and
-**27% of the Pazyryk, where 22 of its 47 centres sit on the plateau**.
-
-Blocked by #11 because the cap creates the plateau: a circle of radius 120 px
-exceeds the cap of 102 px, so its own interior saturates and suppression applied
-to today's field would delete the true centre along with the spurious ones. Also
-blocked by #25 — filtering a centre list with preserved ids corrupts the graph.
+The cap saturates the distance transform wherever nothing is nearby, and
+`peak_local_max` returns many degenerate maxima across the resulting flat plateau.
+None are centres under any definition: there is no enclosing boundary within the
+cap radius. Measured against the old `min(h, w) / 10` cap: negligible on five
+carpets (0–0.9% of canvas) and **27% of the Pazyryk, where 22 of its 47 centres
+sat on the plateau**. Re-measure against the current `8 × edge_spacing` cap before
+starting — #11 will have reduced it, and by how much is unknown.
 
 **Acceptance:** a single circle on a blank canvas yields exactly 1 centre; 9
 circles yield 9 (±2); the Pazyryk's on-plateau count drops to ~0 with no carpet
@@ -104,7 +117,7 @@ losing centres that sit on genuine structure. Add as a test in
 `tests/test_pipeline.py`. Re-check bidjar/roughness under vignette, the one cell
 #10 left at 1.62 against a threshold of 1.5.
 
-### [A2](https://github.com/brunopostle/centres/issues/9) · Make the scale ladder relative to image size and remove the ceiling
+### [A2](https://github.com/brunopostle/centres/issues/9) · Make the scale ladder relative to edge spacing and remove the ceiling
 **Blocks:** #18 — no longer blocked by #8, see above
 
 `min_sigma=2, max_sigma=48` is absolute in pixels, so a 120 px circle is detected
@@ -112,12 +125,23 @@ as many blobs all pinned at 68 px (`max_sigma × √2`). Large centres cannot be
 represented at all, and the excess is reported as multiplicity. This also makes
 every score depend on `--max-size`.
 
-Derive the ladder from image dimensions — e.g. `max_sigma ∝ min(h, w)` — so the
-same artwork at 512 px and 1024 px yields the same structure.
+**Re-specified.** The original text said to derive the ladder from image
+dimensions — the same frame-versus-artwork error #11 fixed for the cap. Derive it
+from `edge_spacing` instead, per the invariant above. That makes the ladder
+framing-independent as well as resolution-independent, since resizing changes
+`edge_spacing` in exact proportion.
+
+Also fix the rung ratio while here: σ = 2 → 48 in 10 log-spaced steps gives a
+ratio of 1.42, while `hierarchy_energy` targets a parent:child ratio of 3, which
+falls *between* rungs — so `levels_of_scale` and `echoes` partly report the
+sampling lattice. Make the lattice a function of the target ratio rather than
+hard-coding either; whether 3 is right at all is a #21 question.
 
 **Acceptance:** a circle of radius r is detected at scale ≈ r (within 25%) for
-r ∈ {30, 60, 120, 200} px. Scores for a corpus image at `--max-size` 512 vs 1024
-agree within 1.0 on the 0–10 scale for every property.
+r ∈ {30, 60, 120, 200} px; scores for a corpus image at `--max-size` 512 vs 1024
+agree within 1.0 on the 0–10 scale for every property; and — new — scores for an
+image and the same image padded with a 10% border agree within 1.0, which the
+original spec would have failed.
 
 ### [A3](https://github.com/brunopostle/centres/issues/10) · ✅ Replace fixed Canny thresholds with locally adaptive edge detection
 **Blocks:** #18
@@ -197,8 +221,8 @@ order-dependent tracking stage.
 **Acceptance:** `mirror` and `rot90` reproduce the `identity` scores for every
 property to within 0.05 on the 0–10 scale. Add as a test.
 
-### [A7](https://github.com/brunopostle/centres/issues/27) · Decouple field normalisation from the absolute detection threshold
-**Blocks:** #8, #9, #11
+### [A7](https://github.com/brunopostle/centres/issues/27) · ✅ Decouple field normalisation from the absolute detection threshold
+**Blocks:** #8
 
 `build_structural_field` ends with `field / (field.max() + 1e-8)`, and
 `detect_centers` then applies an absolute `threshold=0.08`. Those do not compose:
@@ -221,7 +245,7 @@ normalising them away is what created the coupling.
 image by less than 2%; `field.max()` no longer divides a field read by an absolute
 threshold.
 
-### [G](https://github.com/brunopostle/centres/issues/25) · Fix build_graph node/edge key mismatch
+### [G](https://github.com/brunopostle/centres/issues/25) · ✅ Fix build_graph node/edge key mismatch
 **Blocks:** #8, #26
 
 `build_graph` adds nodes keyed by `c.id` but edges keyed by list index. Two

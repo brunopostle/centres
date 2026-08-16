@@ -16,6 +16,31 @@ SPACING_WEIGHT = 1.5
 CAP_SPACINGS = 8.0
 
 
+# --- Project invariant -------------------------------------------------------
+#
+# Every threshold in the pipeline is expressed in units of the artwork's own
+# characteristic scale — edge_spacing — never in pixels, and never as a fraction
+# of an observed maximum.
+#
+# Pixels are a property of the photograph: how much mount, wall or table happened
+# to be in shot, and what the file was resized to. edge_spacing is a property of
+# the thing photographed. Every frame-derived constant this pipeline has carried
+# turned out to be a bug:
+#
+#   - Canny's fixed 50/150 thresholds, absolute in 8-bit gradient units, made a
+#     vignette delete the corners of the image outright (#10).
+#   - A cap of min(h, w) / 10 made cropping 15% off the Ardabil move it from 154
+#     detected centres to 242 (#11).
+#   - Dividing by field.max() let whichever pixel was furthest from an edge set
+#     the amplitude of the whole image (#27).
+#
+# A global scale estimate is correct and intended: the characteristic scale of an
+# artwork is a global property of it, so measures expressed in those units move
+# when the artwork changes — in proportion, which is the point. What is not
+# acceptable is a scale set by the frame, or by a single outlier pixel.
+# -----------------------------------------------------------------------------
+
+
 def edge_spacing(dist):
     """Estimate the typical spacing between edges from their distance transform.
 
