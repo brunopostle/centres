@@ -89,7 +89,8 @@ def with_region(centre, **kw):
     defaults = dict(area=100.0, compactness=0.5, solidity=0.5, tone=0.5,
                     tone_spread=0.0, vertical_symmetry=0.5,
                     horizontal_symmetry=0.5, elongation=0.5, orientation=0.0,
-                    shape_signature=(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0))
+                    shape_signature=(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0),
+                    thickness=3.0, interface_complexity=2.0, boundary_ratio=0.33)
     defaults.update(kw)
     centre.region = Region(**defaults)
     return centre
@@ -227,12 +228,12 @@ def test_local_symmetries_distinguishes_the_axis():
     ]
     assert local_symmetries(horizontal_only) == pytest.approx(0.2)
 
-def test_deep_interlock_one_when_all_edges_overlap():
-    # Two centres whose radii overlap: d=15 < r1+r2=10+10=20
-    centers = [c(0, 0, 0, 10.0, strength=1.0), c(1, 15, 0, 10.0, strength=1.0)]
-    G = connected_graph(centers)
-    assert deep_interlock(centers, G) == pytest.approx(1.0, abs=1e-6)
-
+def test_deep_interlock_reads_interface_complexity():
+    """The source: a complex, not brusque, interface between two regions."""
+    brusque = [_figure(with_region(c(0, 0, 0, 10), interface_complexity=1.0))]
+    interwoven = [_figure(with_region(c(0, 0, 0, 10), interface_complexity=4.0))]
+    assert deep_interlock(brusque, None) == pytest.approx(0.0, abs=1e-9)
+    assert deep_interlock(interwoven, None) > 0.9
 
 def test_deep_interlock_no_edges_is_undefined():
     # Two centres far apart: d=100 > r1+r2=5+5=10. They do not even form an
@@ -243,14 +244,9 @@ def test_deep_interlock_no_edges_is_undefined():
     assert deep_interlock(centers, G) is None
 
 
-def test_deep_interlock_zero_when_edges_exist_but_none_overlap():
-    # An edge exists (scale-similar and within the graph radius) but the two
-    # radii do not reach each other: a genuine zero, not an undefined.
-    centers = [c(0, 0, 0, 6.0, strength=1.0), c(1, 30, 0, 6.0, strength=1.0)]
-    G = connected_graph(centers)
-    assert G.edges
-    assert deep_interlock(centers, G) == 0.0
-
+def test_deep_interlock_is_undefined_without_interfaces():
+    lone = [_figure(with_region(c(0, 0, 0, 10), interface_complexity=0.0))]
+    assert deep_interlock(lone, None) is None
 
 def test_deep_interlock_empty_graph_is_undefined():
     assert (
@@ -448,7 +444,10 @@ def test_compute_all_returns_all_fifteen():
 
 
 def test_compute_all_values_finite():
-    centers = [with_region(x) for x in well_formed_hierarchy()]
+    centers = [
+        with_region(x, interface_complexity=2.0, boundary_ratio=0.33)
+        for x in well_formed_hierarchy()
+    ]
     for x in centers:
         x.polarity = 0.2 if x.parent is not None else -0.2
     G = connected_graph(centers)

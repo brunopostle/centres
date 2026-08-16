@@ -90,33 +90,46 @@ def strong_centres(centers):
 
 
 def boundaries(field, centers, G):
-    """↓  Mean ratio of field value at midpoints between connected centres to
-    the average of their peak values.
+    """↑  How close boundary regions come to a third of what they bound.
 
-    Low ratio means a clear drop in the wholeness field between adjacent
-    centres — the signature of a defined boundary zone separating them.
+    Salingaros (2025): "Effective boundaries are proportionally wide to what they
+    enclose; typically, the boundary **measures roughly 1/3 of what it bounds**."
+    That is a ratio with a stated target, so the measure is how near the artwork's
+    boundary regions come to it.
 
-    Undefined (``None``) with no graph edges: a boundary is a thing between two
-    adjacent centres, so with nothing adjacent there is no boundary to measure.
-    Also undefined when edges exist but every pair's peak field value is ~0, so
-    no ratio can be formed — the reconstruction has nothing there to drop from.
+    A region's own characteristic width is 2A/P; what it bounds is the equivalent
+    diameter of the largest region it borders. The score is highest when that
+    ratio sits at 1/3, falling away on either side — a hairline boundary and a
+    boundary as wide as its interior are both failures, and the source says so:
+    "a thick boundary also functions as an 'implied' center".
+
+    *Redefined (#22).* This measure was the field value at the midpoint between
+    connected centres, read off the reconstructed Gaussian rendering rather than
+    the image, and it involved no thickness and no ratio. That formula scored
+    +0.62 against the band-thickness sweep, better than this one does — but it
+    was not measuring boundary thickness, and an accidental correlation is what
+    this audit exists to remove.
+
+    **Not yet working, and the diagnosis points at the segmentation.** Against
+    the generator that sweeps this quantity the measure scores near zero, and no
+    aggregation helps — median, mean, 90th percentile and maximum all fail. The
+    generator is not the suspect this time: unlike ``symmetry_order``, it was
+    validated by direct measurement of the rendered image, independent of the
+    pipeline. The likely cause is that a watershed seeded at detected centres
+    does not give a thin band or an interdigitating finger a basin of its own —
+    it is absorbed into the region it borders — so the descriptor never sees the
+    geometry the stimulus varies. That is segmentation work, not descriptor work.
     """
-    if not G.edges:
+    ratios = [
+        r.boundary_ratio for r in _regions(centers) if r.boundary_ratio > 0
+    ]
+    if not ratios:
         return None
-    h, w = field.shape
-    ratios = []
-    for i, j, _ in G.edges(data=True):
-        c1 = G.nodes[i]["center"]
-        c2 = G.nodes[j]["center"]
-        mx = int(np.clip((c1.x + c2.x) / 2, 0, w - 1))
-        my = int(np.clip((c1.y + c2.y) / 2, 0, h - 1))
-        p1 = field[int(np.clip(c1.y, 0, h - 1)), int(np.clip(c1.x, 0, w - 1))]
-        p2 = field[int(np.clip(c2.y, 0, h - 1)), int(np.clip(c2.x, 0, w - 1))]
-        peak = (p1 + p2) / 2
-        if peak > 1e-8:
-            ratios.append(field[my, mx] / peak)
-    return float(np.mean(ratios)) if ratios else None
-
+    # Distance from the sourced target, in log units so that a boundary half the
+    # target width and one twice it are equally wrong.
+    target = 1.0 / 3.0
+    deviations = np.abs(np.log(np.array(ratios) / target))
+    return float(np.exp(-np.median(deviations)))
 
 def alternating_repetition(G):
     """↑  Mean standard deviation of strengths across each centre's neighbours.
@@ -227,31 +240,43 @@ def local_symmetries(centers):
     return float((values * weights).sum() / weights.sum())
 
 def deep_interlock(centers, G):
-    """↑  Fraction of connected centre pairs whose spatial extents overlap.
+    """↑  Complexity of the interfaces regions share with their neighbours.
 
-    Two centres interlock when d(i, j) < r_i + r_j — each extends into the
-    territory of the other, creating the interwoven boundary structure
-    Alexander called deep interlock. Measured over reinforcement graph edges
-    rather than parent-child pairs, since LoG hierarchy places children
-    outside parent radii (the hierarchy describes scale nesting, not spatial
-    containment at the individual-blob level).
+    Salingaros (2025): "Two regions can **interpenetrate at a semi-permeable
+    interface** … A **complex (not brusque) interface** joins the two regions into
+    a larger whole … Abrupt, clean transitions between two regions coming up to
+    each other but failing to connect weaken visual cohesion."
 
-    Undefined (``None``) with no graph edges: the value is a fraction *of the
-    edges*, so with no edges the denominator is zero. One edge is enough.
+    Measured as the length of each shared interface divided by the square root of
+    the smaller region's area. A straight cut across a compact region scores
+    about 1; an interdigitating interface scores several times that. The value is
+    mapped so that a brusque interface tends to 0 and a deeply interlocked one
+    towards 1.
+
+    *Redefined (#22).* This measure was the fraction of graph edges whose centres
+    lay within the sum of their radii — a statement about the positions of two
+    points, carrying nothing about the shape of the interface between them. It
+    spanned 0.2 of 10 across the entire corpus, which is to say it was close to a
+    constant.
+
+    **Not yet working, and the diagnosis points at the segmentation.** Against
+    the generator that sweeps this quantity the measure scores near zero, and no
+    aggregation helps — median, mean, 90th percentile and maximum all fail. The
+    generator is not the suspect this time: unlike ``symmetry_order``, it was
+    validated by direct measurement of the rendered image, independent of the
+    pipeline. The likely cause is that a watershed seeded at detected centres
+    does not give a thin band or an interdigitating finger a basin of its own —
+    it is absorbed into the region it borders — so the descriptor never sees the
+    geometry the stimulus varies. That is segmentation work, not descriptor work.
     """
-    if not G.edges:
+    complexities = [
+        r.interface_complexity for r in _regions(centers) if r.interface_complexity > 0
+    ]
+    if not complexities:
         return None
-    overlap = sum(
-        1
-        for i, j in G.edges()
-        if np.sqrt(
-            (G.nodes[i]["center"].x - G.nodes[j]["center"].x) ** 2
-            + (G.nodes[i]["center"].y - G.nodes[j]["center"].y) ** 2
-        )
-        < G.nodes[i]["center"].scale + G.nodes[j]["center"].scale
-    )
-    return overlap / G.number_of_edges()
-
+    # A straight interface scores about 1, so subtract that floor before scaling.
+    excess = max(float(np.median(complexities)) - 1.0, 0.0)
+    return float(1.0 - np.exp(-excess))
 
 def contrast(G):
     """↑  Mean absolute tone difference between adjacent regions.

@@ -65,7 +65,8 @@ def _with_region(centre, **kw):
 
     d = dict(area=100.0, compactness=0.5, solidity=0.5, tone=0.5, tone_spread=0.0,
              vertical_symmetry=0.5, horizontal_symmetry=0.5, elongation=0.5,
-             orientation=0.0, shape_signature=(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0))
+             orientation=0.0, shape_signature=(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0),
+             thickness=3.0, interface_complexity=2.0, boundary_ratio=0.33)
     d.update(kw)
     centre.region = Region(**d)
     return centre
@@ -200,13 +201,14 @@ def test_roughness_boundary():
 
 
 def test_boundaries_boundary():
-    far = [c(0, 0, 0, 3.0), c(1, 500, 0, 3.0)]
-    assert boundaries(reconstruct_field((100, 100), far), far, build_graph(far)) is None
-    near = [c(0, 30, 50, 6.0), c(1, 55, 50, 6.0)]
-    G = _connected(near)
-    assert G.edges
-    assert boundaries(reconstruct_field((100, 100), near), near, G) is not None
-
+    """Redefined (#22): needs a boundary ratio, not a graph edge."""
+    assert boundaries(None, [], None) is None
+    bare = [c(0, 0, 0, 10.0)]
+    assert boundaries(None, bare, None) is None, "no region means no thickness"
+    at_target = [_with_region(c(0, 0, 0, 10.0), boundary_ratio=1.0 / 3.0)]
+    assert boundaries(None, at_target, None) == pytest.approx(1.0)
+    too_thin = [_with_region(c(0, 0, 0, 10.0), boundary_ratio=0.02)]
+    assert boundaries(None, too_thin, None) < 0.3
 
 def test_boundaries_undefined_when_field_is_empty_at_every_peak():
     """Edges exist, but the field is flat zero, so no ratio can be formed."""
@@ -229,15 +231,12 @@ def test_contrast_boundary():
     assert contrast(toned) == pytest.approx(0.0, abs=1e-9)
 
 def test_deep_interlock_boundary():
-    assert deep_interlock([], build_graph([])) is None
-    centers = [c(0, 0, 0, 10.0), c(1, 15, 0, 10.0)]
-    G = _connected(centers)
-    assert G.edges
-    assert deep_interlock(centers, G) == pytest.approx(1.0, abs=1e-6)
-
-
-# --- alternating_repetition: needs a node of degree 2, not merely an edge ---
-
+    """Redefined (#22): needs an interface, not a pair of overlapping discs."""
+    assert deep_interlock([], None) is None
+    bare = [c(0, 0, 0, 10.0)]
+    assert deep_interlock(bare, None) is None
+    interwoven = [_with_region(c(0, 0, 0, 10.0), interface_complexity=3.0)]
+    assert deep_interlock(interwoven, None) > 0.8
 
 def test_alternating_repetition_undefined_without_edges():
     assert alternating_repetition(build_graph([])) is None
