@@ -75,7 +75,14 @@ theory question and #21 should wait on it.
 
 ### Open questions for the repository owner
 
-- **#28 — the energy functional is minimised by the absence of structure.** 36
+- **#28 — decided, and now the next piece of work.** The reported quantity
+  becomes the **degree of life**, L = −E: Alexander's own term, and the semantics
+  the owner asked for — zero for nothing, higher for more. `E` stays as what
+  `evolve()` minimises. The rename must land *with* the participation change and
+  not before: flipping the sign today would report the Ardabil at −1.4 life and a
+  blank canvas at 0, which is the wrong ordering rather than the wrong offset.
+  The reinforcement kernel, the first of the three sequenced steps, is done.
+- **#28 background — the energy functional is minimised by the absence of structure.** 36
   equal-scale centres spaced far apart give zero edges, zero parent-child pairs
   and zero overlap, scoring 1.32 *below* random and below every real artwork.
   Every term is a deviation penalty that vanishes when its set is empty, so

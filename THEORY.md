@@ -176,7 +176,18 @@ Structural energy E is a scalar measuring how far a configuration departs from A
 > [#28](https://github.com/brunopostle/centres/issues/28): the empty case should
 > score **zero**, structure should be **rewarded** (negative), and the reward must
 > not be a sum over centres — that would simply cram in as many centres as possible,
-> which contradicts *the void*. Open.
+> which contradicts *the void*.
+>
+> **The reported quantity becomes the *degree of life*, L = −E** — Alexander's own
+> term, and the semantics required: zero for nothing, higher for more. `E` is kept
+> as the quantity `evolve()` minimises, where the energy analogy is sound: a
+> catenary or a minimal surface minimises an energy *subject to a constraint*, and
+> without the constraint every such minimum is trivial. That is precisely the bug
+> — nothing here constrains how much structure exists.
+>
+> The rename lands with the participation change, not before. Flipping the sign
+> today would report the Ardabil at −1.4 life and a blank canvas at 0: the
+> *ordering* is wrong, not merely the offset. Open.
 
 The total is a weighted sum of six terms. The weights are derived, not chosen: each
 is `PRIORITY / SCALE`, where `SCALE` is that term's standard deviation over a fixed
