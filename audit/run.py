@@ -185,55 +185,45 @@ def redundancy(corpus_scores):
           f"of the variance across 15 'independent' measures")
 
 
-def sweeps():
-    """Do measures track the ground truth they were built to detect?"""
-    from scipy.stats import spearmanr
-    _header("Ground-truth sweeps  (Spearman rho against the generator parameter)")
-    for name, (fn, values, target) in stimuli.SWEEPS.items():
-        got = []
+def measure_generators():
+    """Score every generator stimulus once, and return the results.
+
+    Both the centre-count stage and the sweep stage need the same ~180 scores, and
+    each score is several seconds. They are computed here and shared rather than
+    computed twice.
+    """
+    out = {}
+    for name, (fn, values, target, test) in stimuli.SWEEPS.items():
+        rows = []
         for v in values:
-            _, _, raw, _ = score(fn(v))
-            got.append(raw[target])
-        # A sweep point where the measure is undefined carries no rank
-        # information, so it is dropped rather than imputed.
-        pairs = [(v, g) for v, g in zip(values, got) if g is not None]
-        dropped = len(values) - len(pairs)
-        if len(pairs) < 3:
-            print(f"  {name:<14} -> {target:<24} undefined at "
-                  f"{dropped}/{len(values)} sweep points; no rho")
-            continue
-        rho = spearmanr([p[0] for p in pairs], [p[1] for p in pairs]).statistic
-        flag = "" if abs(rho) > 0.9 else "   <-- does not track its own ground truth"
-        note = f"  ({dropped} undefined)" if dropped else ""
-        print(f"  {name:<14} -> {target:<24} rho = {rho:+.3f}{flag}{note}")
+            n, _, raw, norm = score(fn(v))
+            rows.append((v, n, raw[target], norm[target]))
+        out[name] = (target, test, rows)
+    return out
 
 
-def generators():
+def generators(measured):
     """Centre counts for every synthetic stimulus.
 
-    Cheap, and always run. A front-end change can look clean on the six carpets
-    and still destroy the synthetic stimuli that every later stage depends on:
-    dividing the field by the cap rather than by its own maximum was a 0.0-0.7%
-    no-op on the corpus while collapsing the lattice generators from 481 centres
-    to 4, because the cap does not bite on sparse images and the absolute
-    detection threshold then rejects almost everything (#27).
+    Cheap relative to the rest, and always run. A front-end change can look clean
+    on the six carpets and still destroy the synthetic stimuli that every later
+    stage depends on: dividing the field by the cap rather than by its own maximum
+    was a 0.0-0.7% no-op on the corpus while collapsing the lattice generators
+    from 481 centres to 4, because the cap does not bite on sparse images and the
+    absolute detection threshold then rejects almost everything (#27).
 
-    That regression was invisible from the corpus and obvious here, so this
-    stage exists to make it impossible to miss again.
+    That regression was invisible from the corpus and obvious here, so this stage
+    exists to make it impossible to miss again.
     """
     _header("Generator centre counts  (the instrument every later stage depends on)")
     collapsed = []
-    for name, (fn, values, target) in stimuli.SWEEPS.items():
-        counts = []
-        for v in values:
-            n, _, _, _ = score(fn(v))
-            counts.append(n)
+    for name, (target, _, rows) in measured.items():
+        counts = [n for _, n, _, _ in rows]
+        for v, n, _, _ in rows:
             if n < 10:
                 collapsed.append(f"{name}={v:g} ({n})")
-        joined = " ".join(f"{c:>5}" for c in counts)
-        params = " ".join(f"{v:>5g}" for v in values)
-        print(f"  {name:<14} param {params}")
-        print(f"  {'':<14} n     {joined}")
+        print(f"  {name:<18} param " + " ".join(f"{v:>5g}" for v, _, _, _ in rows))
+        print(f"  {'':<18} n     " + " ".join(f"{c:>5}" for c in counts))
     if collapsed:
         print(f"\n  WARNING — {len(collapsed)} stimuli yield fewer than 10 centres:")
         print(f"    {', '.join(collapsed)}")
@@ -243,22 +233,105 @@ def generators():
     return collapsed
 
 
+def _monotone_verdict(name, target, pairs, dropped):
+    from scipy.stats import spearmanr
+    rho = spearmanr([p[0] for p in pairs], [p[1] for p in pairs]).statistic
+    flag = "" if abs(rho) > 0.9 else "   <-- does not track its own ground truth"
+    note = f"  ({dropped} undefined)" if dropped else ""
+    print(f"  {name:<18} -> {target:<24} monotone  rho = {rho:+.3f}{flag}{note}")
+    return rho
+
+
+def _optimum_verdict(name, target, pairs, claimed, dropped):
+    """For a measure with an interior ideal, report where the ideal actually is.
+
+    These measures are deviations from a target — ``levels_of_scale`` is
+    ``(log(r_parent/r_child) - log 3)**2`` — so they should be *minimal* at the
+    parameter value the theory names and rise on both sides of it. A high
+    Spearman rho over the whole sweep would mean the measure is not centred where
+    it claims to be, so rho is the wrong statistic and is not printed. What is
+    printed is the location of the minimum against the claimed one, and the
+    one-sided rank correlations, which is what a V shape actually asserts.
+    """
+    from scipy.stats import spearmanr
+    xs = [p[0] for p in pairs]
+    ys = [p[1] for p in pairs]
+    at = xs[int(np.argmin(ys))]
+    left = [(x, y) for x, y in pairs if x <= claimed]
+    right = [(x, y) for x, y in pairs if x >= claimed]
+    lo = (spearmanr([p[0] for p in left], [p[1] for p in left]).statistic
+          if len(left) > 2 else None)
+    hi = (spearmanr([p[0] for p in right], [p[1] for p in right]).statistic
+          if len(right) > 2 else None)
+    ok = abs(at - claimed) <= 0.5 * (max(xs) - min(xs)) / (len(xs) - 1)
+    flag = "" if ok else "   <-- minimum is not where the measure claims it is"
+    note = f"  ({dropped} undefined)" if dropped else ""
+    print(f"  {name:<18} -> {target:<24} optimum   min at {at:g}, "
+          f"claimed {claimed:g}{flag}{note}")
+    print(f"  {'':<18}    {'':<24} falling below rho = "
+          f"{'  n/a' if lo is None else f'{lo:+.3f}'}, rising above rho = "
+          f"{'  n/a' if hi is None else f'{hi:+.3f}'}   (a V wants - then +)")
+    return at
+
+
+def sweeps(measured):
+    """Do measures track the ground truth they were built to detect?
+
+    Two tests, chosen per generator in ``stimuli.SWEEPS`` and named in each row:
+
+    *monotone* — the measure should move one way with the parameter throughout,
+    and Spearman's rho over the whole sweep is the statistic.
+
+    *optimum* — the measure claims an ideal in the *middle* of the sweep, so it
+    should be extremal there rather than monotone, and a high rho would be
+    evidence against it. See ``_optimum_verdict``.
+
+    Every row also reports where the *normalised* 0-10 score peaks, which is the
+    parameter value the tool would call ideal if asked. For a monotone property
+    that should be an end of the sweep; anywhere else means the normaliser has
+    put an optimum where the measure does not have one.
+    """
+    _header("Ground-truth sweeps  (against the generator parameter; test named per row)")
+    for name, (target, (kind, arg), rows) in measured.items():
+        # A sweep point where the measure is undefined carries no rank
+        # information, so it is dropped rather than imputed.
+        pairs = [(v, raw) for v, _, raw, _ in rows if raw is not None]
+        scored = [(v, s) for v, _, _, s in rows if s is not None]
+        dropped = len(rows) - len(pairs)
+        if len(pairs) < 3:
+            print(f"  {name:<18} -> {target:<24} undefined at "
+                  f"{dropped}/{len(rows)} sweep points; no statistic")
+            continue
+        if kind == "optimum":
+            _optimum_verdict(name, target, pairs, arg, dropped)
+        else:
+            _monotone_verdict(name, target, pairs, dropped)
+        peak = max(scored, key=lambda p: p[1])[0]
+        print(f"  {'':<18}    {'':<24} normalised score peaks at {peak:g}"
+              f"  (sweep spans {min(v for v, _ in pairs):g} to "
+              f"{max(v for v, _ in pairs):g})")
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--quick", action="store_true",
-                   help="Skip the slower invariance and sweep stages. NOT sufficient "
-                        "to validate a change — see the notice printed at the end.")
+                   help="Skip the invariance, triage and sweep stages. Saves less "
+                        "than it used to — the sweeps now reuse the generator scores "
+                        "rather than recomputing them, so only invariance is skipped. "
+                        "NOT sufficient to validate a change — see the notice printed "
+                        "at the end.")
     args = p.parse_args()
 
     nulls = null_controls()
     cs = corpus(nulls)
-    generators()
+    measured = measure_generators()
+    generators(measured)
     if not args.quick:
         imgs = [os.path.join(IMAGES, f) for f in sorted(os.listdir(IMAGES))
                 if f.endswith((".jpg", ".png"))][:3]
         noise = invariance(imgs)
         triage(cs, noise)
-        sweeps()
+        sweeps(measured)
     redundancy(cs)
 
     print()
