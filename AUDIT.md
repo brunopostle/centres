@@ -515,101 +515,107 @@ features of the measures.
   its edges outright: 1198 centres → 12.
 
 
-## 13. Triage of the fifteen measures
+## 13. Triage of the fifteen measures, against the sourced definitions
 
-The verdict for each measure, on the evidence in this document. Required by
-[#21](https://github.com/brunopostle/centres/issues/21), which gates the
-reappraisal work behind the repository owner's agreement.
+*Redone against Salingaros (2025) — `docs/salingaros-2025-fifteen-properties.pdf`
+— and against the count-controlled figures in §16. The first version of this
+section ranked measures by whether they tracked their own generator. With a
+source in hand the prior question is whether the formula operationalises the
+property at all, and for eleven of the fifteen it does not.*
 
-**ρ** is the ground-truth sweep (§12): does the measure track the quantity it is
-named for, on a stimulus where the answer is known by construction?
-**SNR** is signal against measurement noise (§5): is the spread between artworks
-larger than the spread produced by transformations that cannot change an artwork?
+Required by [#21](https://github.com/brunopostle/centres/issues/21), which gates
+#22–#24 behind the repository owner's agreement.
 
-The two ask different questions, and a measure needs both. ρ without SNR is a
-measure that works in the laboratory and not in the field; SNR without ρ is a
-measure that reports something stable that is not what it claims.
+**ρ** is the partial correlation from §16 — each generator against its own target,
+holding the centre count fixed. It supersedes the raw ρ of §12, which for two
+measures was an artefact. **SNR** is signal against measurement noise (§5).
 
-| property | ρ | SNR | verdict |
-|---|---:|---:|---|
-| strong centres | **+0.993** | 2.11 | **KEEP** |
-| echoes | +0.790 | 6.09 | **PROVISIONAL** |
-| simplicity | +0.699 | 3.65 | **PROVISIONAL** |
-| roughness | +0.629 | 4.03 | **PROVISIONAL** |
-| the void | +0.804 | **0.84** | **STARVED** |
-| gradients | +0.517 | 1.05 | **REPAIR** |
-| not-separateness | +0.406 | 2.67 | **REPAIR** |
-| levels of scale | *not extremal at 3* | 3.69 | **REPAIR** |
-| alternating repetition | +0.091 | 4.07 | **REDEFINE** |
-| boundaries | +0.455 | 6.13 | **REDEFINE** |
-| positive space | −0.399 | 1.87 | **REDEFINE** |
-| good shape | −0.483 | 3.53 | **REDEFINE** |
-| deep interlock | −0.508 | 1.80 | **REDEFINE** |
-| local symmetries | −0.601 | 3.18 | **REDEFINE** |
-| contrast | **−0.882** *(flat)* | 7.23 | **REDEFINE** |
+| # | property | the source's operative content | what the code computes | ρ | SNR | verdict |
+|---|---|---|---|---:|---:|---|
+| 2 | strong centres | defined **and** implied centres, nested, overlapping | mean strength of the top quartile | **+0.99** | 2.11 | **KEEP** |
+| 1 | levels of scale | magnification **band 2–5**, measured separately in vertical and horizontal | quadratic penalty about a single ratio of 3 | +0.15 | 3.69 | **REPAIR** |
+| 11 | roughness | adaptation privileged over precision; regularity broken | CV of nearest-neighbour distances | +0.44 | 4.03 | **REPAIR** |
+| 14 | simplicity | coherence not reductionism; **emptiness is sterile** | Gini coefficient of strengths | +0.75 | 3.65 | **REPAIR** |
+| 3 | thick boundaries | boundary ≈ **1/3 of what it bounds**; itself an implied centre | field value at midpoints of graph edges | +0.62 | 6.13 | **REDEFINE** |
+| 4 | alternating repetition | information **not collapsible** to one repeating unit | dispersion of diffused strengths | +0.18 | 4.07 | **REDEFINE** |
+| 5 | positive space | space **convex**, enclosing boundary **concave** | deviation from 0.65 child-area coverage | −0.38 | 1.87 | **REDEFINE** |
+| 6 | good shape | **compact**, graspable, from nested symmetries | fraction of centres having a child | +0.16 | 3.53 | **REDEFINE** |
+| 8 | deep interlock | interpenetration at a **semi-permeable, complex** interface | fraction of graph edges whose extents overlap | −0.34 | 1.80 | **REDEFINE** |
+| 12 | echoes | **motif similarity** within and across scales | std of log scale ratios | +0.80 | 6.09 | **REDEFINE** |
+| 15 | not-separateness | connects to its **environment**, beyond internal coherence | Fiedler value of the graph | +0.24 | 2.67 | **REDEFINE** |
+| 7 | local symmetries | **bilateral about the vertical axis**, nested, one per scale | radial distance of children from parents | −0.58 | 3.18 | **BLOCKED** |
+| 9 | contrast | **black-white and colour** contrast | strength difference across graph edges | −0.88 | 7.23 | **BLOCKED** |
+| 10 | gradients | gradual change in **colour, size or texture** | mean squared gradient of the blob rendering | +0.52 | 1.05 | **BLOCKED** |
+| 13 | the void | complex structure **surrounds and defines** the void | gradient magnitude inside the strongest centre | **−0.04** | 0.84 | **SPURIOUS** |
 
-**One measure is fit to report. Four are reportable with caveats. Ten are not.**
+**1 keep · 3 repair · 7 redefine · 3 blocked · 1 spurious.**
 
 ### What the verdicts mean
 
-**KEEP** — tracks its ground truth and separates artworks by more than it separates
-an artwork from its own mirror image. Only `strong_centres` qualifies.
+**KEEP** — operationalises the source, tracks its ground truth after controlling for
+the centre count, and separates artworks by more than it separates an artwork from
+its own mirror image. Only `strong_centres`, and with two qualifications: §14 shows
+it is not isolating, and the source says centres are of two kinds — defined and
+implied — which it does not yet distinguish, though `Center.polarity` now can.
 
-**PROVISIONAL** — tracks in the right direction but loosely (0.6 ≤ ρ < 0.9).
-Usable for comparison between images, not as an absolute statement about one.
+**REPAIR** — right quantity, wrong formula or constant.
 
-**STARVED** — tracks its ground truth on a clean stimulus and is swamped by noise
-on real photographs. This is the category the whole audit was built to identify,
-because its fix is upstream: `the_void` is computed on the *reconstructed*
-Gaussian field rather than on the image, so it measures the blob rendering. Point
-it at the structural field and re-measure before touching the formula.
+- `levels_of_scale` reads scale ratios, which the centre set carries. The source
+  gives a **band of 2–5**, not a point, so the quadratic about log 3 is the wrong
+  *shape* whatever the constant — and §12 measured its minimum at **2.381**, inside
+  the sourced band. Rebuild it as a band penalty and re-measure. (Its directional
+  requirement — vertical and horizontal separately — is blocked; see below.)
+- `roughness` is defensible as it stands: the source says roughness arises because
+  "adaptation to local conditions … breaks regularity and perfect symmetry", and
+  deviation-from-regularity is a fair reading of that. What is unsourced is the
+  normaliser's peak at CV = 0.5.
+- `simplicity` measures concentration, which is adjacent to the source's "trimming
+  irrelevant parts". But the source explicitly forbids the degenerate case —
+  "an empty, minimalist design has no informational content" — and that constraint
+  is not encoded anywhere.
 
-**REPAIR** — the current representation carries what the measure needs; the formula
-is wrong. `gradients` shares `the_void`'s defect. `not_separateness` is a graph
-property computed on a graph the representation does have. `levels_of_scale` reads
-scale ratios, which the centre set carries — but the LoG ladder quantises them to
-powers of 1.42 while the target ratio is 3, so it may be partly starved by #9;
-re-measure after that lands. Its target of 3 is also unsourced (§11).
+**REDEFINE** — the property is real, the formula measures a different quantity. Each
+needs #22, and the source now specifies what:
 
-**REDEFINE** — the representation cannot carry what the property is about, so no
-formula over the current centre set will do. Each needs #22:
-
-| property | what it needs that `(x, y, scale, strength)` does not carry |
+| property | what to build |
 |---|---|
-| contrast | tone — the field is a distance transform and carries none, which is why it is *flat* rather than merely wrong |
-| good shape | region geometry — the formula is "fraction of centres with a child" and contains no shape information of any kind |
-| local symmetries | image-domain symmetry — symmetry is never computed; the formula measures radial distance of children from parents |
-| positive space | convexity of the interstitial ground — the formula is deviation from 0.65 child-area coverage, which is a different quantity, and 0.65 is unsourced |
-| boundaries | boundary geometry in the image — currently read off the Gaussian rendering, and thickness cannot be separated from feature scale in any case (§12) |
-| deep interlock | boundary geometry — spans 0.2 of 10 across the whole corpus, so it is close to a constant |
-| alternating repetition | periodicity — the formula is dispersion of strengths that have just been through a diffusion, and diffusion destroys alternation |
+| thick boundaries | boundary thickness as a fraction of the enclosed extent, target ≈ 1/3 |
+| alternating repetition | collapsibility — does the pattern reduce to one repeating unit? |
+| positive space | convexity of the interstitial region, concavity of its enclosing solid |
+| good shape | compactness of the region, not a hierarchy statistic |
+| deep interlock | complexity of the shared interface between adjacent regions |
+| echoes | shape similarity of motifs, within and across scales |
+| not-separateness | relation to surroundings — note this may be unmeasurable from a cropped photograph, which is worth deciding before building |
 
-**RETIRE** — none. Every one of the fifteen is a real property in Alexander's
-sense. What should be retired is seven *formulas*, not seven properties.
+**BLOCKED** — cannot be computed from this representation at all, however the
+formula is written. The structural field is a **direction-free, tone-free** distance
+transform. `contrast` is explicitly colour; `gradients` is colour and texture;
+`local_symmetries` is explicitly about the **vertical** axis. `contrast` is the
+proof: it is *flat* — figure/ground contrast triples while the measure moves 0.2%
+— and its generator holds the centre count constant, so that result is
+unconfounded.
 
-### The practical recommendation
+**SPURIOUS** — `the_void`'s ρ = +0.804 in §12 was **entirely a centre-count
+artefact**. Clearing a growing central region removes centres, and the measure was
+reading the removal. Partial the count out and it is −0.04. It was never tracking.
 
-Report `strong_centres` outright, and the three provisional measures with their
-uncertainty. **Withhold the other eleven from the output** — behind a flag, or
-removed — until their verdicts are acted on. A tool that reports four measures it
-can defend is more useful for assessing 2D artwork than one that reports fifteen
-it cannot, and the present output invites a reader to compare numbers that do not
-mean what their labels say.
+### Three corrections the source forces on the rest of this document
 
-### Two cautions on this table
+1. **Gap centres are not a defect.** The source names "implied" centres — a complex
+   boundary focusing attention on an emptier interior — as one of the two kinds.
+   §1's framing of the 256 gap detections as spurious was wrong.
+2. **Overlap is required.** "Many such mutually-reinforcing centers interconnect and
+   **overlap**, rather than being isolated." `locality_energy` penalises it and
+   carries the largest weight in the functional.
+3. **Emptiness is condemned outright**, so §2a's structureless minimum contradicts
+   the theory rather than merely being counter-intuitive.
 
-**The SNR column is measured on six images.** It is the best available estimate of
-each measure's noise floor, but six artworks is a small sample and the corpus is
-all Persian carpets. A measure that separates carpets may not separate paintings.
+### The practical recommendation, unchanged in shape and sharper in content
 
-**Redundancy is not evidence here.** The audit originally reported "3 principal
-components explain 90% of the variance across 15 measures", computed over the six
-corpus images. With 6 samples and 15 variables the correlation matrix has rank at
-most 5, so that finding was largely an artefact of sample size. Recomputed over a
-33-case ensemble the answer is 6 components for 90% and 8 for 95% — the measures
-are *more* independent than the original figure suggested. The harness now
-computes it over the full ensemble.
-
+Report `strong_centres`. Withhold the other fourteen until their verdicts are
+acted on. Three of them cannot be fixed without a tonal and directional
+representation, one has never measured anything, and seven measure a different
+quantity from the one named on them.
 
 ## 14. Sensitivity matrix: no measure is dominated by its own generator
 
