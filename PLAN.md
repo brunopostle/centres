@@ -11,6 +11,22 @@ being fed a bad centre set, and phase C is what separates them.
 
 Phase B is independent and can proceed in parallel with A at any time.
 
+## Standing rules
+
+1. **Every change is measured against the corpus AND the synthetic generators,
+   with the full `python -m audit`, not `--quick`.** Corpus-only validation has
+   hidden a regression twice — #27's normalisation change was a 0.0–0.7% no-op on
+   the six carpets while collapsing the lattice generators from 481 centres to 4,
+   and #11's crop criterion was passed by the buggy code and unpassable by any
+   correct one. The harness now always prints generator centre counts and warns
+   when a stimulus collapses, and `--quick` prints a VALIDATION INCOMPLETE notice.
+2. **A claim in `THEORY.md` that is measured and found false is corrected there,
+   not left standing.** Much of that document was assembled by AI tools across
+   several rounds with nothing able to distinguish an improvement from a
+   regression. Falsified claims are marked inline and listed in a status table at
+   the top. Where the right replacement is not yet known, the claim is struck and
+   marked open rather than quietly softened.
+
 ## Project invariant
 
 **Every threshold is expressed in units of the artwork's own characteristic scale

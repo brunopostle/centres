@@ -182,14 +182,51 @@ def sweeps():
         print(f"  {name:<14} -> {target:<24} rho = {rho:+.3f}{flag}{note}")
 
 
+def generators():
+    """Centre counts for every synthetic stimulus.
+
+    Cheap, and always run. A front-end change can look clean on the six carpets
+    and still destroy the synthetic stimuli that every later stage depends on:
+    dividing the field by the cap rather than by its own maximum was a 0.0-0.7%
+    no-op on the corpus while collapsing the lattice generators from 481 centres
+    to 4, because the cap does not bite on sparse images and the absolute
+    detection threshold then rejects almost everything (#27).
+
+    That regression was invisible from the corpus and obvious here, so this
+    stage exists to make it impossible to miss again.
+    """
+    _header("Generator centre counts  (the instrument every later stage depends on)")
+    collapsed = []
+    for name, (fn, values, target) in stimuli.SWEEPS.items():
+        counts = []
+        for v in values:
+            n, _, _, _ = score(fn(v))
+            counts.append(n)
+            if n < 10:
+                collapsed.append(f"{name}={v:g} ({n})")
+        joined = " ".join(f"{c:>5}" for c in counts)
+        params = " ".join(f"{v:>5g}" for v in values)
+        print(f"  {name:<14} param {params}")
+        print(f"  {'':<14} n     {joined}")
+    if collapsed:
+        print(f"\n  WARNING — {len(collapsed)} stimuli yield fewer than 10 centres:")
+        print(f"    {', '.join(collapsed)}")
+        print("  A stimulus the detector cannot see cannot validate anything. Some of")
+        print("  these are genuine (a zero-contrast field has nothing to detect); a")
+        print("  sudden change in this table after a front-end edit is not.")
+    return collapsed
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--quick", action="store_true",
-                   help="Skip the slower sweep and invariance stages.")
+                   help="Skip the slower invariance and sweep stages. NOT sufficient "
+                        "to validate a change — see the notice printed at the end.")
     args = p.parse_args()
 
-    nulls = null_controls()
+    null_controls()
     cs = corpus()
+    generators()
     if not args.quick:
         imgs = [os.path.join(IMAGES, f) for f in sorted(os.listdir(IMAGES))
                 if f.endswith((".jpg", ".png"))][:3]
@@ -197,6 +234,18 @@ def main():
         triage(cs, noise)
         sweeps()
     redundancy(cs)
+
+    print()
+    if args.quick:
+        print("  " + "=" * 68)
+        print("  VALIDATION INCOMPLETE — --quick skipped invariance, triage and the")
+        print("  ground-truth sweeps. Do not report a change as verified on this run.")
+        print("  Every change is measured against the corpus AND the generators, with")
+        print("  the full `python -m audit`. Corpus-only validation has hidden a")
+        print("  regression twice (#27, and the crop criterion on #11).")
+        print("  " + "=" * 68)
+    else:
+        print("  Full run: corpus, generators, invariance, triage and sweeps.")
 
 
 if __name__ == "__main__":

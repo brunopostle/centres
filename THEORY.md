@@ -4,6 +4,33 @@ This document sets out the mathematical theory implemented in this codebase. The
 
 ---
 
+> ## ⚠ Status: parts of this document are known to be false
+>
+> This theory was assembled largely by AI tools across several rounds of revision,
+> with no test that could tell an improvement from a regression. [`AUDIT.md`](AUDIT.md)
+> supplies that test, and it has falsified a number of the claims below. Corrections
+> are marked **⚠ FALSIFIED** inline, with the measurement and the tracking issue.
+>
+> Standing rule for this document: **a claim that has been measured and found false
+> is corrected here, not left standing.** Where the right replacement is not yet
+> known, the claim is struck and marked open rather than quietly softened.
+>
+> Falsified so far:
+>
+> | § | Claim | Status |
+> |---|---|---|
+> | 8 | "Lower energy = greater wholeness" | **False.** The functional's minimum is the *absence* of structure ([#28](https://github.com/brunopostle/centres/issues/28)) |
+> | 8 | The stated weights, incl. `50·E_L` | **Superseded.** Terms were not intensive; the total was centre count × 0.27 ([#14](https://github.com/brunopostle/centres/issues/14)) |
+> | 8.4 | Child coverage of 0.65 | **Unsourced.** Attributed to Alexander with no citation ([#24](https://github.com/brunopostle/centres/issues/24)) |
+> | 8.5 | Radial band of 0.3–0.7 | **Unsourced.** Attributed to Alexander with no citation ([#24](https://github.com/brunopostle/centres/issues/24)) |
+> | 9 | "All 15 properties arise as stable patterns when E is minimised" | **Unsupported.** Never demonstrated; four of five measures tested fail to track their own ground truth |
+> | 11 | 15 levels of scale "follows mathematically" | **Circular.** Assumes 3¹⁴ in order to conclude 14 |
+> | 11 | Wholeness as a renormalisation fixed point | **Unsupported.** Nothing in the implementation bears on it |
+>
+> Sections 2, 4, 5 and 6 have been corrected in place as the implementation changed.
+
+---
+
 ## 1. Background: Alexander's Concept of Centres
 
 Alexander argues that living structure — in buildings, cities, art, and nature — arises from a recursive system of **centres**: coherent spatial regions that draw attention and reinforce each other. A centre is not just a point; it is a region of space with a degree of *strength* (salience, coherence) and a *scale*.
@@ -124,11 +151,47 @@ This is a superposition of Gaussian kernels, one per centre, weighted by strengt
 
 ## 8. The Energy Functional
 
-Structural energy E is a scalar measuring how far a configuration departs from Alexander's ideal. **Lower energy = greater wholeness.** The total is a weighted sum of six terms:
+Structural energy E is a scalar measuring how far a configuration departs from Alexander's ideal.
 
-```
-E = 0.3·E_H + 0.3·E_R + 0.2·E_C + 0.1·E_A + 0.1·E_φ + 50·E_L
-```
+> **⚠ FALSIFIED — "Lower energy = greater wholeness" is the wrong framing.**
+>
+> The functional's global minimum is the *absence* of structure. 36 centres at
+> identical scale, spaced far apart, have no parent-child pairs (identical scales
+> admit no parent), no graph edges (spacing beyond the weight threshold) and no
+> overlap. Every term is a deviation penalty evaluated only over the objects it
+> applies to, so all of them are zero:
+>
+> ```
+> equal scales, far apart:  E = +0.081   edges = 0   pairs = 0   overlap = 0
+> random, same canvas:      E = +1.396   edges = 23  pairs = 12  overlap = 0.0034
+> real carpets:             E = +0.95 .. +1.74
+> ```
+>
+> **Nothing in the functional rewards structure existing**, so emptiness scores
+> better than any artwork. `evolve()` does not collapse to this only because its
+> move set is too weak to reach it — the generative mode works by failing to
+> optimise its own objective.
+>
+> The intended framing, per the repository owner on
+> [#28](https://github.com/brunopostle/centres/issues/28): the empty case should
+> score **zero**, structure should be **rewarded** (negative), and the reward must
+> not be a sum over centres — that would simply cram in as many centres as possible,
+> which contradicts *the void*. Open.
+
+The total is a weighted sum of six terms. The weights are derived, not chosen: each
+is `PRIORITY / SCALE`, where `SCALE` is that term's standard deviation over a fixed
+33-case reference ensemble, so each term contributes its intended share of the
+total's variation. Locality is sized separately, as a barrier rather than a
+descriptor.
+
+> **⚠ SUPERSEDED — the previously stated weights.** This document gave
+> `E = 0.3·E_H + 0.3·E_R + 0.2·E_C + 0.1·E_A + 0.1·E_φ + 50·E_L`. Three of those
+> terms were sums over centres and two were means, so the total scaled with N and
+> correlated with centre count at **r = 0.993** — the reported energy was the centre
+> count times 0.27. The `50` on E_L had no traceable derivation; the claim that it
+> existed to dominate an O(N²) reinforcement term was wrong, since E_R has been
+> normalised since the initial commit. See
+> [#14](https://github.com/brunopostle/centres/issues/14).
 
 ### 8.1 Hierarchy Energy E_H
 
@@ -150,7 +213,7 @@ E_R = -(1 / (N(N-1)/2)) · Σ_{ij} W_ij · s_i · s_j
 
 Lower (more negative) E_R means pairs of strongly connected centres both have high strength. This is the correct measure of *strong centres*: the energy is minimised by configurations where spatially clustered, scale-similar centres are all strong together.
 
-Normalisation by N(N-1)/2 is essential: without it E_R scales as O(N²), and the global minimum is a degenerate cluster where all centres coincide (maximising every W_ij to 1 and every s_i to 10 after propagation), outweighing all other terms by orders of magnitude.
+Normalisation is essential: without it E_R scales as O(N²) and the global minimum is a degenerate cluster where all centres coincide. It is now divided by the **edge count** rather than by N(N-1)/2 — both kill the O(N²) sum, but a spatially local graph has O(N) edges, so the old denominator left the term decaying as O(1/N).
 
 *Note on an earlier formulation.* A previous version used E_R = Σ W_ij (s_i - s_j)², which is minimised by equal but arbitrarily weak strengths — rewarding uniformity and blandness rather than coherent strength. The product formulation corrects this.
 
@@ -162,7 +225,11 @@ Penalises spatial overlap between centres, preventing the degenerate cluster min
 E_L = (1 / (N(N-1)/2)) · Σ_{i<j} exp( -d_ij² / (r_i + r_j)² )
 ```
 
-E_L = 1 when all centres are coincident; E_L ≈ 0 when centres are well-separated relative to their scales. The large coefficient (50) ensures this penalty dominates over the O(1) reinforcement gain from clustering, while still allowing nearby centres of similar scale to form genuine local clusters.
+E_L = 1 when all centres are coincident; E_L ≈ 0 when centres are well-separated relative to their scales.
+
+Its weight is **5.54**, not the 50 previously stated, and is derived from what the barrier has to do rather than chosen. The sizing turns on a point that is easy to miss: at full collapse E_H, E_C and E_A all go to *zero*, because assigning a parent requires a strictly larger centre. A barrier sized only against the reinforcement gain leaves the collapsed configuration marginally *below* a random one. Requiring collapse to cost more than the worst configuration in the reference ensemble gives 5.54.
+
+E_L is also the one term that is not intensive: it divides by all N(N-1)/2 pairs while only O(N) contribute, so it decays as 1/N when a whole scene is scaled up. Every intensive overlap measure tried was O(1) on real centre sets and so could not carry a barrier-sized weight without swamping the descriptive terms. Splitting the barrier from the descriptor is open, and entangled with [#28](https://github.com/brunopostle/centres/issues/28).
 
 ### 8.4 Coverage Energy E_C
 
@@ -173,7 +240,9 @@ C_i = Σ_{j∈children(i)} r_j² / r_i²
 E_C = Σ_i (C_i - 0.65)²
 ```
 
-C_i ≈ 0.65 means children collectively occupy about 65% of the parent's area — filled without overcrowding. This encodes Alexander's *positive space*: regions are well-formed and occupied rather than fragmented or empty.
+C_i ≈ 0.65 means children collectively occupy about 65% of the parent's area — filled without overcrowding. This is intended to encode Alexander's *positive space*: regions well-formed and occupied rather than fragmented or empty.
+
+> **⚠ UNSOURCED.** The value 0.65 is not Alexander's and has no citation. It appears to have been invented and then attributed. Either source it or derive it from the corpus and say so. [#24](https://github.com/brunopostle/centres/issues/24)
 
 ### 8.5 Alignment Energy E_A
 
@@ -184,7 +253,10 @@ d_i = dist(c_i, c_{p(i)}) / r_{p(i)}
 E_A = Σ_i (d_i - 0.5)²
 ```
 
-Alexander observed that child centres tend to lie at 0.3–0.7 of the parent radius from the parent centre. The target 0.5 is the midpoint of this range. Too close to the parent's centre (d << 0.3) produces concentric but weakly differentiated structure; too far (d >> 0.7) breaks containment. This encodes *local symmetries* and *deep interlock*.
+The target 0.5 is the midpoint of a supposed 0.3–0.7 range.
+
+> **⚠ UNSOURCED.** "Alexander observed that child centres tend to lie at 0.3–0.7 of the parent radius" carries no citation and appears to be invented. [#24](https://github.com/brunopostle/centres/issues/24)
+ Too close to the parent's centre (d << 0.3) produces concentric but weakly differentiated structure; too far (d >> 0.7) breaks containment. This encodes *local symmetries* and *deep interlock*.
 
 ### 8.6 Field Energy E_φ
 
@@ -200,7 +272,9 @@ Minimising E_φ encourages *gradients* — smooth transitions between regions of
 
 ## 9. Connection to Alexander's 15 Properties
 
-All 15 properties arise as stable patterns when E is minimised. Each can also be computed directly as a scalar score from the centre set, field, and reinforcement graph — see `centres/properties.py` and the `compute_all()` function. The CLI displays all 15 scores after every analysis.
+> **⚠ UNSUPPORTED.** The claim that all 15 properties arise as stable patterns when E is minimised has never been demonstrated, and nothing in the repository tests it. Five different properties are attributed to the same driver (E_R). Against it: on synthetic stimuli where the answer is known by construction, **four of the five measures tested fail to track the quantity they were built to detect** — levels of scale is uncorrelated (ρ = −0.10) with a swept parent:child scale ratio, and alternating repetition runs backwards (ρ = −0.60). See AUDIT.md §12.
+
+The intended claim was that all 15 properties arise as stable patterns when E is minimised. Each can also be computed directly as a scalar score from the centre set, field, and reinforcement graph — see `centres/properties.py` and the `compute_all()` function. The CLI displays all 15 scores after every analysis.
 
 | Property | Energy driver | Score (from `properties.py`) |
 |---|---|---|
@@ -240,10 +314,16 @@ The result tends toward configurations with hierarchical scaling, strong local c
 
 ## 11. Scale-Invariance and the 15-Level Observation
 
-Alexander observed approximately 15 levels of scale in highly coherent structures. This follows mathematically from the hierarchy energy: if the minimum-energy scale ratio is k ≈ 3, and the ratio of largest to smallest centre is r_max/r_min ≈ 3^14 ≈ 5×10^6 (roughly the ratio of a city to a brick), then:
+> **⚠ CIRCULAR.** The derivation below assumes `r_max/r_min ≈ 3^14` in order to conclude that there are ≈14 levels. Substituting any other ratio yields any other number of levels, so it demonstrates nothing. Retained only as a record of what was claimed.
+
+Alexander observed approximately 15 levels of scale in highly coherent structures. This was claimed to follow mathematically from the hierarchy energy: if the minimum-energy scale ratio is k ≈ 3, and the ratio of largest to smallest centre is r_max/r_min ≈ 3^14 ≈ 5×10^6 (roughly the ratio of a city to a brick), then:
 
 ```
 L = log(r_max / r_min) / log(k) ≈ 14
 ```
 
-Near the minimum of E_H, centre sizes follow a power law P(r) ∝ r^{-γ}, which is the signature of a scale-invariant (fractal) system. This connects the theory to statistical physics: wholeness corresponds to configurations near a **fixed point of a renormalisation operator** — structures that look similar at every scale of observation.
+Near the minimum of E_H, centre sizes follow a power law P(r) ∝ r^{-γ}, which is the signature of a scale-invariant (fractal) system.
+
+> **⚠ UNSUPPORTED.** The claim that "wholeness corresponds to configurations near a fixed point of a renormalisation operator" is not supported by anything in the implementation. No renormalisation operator is defined, constructed or tested anywhere in the codebase. It is an analogy, and should be labelled as one or removed.
+>
+> The power-law claim is also untested, and is in tension with the measured behaviour of the detector: the LoG scale ladder runs σ = 2 → 48 in 10 log-spaced steps, a rung ratio of 1.42, so detected scale ratios are quantised to powers of 1.42 while the target ratio of 3 falls between rungs. Levels of scale and echoes partly report the sampling lattice rather than the image ([#9](https://github.com/brunopostle/centres/issues/9)).
