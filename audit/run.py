@@ -386,6 +386,76 @@ def sensitivity(measured):
     return rho
 
 
+
+def count_confound(measured):
+    """Is the centre count the common driver behind the sensitivity matrix?
+
+    Section 14 found that all fifteen measures respond more strongly to some
+    other generator than to their own, and that two generators - dominance and
+    void_size - drive most of them. Both make large changes to gross composition,
+    and gross composition changes the number of detected centres: across the
+    generators the count swings from 37 to 1169.
+
+    So the obvious hypothesis is that there is one underlying quantity, the
+    centre count, and the fifteen measures are fifteen views of it.
+
+    Two tests. First, the pooled rank correlation between each measure and the
+    count over every generator stimulus. Second - the one that decides it - the
+    *partial* correlation between each generator's parameter and its own target
+    measure, holding the count fixed. If the count is the whole story the raw and
+    partial figures diverge sharply; if the diagonal survives partialling, the
+    measures are seeing something the count does not carry.
+    """
+    from scipy.stats import spearmanr
+
+    pooled_n, pooled_m = [], {k: [] for k in KEYS}
+    for _, _, rows in measured.values():
+        for v, n, raw, _ in rows:
+            pooled_n.append(n)
+            for k in KEYS:
+                pooled_m[k].append(raw[k])
+
+    _header("Centre-count confound  (is the count the common driver?)")
+    print(f"  {'measure':<24}{'rho vs count':>14}   pooled over "
+          f"{len(pooled_n)} stimuli, counts {min(pooled_n)}-{max(pooled_n)}")
+    print("  " + "-" * 60)
+    for k in KEYS:
+        pairs = [(a, b) for a, b in zip(pooled_n, pooled_m[k]) if b is not None]
+        r = spearmanr([p[0] for p in pairs], [p[1] for p in pairs]).statistic
+        flag = "  <-- tracks the count" if abs(r) >= 0.7 else ""
+        print(f"  {k:<24}{r:+14.3f}{flag}")
+
+    def _partial(x, y, z):
+        """Spearman partial correlation of x and y controlling for z."""
+        rx = spearmanr(x, y).statistic
+        rz1 = spearmanr(x, z).statistic
+        rz2 = spearmanr(y, z).statistic
+        denom = np.sqrt((1 - rz1**2) * (1 - rz2**2))
+        return float("nan") if denom == 0 else (rx - rz1 * rz2) / denom
+
+    print(f"\n  Each generator against its own target, before and after holding "
+          f"the count fixed:")
+    print(f"  {'generator -> measure':<40}{'raw':>8}{'partial':>10}{'change':>9}")
+    print("  " + "-" * 68)
+    survived = 0
+    for gname, (target, _, rows) in measured.items():
+        trip = [(v, raw[target], n) for v, n, raw, _ in rows if raw[target] is not None]
+        if len(trip) < 4:
+            print(f"  {gname + ' -> ' + target:<40}{'too few defined points':>27}")
+            continue
+        xs = [t[0] for t in trip]
+        ys = [t[1] for t in trip]
+        ns = [t[2] for t in trip]
+        raw_r = spearmanr(xs, ys).statistic
+        par_r = _partial(xs, ys, ns)
+        if abs(par_r) >= abs(raw_r) - 0.1:
+            survived += 1
+        print(f"  {gname + ' -> ' + target:<40}{raw_r:+8.2f}{par_r:+10.2f}"
+              f"{abs(par_r) - abs(raw_r):+9.2f}")
+    print(f"\n  {survived} of {len(measured)} diagonals survive partialling out the "
+          f"count (lose < 0.1).")
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--quick", action="store_true",
@@ -407,6 +477,7 @@ def main():
         triage(cs, noise)
         sweeps(measured)
         sensitivity(measured)
+        count_confound(measured)
     extra = [norm for _, _, rows in measured.values() for _, _, _, norm in rows]
     extra += [v[2] for v in nulls.values()]
     redundancy(cs, extra)
