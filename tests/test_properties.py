@@ -43,6 +43,34 @@ def small_hierarchy():
     return [parent, child1, child2]
 
 
+def well_formed_hierarchy():
+    """A parent with three mutually adjacent children.
+
+    small_hierarchy() has only two children, so its graph has a single edge and
+    no node of degree 2 — which leaves alternating_repetition legitimately
+    undefined. That is a property of the fixture, not of the measure. Three
+    children at 120 degrees, each 0.5 * r_parent out, are mutually adjacent
+    (d = 26 against a touching distance of 20), giving every child degree 2.
+    """
+    import math
+
+    parent = c(0, 50, 50, 30.0, strength=2.0)
+    kids = []
+    for k, angle in enumerate((90, 210, 330)):
+        rad = math.radians(angle)
+        kids.append(
+            c(
+                k + 1,
+                50 + 15 * math.cos(rad),
+                50 + 15 * math.sin(rad),
+                10.0,
+                strength=1.0 + 0.4 * k,
+                parent=0,
+            )
+        )
+    return [parent] + kids
+
+
 def connected_graph(centers):
     G = build_graph(centers)
     return propagate_strength(G)
@@ -104,8 +132,8 @@ def test_alternating_repetition_high_with_varied_neighbours():
     # Centre with neighbours of very different strengths
     centers = [
         c(0, 0, 0, 10, strength=1.0),
-        c(1, 5, 0, 10, strength=0.1),
-        c(2, -5, 0, 10, strength=2.0),
+        c(1, 15, 0, 10, strength=0.1),
+        c(2, -15, 0, 10, strength=2.0),
     ]
     G = connected_graph(centers)
     score = alternating_repetition(G)
@@ -156,8 +184,8 @@ def test_local_symmetries_zero_at_half_radius():
 
 
 def test_deep_interlock_one_when_all_edges_overlap():
-    # Two centres whose radii overlap: d=5 < r1+r2=10+10=20
-    centers = [c(0, 0, 0, 10.0, strength=1.0), c(1, 5, 0, 10.0, strength=1.0)]
+    # Two centres whose radii overlap: d=15 < r1+r2=10+10=20
+    centers = [c(0, 0, 0, 10.0, strength=1.0), c(1, 15, 0, 10.0, strength=1.0)]
     G = connected_graph(centers)
     assert deep_interlock(centers, G) == pytest.approx(1.0, abs=1e-6)
 
@@ -190,14 +218,14 @@ def test_deep_interlock_empty_graph_is_undefined():
 
 
 def test_contrast_positive_with_strength_difference():
-    centers = [c(0, 0, 0, 10, strength=2.0), c(1, 5, 0, 10, strength=0.5)]
+    centers = [c(0, 0, 0, 10, strength=2.0), c(1, 15, 0, 10, strength=0.5)]
     G = connected_graph(centers)
     if G.has_edge(0, 1):
         assert contrast(G) > 0
 
 
 def test_contrast_zero_equal_strengths():
-    centers = [c(0, 0, 0, 10, strength=1.0), c(1, 5, 0, 10, strength=1.0)]
+    centers = [c(0, 0, 0, 10, strength=1.0), c(1, 15, 0, 10, strength=1.0)]
     G = connected_graph(centers)
     assert contrast(G) == pytest.approx(0.0, abs=1e-6)
 
@@ -259,7 +287,7 @@ def test_echoes_zero_consistent_ratios():
 
 def test_echoes_positive_inconsistent_ratios():
     parent = c(0, 0, 0, 30.0)
-    child1 = c(1, 5, 0, 10.0, parent=0)  # ratio 3
+    child1 = c(1, 15, 0, 10.0, parent=0)  # ratio 3
     child2 = c(2, -5, 0, 2.0, parent=0)  # ratio 15
     assert echoes([parent, child1, child2]) > 0
 
@@ -301,7 +329,7 @@ def test_simplicity_empty_is_undefined():
 
 
 def test_not_separateness_positive_connected():
-    centers = [c(0, 0, 0, 10, strength=1.0), c(1, 5, 0, 10, strength=1.0)]
+    centers = [c(0, 0, 0, 10, strength=1.0), c(1, 15, 0, 10, strength=1.0)]
     G = connected_graph(centers)
     if G.has_edge(0, 1):
         assert not_separateness(G) > 0
@@ -350,7 +378,7 @@ def test_compute_all_returns_all_fifteen():
 
 
 def test_compute_all_values_finite():
-    centers = small_hierarchy()
+    centers = well_formed_hierarchy()
     G = connected_graph(centers)
     field = reconstruct_field((100, 100), centers)
     for key, val in compute_all(field, centers, G).items():

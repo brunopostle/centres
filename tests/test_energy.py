@@ -51,8 +51,8 @@ def test_hierarchy_zero_no_parents():
 
 
 def test_reinforcement_more_negative_with_higher_strength():
-    G_weak = build_graph([c(0, 0, 0, 10, strength=0.1), c(1, 5, 0, 10, strength=0.1)])
-    G_strong = build_graph([c(0, 0, 0, 10, strength=2.0), c(1, 5, 0, 10, strength=2.0)])
+    G_weak = build_graph([c(0, 0, 0, 10, strength=0.1), c(1, 15, 0, 10, strength=0.1)])
+    G_strong = build_graph([c(0, 0, 0, 10, strength=2.0), c(1, 15, 0, 10, strength=2.0)])
     assert reinforcement_energy(G_strong) < reinforcement_energy(G_weak)
 
 
@@ -63,7 +63,7 @@ def test_reinforcement_zero_no_edges():
 
 
 def test_reinforcement_negative_when_edges_exist():
-    G = build_graph([c(0, 0, 0, 10, strength=1.0), c(1, 5, 0, 10, strength=1.0)])
+    G = build_graph([c(0, 0, 0, 10, strength=1.0), c(1, 15, 0, 10, strength=1.0)])
     assert G.has_edge(0, 1)
     assert reinforcement_energy(G) < 0.0
 

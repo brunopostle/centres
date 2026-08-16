@@ -24,8 +24,13 @@ def c(id, x, y, scale, strength=0.5):
     return Center(id=id, x=float(x), y=float(y), scale=float(scale), strength=strength)
 
 
-def grid_centers(n=3, spacing=8, scale=10, strength=0.5, start_id=0):
-    """An n x n block of mutually connected, scale-similar centres."""
+def grid_centers(n=3, spacing=20, scale=10, strength=0.5, start_id=0):
+    """An n x n block of mutually connected, scale-similar centres.
+
+    Spacing equals the touching distance (r_i + r_j = 20), where the adjacency
+    kernel peaks. 8px would put them at 0.4x touching -- deeply overlapping, and
+    barely connected under a kernel that treats superposition as identity.
+    """
     return [
         c(start_id + i * n + j, i * spacing, j * spacing, scale, strength)
         for i in range(n)
@@ -37,7 +42,7 @@ def grid_centers(n=3, spacing=8, scale=10, strength=0.5, start_id=0):
 
 
 def test_nearby_same_scale_connected():
-    G = build_graph([c(0, 0, 0, 10), c(1, 5, 0, 10)])
+    G = build_graph([c(0, 0, 0, 10), c(1, 15, 0, 10)])
     assert G.has_edge(0, 1)
 
 
@@ -55,7 +60,7 @@ def test_very_different_scales_reduce_weight():
 
 
 def test_edge_weight_between_zero_and_one():
-    G = build_graph([c(0, 0, 0, 10), c(1, 5, 0, 10)])
+    G = build_graph([c(0, 0, 0, 10), c(1, 15, 0, 10)])
     for _, _, data in G.edges(data=True):
         assert 0.0 < data["weight"] <= 1.0
 
@@ -82,8 +87,8 @@ def test_node_stores_center():
 
 
 def test_connected_centres_stay_strong():
-    # Two high-strength centres close together — reinforcement should sustain them
-    G = build_graph([c(0, 0, 0, 10, strength=0.9), c(1, 5, 0, 10, strength=0.9)])
+    # Two adjacent high-strength centres — reinforcement should sustain them
+    G = build_graph([c(0, 0, 0, 10, strength=0.9), c(1, 15, 0, 10, strength=0.9)])
     assert G.has_edge(0, 1)
     G = propagate_strength(G)
     assert G.nodes[0]["center"].strength > 0.5
@@ -104,7 +109,7 @@ def test_isolated_centre_keeps_intrinsic_strength():
 
 
 def test_strengths_clipped_positive():
-    G = build_graph([c(0, 0, 0, 10, strength=0.5), c(1, 5, 0, 10, strength=0.5)])
+    G = build_graph([c(0, 0, 0, 10, strength=0.5), c(1, 15, 0, 10, strength=0.5)])
     G = propagate_strength(G)
     for n in G.nodes:
         assert G.nodes[n]["center"].strength >= 0.0
@@ -221,7 +226,7 @@ def test_nodes_keyed_by_position_not_id():
     """
     centers = [
         Center(id=5, x=0.0, y=0.0, scale=10.0, strength=1.0),
-        Center(id=7, x=5.0, y=0.0, scale=10.0, strength=1.0),
+        Center(id=7, x=15.0, y=0.0, scale=10.0, strength=1.0),
     ]
     G = build_graph(centers)
     assert len(G.nodes) == len(centers)

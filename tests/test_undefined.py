@@ -185,14 +185,14 @@ def test_boundaries_undefined_when_field_is_empty_at_every_peak():
 def test_contrast_boundary():
     assert contrast(build_graph([c(0, 0, 0, 3.0), c(1, 500, 0, 3.0)])) is None
     # Edges with equal strengths are a genuine zero, not an undefined.
-    G = _connected([c(0, 0, 0, 10.0, strength=1.0), c(1, 5, 0, 10.0, strength=1.0)])
+    G = _connected([c(0, 0, 0, 10.0, strength=1.0), c(1, 15, 0, 10.0, strength=1.0)])
     assert G.edges
     assert contrast(G) == pytest.approx(0.0, abs=1e-6)
 
 
 def test_deep_interlock_boundary():
     assert deep_interlock([], build_graph([])) is None
-    centers = [c(0, 0, 0, 10.0), c(1, 5, 0, 10.0)]
+    centers = [c(0, 0, 0, 10.0), c(1, 15, 0, 10.0)]
     G = _connected(centers)
     assert G.edges
     assert deep_interlock(centers, G) == pytest.approx(1.0, abs=1e-6)
@@ -241,7 +241,7 @@ def test_not_separateness_undefined_below_a_component_of_two():
 
 
 def test_not_separateness_defined_for_a_component_of_two():
-    G = _connected([c(0, 0, 0, 10.0), c(1, 5, 0, 10.0)])
+    G = _connected([c(0, 0, 0, 10.0), c(1, 15, 0, 10.0)])
     assert G.edges
     assert not_separateness(G) is not None
 
