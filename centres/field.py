@@ -127,12 +127,53 @@ def _flat_field(gray):
     return np.clip(normalized, 0, 255).astype(np.uint8)
 
 
+#: How many of the eight dihedral orientations must agree for a pixel to be an
+#: edge. Four is the majority. See _detect_edges.
+_EDGE_VOTES = 4
+
+
+def _canny_symmetrised(blurred, low, high):
+    """Canny, made exactly equivariant under the symmetries of the square.
+
+    ``cv2.Canny`` is not. Its non-maximum suppression bins the gradient direction
+    and its hysteresis traces weak edges outward from strong ones in array
+    traversal order, so which marginal edges survive depends on how the image
+    happens to be oriented in memory. Measured on the Ardabil: greyscale
+    conversion and Gaussian blur are exactly mirror-equivariant, Canny is not —
+    2907 edge pixels differ under a mirror flip, 0.54% — and the distance
+    transform amplifies that into 8.6% of the field. 24 of 154 centres failed to
+    survive a mirror flip, and roughness moved 3.4 points out of 10, further than
+    the spread across all six carpets.
+
+    Running Canny under each of the eight orientations of the square, mapping the
+    results back and taking a majority vote, gives an edge map that is equivariant
+    by construction: the vote is over the same eight results whatever orientation
+    the image arrives in, so the answer cannot depend on the arrival orientation.
+
+    Costs eight edge detections. Edge detection is not the pipeline's bottleneck —
+    ``reconstruct_field`` is O(n.h.w) — so this is affordable in exchange for a
+    guarantee.
+    """
+    votes = np.zeros(blurred.shape, dtype=np.uint8)
+    for k in range(4):
+        rotated = np.rot90(blurred, k)
+        for flipped in (False, True):
+            oriented = rotated[:, ::-1] if flipped else rotated
+            edges = cv2.Canny(np.ascontiguousarray(oriented), low, high)
+            if flipped:
+                edges = edges[:, ::-1]
+            votes += (np.rot90(edges, -k) > 0).astype(np.uint8)
+    return np.where(votes >= _EDGE_VOTES, 255, 0).astype(np.uint8)
+
+
 def _detect_edges(gray):
     """Canny edges with thresholds set by image statistics, not by fiat.
 
     Illumination is flattened first, then the hysteresis thresholds are taken
     from a percentile of the gradient magnitude. See
-    :func:`build_structural_field` for why.
+    :func:`build_structural_field` for why. The detection itself is symmetrised
+    over the dihedral group so that the result does not depend on which way up
+    the image happens to be stored — see :func:`_canny_symmetrised`.
     """
     blurred = cv2.GaussianBlur(_flat_field(gray), (0, 0), sigmaX=2)
     # Canny's default gradient is the L1 norm of a 3x3 Sobel; match it so the
@@ -141,7 +182,7 @@ def _detect_edges(gray):
     dy = cv2.Sobel(blurred, cv2.CV_32F, 0, 1, ksize=3)
     magnitude = np.abs(dx) + np.abs(dy)
     high = max(float(np.percentile(magnitude, _EDGE_PERCENTILE)), _EDGE_FLOOR)
-    return cv2.Canny(blurred, high * _EDGE_RATIO, high)
+    return _canny_symmetrised(blurred, high * _EDGE_RATIO, high)
 
 
 def build_structural_field(image):
