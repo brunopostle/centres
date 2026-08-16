@@ -8,10 +8,12 @@ from centres.energy import (
     coverage_energy,
     alignment_energy,
     field_energy,
+    locality_energy,
     total_energy,
 )
 from centres.graph import build_graph, propagate_strength
 from centres.field import reconstruct_field
+from centres.pipeline import assign_hierarchy
 
 
 def c(id, x, y, scale, strength=1.0, parent=None):
@@ -138,3 +140,82 @@ def test_total_energy_finite():
     G = propagate_strength(G)
     field = reconstruct_field((60, 60), centers)
     assert np.isfinite(total_energy(field, centers, G))
+
+
+def _random_centers(n, side, seed, scale_range=(2.8, 16.8)):
+    """n centres drawn from a fixed distribution over a side x side canvas."""
+    rng = np.random.default_rng(seed)
+    lo, hi = np.log(scale_range[0]), np.log(scale_range[1])
+    centers = [
+        c(i, rng.uniform(0, side), rng.uniform(0, side),
+          float(np.exp(rng.uniform(lo, hi))),
+          strength=float(rng.uniform(0.3, 1.0)))
+        for i in range(n)
+    ]
+    return assign_hierarchy(centers)
+
+
+def _energy_of(centers, shape):
+    G = propagate_strength(build_graph(centers))
+    return total_energy(reconstruct_field(shape, centers), centers, G)
+
+
+def test_total_energy_does_not_track_centre_count():
+    """Regression for the defect that made the total the centre count times a
+    constant (AUDIT.md section 2, issue #14).
+
+    Centre sets are drawn at *constant spatial density* — the canvas area grows
+    with n — so every per-pair, per-parent and per-edge statistic is the same in
+    distribution at every n, and an intensive energy must be flat in n. Before
+    the fix, hierarchy, coverage and alignment entered as sums over centres and
+    the total grew almost exactly linearly with n (r = 0.99 over the audit
+    corpus). The threshold matches the acceptance criterion for that issue.
+
+    The measured value here is about -0.40 rather than 0. Roughly -0.33 of that
+    is locality_energy, which is a mean over all N(N-1)/2 centre pairs while the
+    pairs that actually overlap number O(N), so it decays as 1/N when the whole
+    scene is scaled up. That does not affect comparability between images — on
+    the corpus locality contributes 0.004 of a total of about 1.3 — but it is
+    the one term that is not intensive, and it is why the threshold is not
+    tighter. Dropping the locality term leaves r = -0.07.
+    """
+    ns, energies = [], []
+    for n in (32, 64, 128, 256):
+        side = 24.5 * math.sqrt(n)  # constant density: area proportional to n
+        shape = (int(side), int(side))
+        for seed in (0, 1, 2):
+            centers = _random_centers(n, side, seed)
+            ns.append(n)
+            energies.append(_energy_of(centers, shape))
+    r = float(np.corrcoef(ns, energies)[0, 1])
+    assert abs(r) < 0.5, f"structural energy still tracks centre count: r = {r:+.3f}"
+
+
+def test_total_energy_invariant_under_uniform_rescaling():
+    """Doubling every length must not change the energy.
+
+    Every term is dimensionless except the field term, whose mean squared
+    gradient carries units of 1/pixel^2; total_energy scales it by the squared
+    rms centre radius for exactly this reason.
+    """
+    base = _random_centers(24, 160.0, seed=7)
+    scaled = [c(x.id, x.x * 2, x.y * 2, x.scale * 2, x.strength, x.parent) for x in base]
+    e1 = _energy_of(base, (160, 160))
+    e2 = _energy_of(scaled, (320, 320))
+    assert e2 == pytest.approx(e1, rel=0.05)
+
+
+def test_collapse_costs_more_than_a_spread_configuration():
+    """The locality barrier must keep the degenerate cluster uphill.
+
+    All centres at one point and one scale is the configuration that maximises
+    reinforcement, and it also exempts itself from the hierarchy, coverage and
+    alignment terms because assign_hierarchy needs a strictly larger centre to
+    make a parent. WEIGHT_LOCALITY is derived to cover both.
+    """
+    spread = _random_centers(30, 300.0, seed=3)
+    collapsed = assign_hierarchy(
+        [c(i, 150.0, 150.0, 20.0, strength=x.strength) for i, x in enumerate(spread)]
+    )
+    assert locality_energy(collapsed) == pytest.approx(1.0)
+    assert _energy_of(collapsed, (300, 300)) > _energy_of(spread, (300, 300))
