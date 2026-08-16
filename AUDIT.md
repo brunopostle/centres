@@ -404,47 +404,108 @@ centre set does not contain.
 
 ## 12. On stimuli with known answers, the measures do not track the answer
 
-This is the decisive test, and it is the one that requires no interpretation.
+This is the decisive test, and the one that needs no interpretation.
 
 `audit/stimuli.py` builds images in which exactly one structural quantity is
 varied along a known scalar while the rest is held fixed. The generator parameter
-*is* the ground truth. A valid measure must be monotone in it.
+*is* the ground truth.
 
-| generator | varies | measure under test | Spearman ρ |
+**All fifteen properties now have a generator**, each swept over 12–13 points.
+(The original five used 5–6 points, which was too coarse to be meaningful: a
+single adjacent rank swap moved Spearman ρ by 0.1, so ρ ≥ 0.9 tested for
+perfection and small movements carried no information.)
+
+| generator | parameter swept | property | statistic |
 |---|---|---|---:|
-| `jittered_lattice` | positional disorder, σ = 0 → 0.45 | roughness | **+0.83** |
-| `contrast_field` | figure/ground tonal separation, 0.1 → 1.0 | contrast | **+0.67** |
-| `void_field` | radius of a cleared central region, 0 → 0.6 | the void | **+0.50** |
-| `nested_squares` | parent:child scale ratio, 1.5 → 6.0 | levels of scale | **−0.10** |
-| `alternating_tiles` | motif-size alternation, 0 → 1 | alternating repetition | **−0.60** |
+| `dominance` | dominant motif radius ×1.0→5.4 | strong centres | **+0.993** ✅ |
+| `void_size` | cleared radius 0→0.6 | the void | +0.804 |
+| `shape_vocabulary` | distinct shapes across 3 scales 1→12 | echoes | +0.790 |
+| `element_kinds` | distinct elements at one scale 1→12 | simplicity | +0.699 |
+| `jitter` | positional disorder σ 0→0.45 | roughness | +0.629 |
+| `zone_width` | zone transition width | gradients | +0.517 |
+| `border_band` | band thickness / motif radius | boundaries | +0.455 |
+| `bleed` | figure/ground transition / radius | not-separateness | +0.406 |
+| `alternation` | motif-size alternation 0→1 | alternating repetition | +0.091 |
+| `ground_solidity` | interstitial solidity 0.6→1.0 | positive space | **−0.399** |
+| `motif_circularity` | motif 4πA/P² 0.65→1.0 | good shape | **−0.483** |
+| `interlock_depth` | interdigitation depth 0→0.8 | deep interlock | **−0.508** |
+| `symmetry_order` | rotational order m = 1→12 | local symmetries | **−0.601** |
+| `tonal_delta` | figure/ground separation 0.3→1.0 | contrast | **−0.882** |
+| `scale_ratio` | parent:child ratio 1.5→6.0 | levels of scale | *(see below)* |
 
-Not one reaches ρ = 0.9. Two are worth dwelling on:
+**One of fifteen tracks the quantity it is named for.** Five run *backwards*.
 
-- **Levels of scale, ρ = −0.10.** This measure exists for one purpose: to detect
-  the parent-to-child scale ratio. Given a recursive subdivision in which that
-  ratio is swept from 1.5 to 6.0 — spanning, and centred on, the ideal value of 3
-  the theory is built around — the measure is *uncorrelated with it*. It is blind
-  to the only thing it was designed to see.
-- **Alternating repetition, ρ = −0.60.** Increasing alternation *decreases* the
-  score. The measure runs backwards. This is consistent with §10: it is the
-  dispersion of strengths that have just been through ten steps of diffusion, and
-  diffusion is a smoothing operator, so the more regular the alternation, the more
-  effectively it is averaged away.
+### Contrast does not measure contrast — it is flat
 
-The roughness sweep is the counterpoint that makes the diagnosis interesting. At
-ρ = +0.83 its formula broadly works on a clean stimulus — yet on real photographs
-it is the worst measure in the suite, moved further by a mirror flip than by the
-difference between any two carpets. Note also that the perfect grid at σ = 0 yields
-a CV of 0.146 rather than 0 (481 centres from 225 circles), and that the centre
-count collapses from 481 to 148 across the sweep: the detector changes regime
-partway through the experiment.
+The raw values across the whole sweep, verified independently:
 
-So the two failure modes are distinguishable in principle — a sound formula
-starved by a bad centre set (roughness), versus a formula that is wrong on its own
-terms (alternating repetition) — but these sweeps test the pipeline end to end and
-cannot by themselves say which applies to each measure. Repairing the front end
-first and re-running this table is what separates them, and it is the cheapest way
-to find out how much of the theory is actually salvageable.
+```
+delta 0.30  raw 0.06694        delta 0.72  raw 0.06529
+delta 0.44  raw 0.06620        delta 0.86  raw 0.06528
+delta 0.58  raw 0.06525        delta 1.00  raw 0.06524
+```
+
+Figure/ground contrast more than triples; the measure moves by **0.2%**. The
+ρ = −0.882 is that near-constant drifting imperceptibly downward, so "runs
+backwards" understates it: the measure is *insensitive* to the quantity it is
+named for.
+
+The reason is architectural and was predicted in §10. `contrast` is the mean
+weighted strength difference between connected centres; strengths come from the
+structural field; the field is a distance transform from edges and **carries no
+tone at all**. A tone-based property computed from a tone-free representation
+cannot do anything else.
+
+### Levels of scale is not extremal where the theory says it is
+
+Given a recursive subdivision whose parent:child ratio is swept geometrically
+about 3 — the value the whole hierarchy energy is built around:
+
+```
+ratio 1.500  raw 0.286      ratio 3.000  raw 0.476   <- the claimed ideal
+ratio 2.381  raw 0.189  <- minimum      ratio 3.367  raw 0.224
+ratio 2.673  raw 0.448      ratio 6.000  raw 0.580
+```
+
+The measure's minimum sits at 2.381, and **at exactly the ratio the theory calls
+ideal it reports one of the worst deviations in the sweep**. Neither side is
+monotone in the right direction. This is a stronger statement than the original
+five-point ρ = −0.10: not merely uncorrelated, but not extremal anywhere near
+where it claims to be.
+
+### The normaliser invents optima the measures do not have
+
+Every row also reports where the *normalised* 0–10 score peaks. Several peak in
+the middle of a sweep that has no interior ideal — `border_band` at 0.2,
+`interlock_depth` at 0.218, `zone_width` at 0.364, `motif_circularity` at 0.745.
+Those peaks are artefacts of the reference constants in `normalize_all`, not
+features of the measures.
+
+### Properties that could not be isolated, which is itself a finding
+
+- **Local symmetries.** A bounded motif with symmetry of order *m* necessarily
+  has angular features no wider than 2π/m, so raising the symmetry order *is*
+  refining the feature scale — as geometry, not as a defect of the construction.
+  Any ρ here is shared with good shape and levels of scale.
+- **Boundaries.** Band thickness is a length, and `edge_spacing` estimates the
+  artwork's characteristic length from exactly such features. Boundary thickness
+  cannot be separated from feature scale because it *is* feature scale.
+- **Positive space and good shape** are two readings of one boundary, separable
+  only by which side is the isolated shape. And `positive_space` is a deviation
+  from 0.65 child-area coverage, which has nothing to do with convexity — the
+  generator tests the property as Alexander states it while the formula tests
+  something else.
+
+### Three pipeline facts surfaced by building the stimuli
+
+- A blank frame margin owns the deepest point of the distance transform and so
+  sets the detection threshold for the whole artwork — a rosette lattice found 40
+  centres from 121 motifs for that reason alone.
+- Sharp corners reset `edge_spacing`: a star-polygon stimulus read 2.3 px against
+  40 px for its own convex counterpart, a factor of 17 on the distance cap.
+- Canny's percentile threshold is global, so in a two-zone image the stronger zone
+  sets the bar the weaker must clear. At one `zone_width` point the weak zone lost
+  its edges outright: 1198 centres → 12.
 
 ## Recommended order of work
 
