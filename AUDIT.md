@@ -611,6 +611,78 @@ are *more* independent than the original figure suggested. The harness now
 computes it over the full ensemble.
 
 
+## 14. Sensitivity matrix: no measure is dominated by its own generator
+
+Every measure against every generator parameter, |Spearman ρ|. **Dominance** is
+`|ρ_own| / max |ρ_other|`: above 1 the measure responds most strongly to the
+quantity it is named for; below 1 something else moves it more.
+
+| measure | own ρ | strongest other | dominance |
+|---|---:|---|---:|
+| strong centres | 0.99 | 1.00 motif_circularity | 0.99 |
+| contrast | 0.88 | 0.94 dominance | 0.93 |
+| echoes | 0.79 | 0.95 jitter | 0.83 |
+| the void | 0.80 | 0.97 dominance | 0.83 |
+| local symmetries | 0.60 | 0.85 void_size | 0.70 |
+| simplicity | 0.70 | 1.00 dominance | 0.70 |
+| roughness | 0.63 | 0.91 alternation | 0.69 |
+| good shape | 0.48 | 0.80 bleed | 0.60 |
+| deep interlock | 0.51 | 0.92 zone_width | 0.55 |
+| gradients | 0.52 | 0.99 dominance | 0.52 |
+| boundaries | 0.45 | 0.89 void_size | 0.51 |
+| positive space | 0.40 | 0.88 void_size | 0.45 |
+| not-separateness | 0.41 | 1.00 dominance | 0.41 |
+| levels of scale | 0.14 | 0.87 void_size | 0.16 |
+| alternating repetition | 0.09 | 0.97 jitter | 0.09 |
+
+**Fifteen of fifteen have dominance below 1.** Not one measure responds most
+strongly to the quantity it is named for — including `strong_centres`, the only
+measure that passed §12, which responds to `motif_circularity` (1.00) marginally
+more than to its own `dominance` (0.99).
+
+This is not sampling noise. On synthetic random scores the off-diagonal cells of
+a 12-point Spearman land around 0.4–0.7; here they routinely reach 0.9–1.00.
+
+### What the measures are actually responding to
+
+Two generator columns dominate the table. `dominance` — which sweeps one motif's
+radius from ×1.0 to ×5.4 — is the strongest driver for six measures, at ρ ≥ 0.94
+for five of them. `void_size` — which clears a growing central region — is
+strongest for four more.
+
+Both make large changes to the *gross composition* of the image. What the fifteen
+measures have in common is that they respond to that, and not much else. The
+labels distinguish them; their behaviour does not.
+
+### The distinction this draws, which §12 could not
+
+§12 showed that fourteen of fifteen measures fail to track their own ground truth.
+It could not say whether they were tracking *something else* or nothing at all.
+The matrix answers it: they are tracking something else, strongly and in common.
+
+Note the tension with the redundancy figure, which over 188 stimuli says 8
+principal components explain 90% of the variance. The measures' *outputs* are
+moderately independent; their *drivers* are not. A shared cause and distinct
+outputs is what you would expect from fifteen different statistics computed over
+one point process — which is what they are.
+
+### Consequence for the triage in §13
+
+The verdicts stand, but the KEEP is weaker than it looked. `strong_centres`
+tracks its ground truth at ρ = +0.993 and still is not isolating: any measurement
+of it on a real image is confounded by whatever else changes the gross
+composition. It should be reported with that stated, not as a clean measure.
+
+It also raises the bar for #22. Widening the representation to carry shape, tone
+and symmetry is necessary but may not be sufficient: if every statistic over a
+point process responds mainly to gross composition, adding attributes to the
+points may not separate them. The cheapest next test is to regress each measure
+against centre count across all 188 stimuli — several generators swing the count
+by an order of magnitude (`symmetry_order` 113–1169, `ground_solidity` 281–975),
+and if count explains the off-diagonals then the fifteen measures are one
+measure, and the representation is not the problem.
+
+
 ## Recommended order of work
 
 1. **Keep the harness in front of every change.** `python -m audit` turns "this
