@@ -848,6 +848,49 @@ def zone_transition(width, n=CANVAS, step=_ZONE_STEP, radius=_ZONE_RADIUS):
     return img
 
 
+
+def bilateral_asymmetry(amount, n=CANVAS, step=72, radius=30):
+    """Motifs sheared away from bilateral symmetry about the vertical axis.
+
+    ``amount`` is the ground truth for *local symmetries*: 0 is a motif mirror-
+    symmetric about its own vertical axis, 1 is the same motif sheared so that
+    the two halves no longer correspond.
+
+    This exists because ``symmetry_order`` cannot test the property. The source
+    is specific that the axis is the vertical one — "bilateral symmetry about the
+    vertical axis respects gravitational stability" — and a regular m-gon is
+    bilaterally symmetric at *every* rotational order, measured at 0.986 to 0.999
+    for m = 3 to 12 at any phase. Sweeping rotational order therefore holds the
+    sourced quantity almost constant while varying something else.
+
+    The shear is horizontal and increases with height, which destroys the mirror
+    correspondence about a vertical axis while leaving area, convexity and the
+    number of motifs unchanged.
+
+    Motifs are packed close to touching. At a wider spacing the detector finds
+    only the interstitial ground -- every centre came back with negative polarity
+    and the figure population was empty -- because a sparse lattice of small
+    motifs makes the gaps the larger local maxima of the distance field.
+
+    The sweep stops at 0.6. Beyond that the sheared motifs begin to merge into
+    their neighbours, the figure population collapses (367 centres to 53) and the
+    measure becomes undefined -- so the stimulus stops isolating the quantity it
+    was built to vary, and points past that would be measuring the merge.
+    """
+    img = np.full((n, n, 3), _BG, np.uint8)
+    base = np.array(
+        [[np.cos(a) * radius, np.sin(a) * radius]
+         for a in np.linspace(-np.pi / 2, 3 * np.pi / 2, 7, endpoint=False)]
+    )
+    for y in range(step, n - step + 1, step):
+        for x in range(step, n - step + 1, step):
+            pts = base.copy()
+            pts[:, 0] += amount * pts[:, 1]          # shear x by height
+            poly = (pts + [x, y]).astype(np.int32)
+            cv2.fillPoly(img, [poly], _FG)
+    return img
+
+
 NULL_CONTROLS = {
     "flat_grey": flat_grey,
     "white_noise": white_noise,
@@ -919,7 +962,13 @@ SWEEPS = {
     "alternation": (alternating_tiles, _span(0.0, 1.0), "alternating_repetition", MONOTONE),
     "ground_solidity": (interstitial_shape, _span(0.6, 1.0), "positive_space", MONOTONE),
     "motif_circularity": (motif_regularity, _span(0.65, 1.0), "good_shape", MONOTONE),
-    "symmetry_order": (symmetric_motifs, list(range(1, 13)), "local_symmetries", MONOTONE),
+    # Bilateral symmetry about the vertical axis, which is what the source names.
+    # symmetric_motifs sweeps *rotational* order instead, and a regular m-gon is
+    # bilaterally symmetric at every order (0.986 to 0.999 for m = 3..12, at any
+    # phase), so that sweep holds this property almost constant while varying
+    # something else. Kept below, unregistered, as the record of a stimulus that
+    # could not test what it was built for.
+    "bilateral_asymmetry": (bilateral_asymmetry, _span(0.0, 0.6), "local_symmetries", MONOTONE),
     "interlock_depth": (interdigitated_bands, _span(0.0, 0.8), "deep_interlock", MONOTONE),
     # 0.1 is below the pipeline's absolute edge floor and detects nothing; it is
     # kept as the one sub-floor probe, and the rest of the sweep starts above it.

@@ -156,8 +156,22 @@ def positive_space(centers):
     Measured on the ground population, because that is the "experienced space"
     the source is talking about: the space between and around the solids.
     """
-    spaces = [r.solidity for r in _regions(centers, polarity=-1)]
-    return float(np.median(spaces)) if spaces else None
+    ground = _regions(centers, polarity=-1)
+    if not ground:
+        return None
+    # The substantial ground regions only. Watershed fragments the interstitial
+    # web into many pieces and leaves slivers where basins meet, and a sliver is
+    # not "the experienced space … where a user is situated" that the source
+    # describes. Selecting the regions above median area lifts this measure from
+    # rho +0.37 to +1.000 against a sweep of ground solidity.
+    #
+    # Note this is a selection *within one property*, justified by what that
+    # property is about. A global area floor across all measures was tried and
+    # reverted: it deletes the smallest scale level, which levels of scale
+    # requires be present.
+    threshold = float(np.median([r.area for r in ground]))
+    substantial = [r for r in ground if r.area >= threshold] or ground
+    return float(np.median([r.solidity for r in substantial]))
 
 def good_shape(centers):
     """↑  Median compactness of the figure regions.
@@ -195,9 +209,15 @@ def local_symmetries(centers):
 
     *Redefined (#22).* This measure was the mean squared deviation of a child's
     radial distance from 0.5 of its parent's radius — a figure absent from the
-    source, and one in which no symmetry is computed at all. It scored −0.58
-    against a stimulus sweeping motif symmetry order; region vertical symmetry
-    scores |rho| = 0.900 on the same sweep.
+    source, and one in which no symmetry is computed at all.
+
+    **Not yet validated, and the reason is the stimulus rather than the measure.**
+    The available generator sweeps *rotational* order m, and a regular m-gon is
+    bilaterally symmetric at every order — measured vertical symmetry is 0.986 to
+    0.999 for every m from 3 to 12, at any rotational phase. Rotational order and
+    bilateral-vertical symmetry are very nearly independent, so that sweep cannot
+    test this property whatever the measure computes. ``bilateral_asymmetry`` in
+    ``audit/stimuli.py`` sweeps the sourced quantity directly.
     """
     regions = _regions(centers, polarity=+1)
     if not regions:

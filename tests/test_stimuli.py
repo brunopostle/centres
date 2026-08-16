@@ -292,8 +292,29 @@ def _rotational_order(rad, candidates=range(2, 13), tol=0.97):
     return best
 
 
+def test_bilateral_asymmetry_reduces_vertical_mirror_correspondence():
+    """The generator that replaced symmetry_order for local symmetries.
+
+    A regular m-gon is bilaterally symmetric at *every* rotational order, so
+    sweeping order held the sourced property almost constant. This sweeps it
+    directly, and the shear must actually reduce it.
+    """
+    from centres.regions import _describe
+
+    fn, values, target, _ = stimuli.SWEEPS["bilateral_asymmetry"]
+    assert target == "local_symmetries"
+    scores = []
+    for v in (values[0], values[-1]):
+        gray = cv2.cvtColor(fn(v), cv2.COLOR_BGR2GRAY)
+        mask = gray < 128
+        num, labels = cv2.connectedComponents(mask.astype(np.uint8))
+        biggest = max(range(1, num), key=lambda k: (labels == k).sum())
+        scores.append(_describe(labels == biggest, gray).vertical_symmetry)
+    assert scores[0] > scores[-1] + 0.05, "shear must break vertical symmetry"
+
+
 def test_symmetry_order_is_recoverable_from_the_motif_outline():
-    _, values, _, _ = stimuli.SWEEPS["symmetry_order"]
+    values = list(range(1, 13))  # symmetric_motifs is no longer registered
     step = stimuli._SYM_STEP
     for m in values:
         img = stimuli.symmetric_motifs(m)
@@ -309,7 +330,7 @@ def test_symmetry_order_is_recoverable_from_the_motif_outline():
 def test_symmetry_order_holds_motif_area_fixed():
     """The rosette family has an m-independent mean square radius, so the ink
     on the canvas does not move with the symmetry order."""
-    _, values, _, _ = stimuli.SWEEPS["symmetry_order"]
+    values = list(range(1, 13))  # symmetric_motifs is no longer registered
     inks = [_ink(stimuli.symmetric_motifs(m)) for m in values]
     # 4% rather than 0: the *outline* encloses an m-independent area exactly,
     # but rasterising it does not, because the perimeter grows with m and so
