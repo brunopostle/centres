@@ -34,6 +34,13 @@ from .energy import hierarchy_energy, coverage_energy, alignment_energy, field_e
 
 
 
+#: The sourced band of optimal magnification factors between successive scales.
+#: Salingaros (2025): "optimal magnification factors range between approximately
+#: 2 to 5", with 1.5 too close to distinguish and 10 disengaging.
+BAND_LOW = 2.0
+BAND_HIGH = 5.0
+
+
 def _regions(centers, polarity=None):
     """Regions worth measuring, optionally restricted to one polarity.
 
@@ -57,21 +64,39 @@ def _regions(centers, polarity=None):
 
 
 def levels_of_scale(centers):
-    """↓  Mean per-pair E_H: deviation from scale ratio ~3 between parent and child.
+    """↑  How far parent/child scale ratios fall inside the sourced band.
 
-    Mean of (log(r_parent/r_child) - log 3)² across all parent-child pairs.
-    Zero when every pair has exactly a 3× scale ratio. Normalised per pair
-    so the score is comparable across centre sets of different sizes.
+    Salingaros (2025): "Each scale must be distinct, with scales in a hierarchy
+    spaced closely enough in size for scaling coherence, but not too close to
+    blur the distinction … **Optimal magnification factors range between
+    approximately 2 to 5.** A subtle magnification factor of 1.5 is too close to
+    distinguish one scale from another, whereas an abrupt jump in adjacent scales
+    by a factor of 10 is disengaging."
 
-    Undefined (``None``) with no parent-child pairs: there is no hierarchy, so
-    there is no scale ratio to deviate from. One pair is enough — the mean of a
-    single deviation is a perfectly good deviation.
+    That is a **band**, not a point. A ratio anywhere in [2, 5] is optimal, so the
+    measure is zero-penalty inside it and grows in log units outside — reaching a
+    substantial penalty at the 1.5 and 10 the source names as failures.
+
+    *Repaired (#22).* The previous formula was a quadratic penalty about a single
+    ratio of 3, described as the midpoint of an unsourced range of "2 to 4". Both
+    the range and the point target were wrong: the source gives 2 to 5, and gives
+    it as a band, so a quadratic about any single value is the wrong shape however
+    the constant is chosen. The audit measured the old measure's minimum at a
+    ratio of 2.381 — inside the sourced band — so it was being scored against a
+    target that was itself incorrect.
     """
-    pairs = [c for c in centers if c.parent is not None]
-    if not pairs:
+    ratios = [
+        centers[c.parent].scale / (c.scale + 1e-8)
+        for c in centers
+        if c.parent is not None
+    ]
+    if not ratios:
         return None
-    return hierarchy_energy(centers) / len(pairs)
-
+    ratios = np.array(ratios, dtype=float)
+    below = np.log(BAND_LOW / np.clip(ratios, 1e-8, None))
+    above = np.log(np.clip(ratios, 1e-8, None) / BAND_HIGH)
+    outside = np.maximum(np.maximum(below, above), 0.0)
+    return float(np.exp(-float(np.mean(outside))))
 
 def strong_centres(centers):
     """↑  Mean strength of the top-quartile centres after reinforcement propagation.
@@ -310,25 +335,53 @@ def contrast(G):
     weights = [d["weight"] for _, _, d in G.edges(data=True)]
     return float(sum(diffs) / (sum(weights) + 1e-12))
 
-def gradients(field, centers):
-    """↓  E_φ: mean squared gradient of the wholeness field.
+def gradients(field, centers, G=None):
+    """↑  How gradually tone changes across space, rather than in steps.
 
-    Directly measures smooth directional transitions across the field.
-    Low value = gentle gradients between regions rather than abrupt jumps.
+    Salingaros (2025): "**Gradual changes and transitions in colour, size, or
+    texture** … Gradients represent controlled transitions and avoid abrupt
+    interruptions. Certain regions need continuous variation instead of contrast."
 
-    Undefined (``None``) with no centres. The field this reads is the
-    *reconstructed* field — a sum of Gaussians placed at the detected centres,
-    not the image (see AUDIT.md §10). With no centres it is identically zero
-    everywhere, so its mean squared gradient is 0 by construction, which
-    ``normalize_all`` would report as a perfect 10. There are no regions, so
-    there are no transitions between regions to be gentle or abrupt. ``centers``
-    is required rather than optional so a caller cannot silently get the old
-    behaviour back by omitting it.
+    Measured as the rate of tonal change between adjacent regions: the difference
+    in tone divided by the distance between them, that distance expressed in
+    units of their own combined size. A wide transition spreads a given tonal
+    change over many regions, so the rate per step is low; an abrupt one
+    concentrates it into a single step.
+
+    That the source sets this *against* contrast is deliberate on its part, and
+    they are not simply inverses here: contrast is the size of the step between
+    neighbours, this is the step divided by the distance it is taken over. A
+    design can have strong contrast and gradual transitions at once, which is
+    what the source describes when it says both are needed in different regions.
+
+    *Redefined (#22).* This measure was the mean squared gradient of the
+    *reconstructed* Gaussian field — a property of the blob rendering, not of the
+    image, and one carrying no tone at all.
     """
-    if not centers:
+    if G is None or not G.edges:
         return None
-    return field_energy(field)
-
+    rates = []
+    for i, j, _ in G.edges(data=True):
+        a, b = G.nodes[i]["center"], G.nodes[j]["center"]
+        if a.region is None or b.region is None:
+            continue
+        if a.region.area <= 0 or b.region.area <= 0:
+            continue
+        span = a.scale + b.scale
+        if span <= 0:
+            continue
+        separation = np.hypot(a.x - b.x, a.y - b.y) / span
+        if separation <= 0:
+            continue
+        rates.append(abs(a.region.tone - b.region.tone) / separation)
+    if not rates:
+        return None
+    # The 90th percentile, not the median. Most adjacent pairs sit inside a
+    # uniform area and differ in tone by nothing at all, so the median is 0 and
+    # the measure saturates at 1 for every image -- measured, before this. The
+    # property is about how gradually the *transitions* are taken, so the
+    # statistic has to be drawn from the steepest of them.
+    return float(np.exp(-float(np.percentile(rates, 90)) * 4.0))
 
 def roughness(centers):
     """~  Coefficient of variation of nearest-neighbour distances between centres.
@@ -475,7 +528,7 @@ def compute_all(field, centers, G):
         "local_symmetries": local_symmetries(centers),
         "deep_interlock": deep_interlock(centers, G),
         "contrast": contrast(G),
-        "gradients": gradients(field, centers),
+        "gradients": gradients(field, centers, G),
         "roughness": roughness(centers),
         "echoes": echoes(centers),
         "the_void": the_void(field, centers),
@@ -512,28 +565,31 @@ def normalize_all(raw):
     def roughness_peak(x):
         return 10.0 * float(np.exp(-((x - 0.5) ** 2) / 0.04))
 
+    #: The nine measures redefined or repaired against the source (#22) all
+    #: return a value already in [0, 1] with 1 as the ideal -- a compactness, a
+    #: solidity, a symmetry fraction, a tone difference, or an exp(-deviation).
+    #: They need scaling to the 0-10 display range and nothing else, and a
+    #: reference constant would only reintroduce the saturation that #16 removed.
+    direct = {
+        "levels_of_scale", "boundaries", "positive_space", "good_shape",
+        "local_symmetries", "deep_interlock", "contrast", "gradients", "echoes",
+    }
+
     transforms = {
-        # ↓ properties — lower raw = better
-        "levels_of_scale": lambda x: decay(x, 2.0),
-        "boundaries": lambda x: 10.0 * (1.0 - float(x)),
-        "positive_space": lambda x: decay(x, 7.0),
-        "local_symmetries": lambda x: decay(x, 0.25),
-        "gradients": lambda x: decay(x, 4000.0),
-        "echoes": lambda x: decay(x, 2.0),
-        "the_void": lambda x: decay(x, 40.0),
-        # ↑ properties — higher raw = better
+        # ↑ properties already on a natural 0-1 scale
+        **{k: (lambda x: 10.0 * min(max(float(x), 0.0), 1.0)) for k in direct},
+        # ↑ properties with a reference saturation level
         "strong_centres": lambda x: rise(x, 10.0),
         "alternating_repetition": lambda x: rise(x, 0.2),
-        "good_shape": lambda x: rise(x, 1.0),
-        "deep_interlock": lambda x: rise(x, 1.0),
-        "contrast": lambda x: rise(x, 0.2),
         "simplicity": lambda x: rise(x, 1.0),
         "not_separateness": lambda x: rise(x, 0.02),
+        # ↓ property — lower raw = better
+        "the_void": lambda x: decay(x, 40.0),
         # ~ roughness — ideal at moderate irregularity, peak at 0.5
         "roughness": roughness_peak,
     }
 
     return {
-        key: (None if raw[key] is None else fn(raw[key]))
+        key: (None if raw[key] is None else min(max(fn(raw[key]), 0.0), 10.0))
         for key, fn in transforms.items()
     }

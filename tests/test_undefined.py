@@ -178,17 +178,10 @@ def test_the_void_undefined_when_strongest_centre_is_off_frame():
 
 
 def test_gradients_boundary():
-    """The field read here is the *reconstructed* field. With no centres it is
-    identically zero, so its mean squared gradient is 0 by construction — which
-    normalises to a perfect 10."""
-    field = np.zeros((50, 50))
-    field[:, 25:] = 1.0
-    assert gradients(field, []) is None
-    assert gradients(field, [c(0, 25, 25, 5.0)]) > 0
-
-
-# --- roughness: needs two centres to have a spacing at all ---
-
+    """Redefined (#22): needs adjacent regions with tone, not a field."""
+    assert gradients(None, [], None) is None
+    bare = _connected([c(0, 0, 0, 10.0), c(1, 15, 0, 10.0)])
+    assert gradients(None, [], bare) is None, "no regions means no tone"
 
 def test_roughness_boundary():
     assert roughness([]) is None
@@ -305,16 +298,19 @@ def test_normalize_all_propagates_none_and_never_invents_ten():
     }
 
 
-def test_normalize_all_still_maps_a_genuine_zero_to_ten():
-    """The undefined case must not be implemented by suppressing raw zeros.
-    A raw 0 that was actually measured still normalises to 10."""
-    raw = {k: 0.0 for k in KEYS}
-    norm = normalize_all(raw)
-    assert norm["levels_of_scale"] == pytest.approx(10.0)
-    assert norm["boundaries"] == pytest.approx(10.0)
-    assert norm["echoes"] == pytest.approx(10.0)
-    assert norm["contrast"] == pytest.approx(0.0)
+def test_normalize_all_maps_a_genuine_zero_to_zero_for_the_redefined_measures():
+    """The redefined measures are all ↑ on a natural 0-1 scale (#22).
 
+    A raw 0 now means "none of this property", not "no deviation from the
+    ideal", so it maps to 0 rather than to 10. That inversion is the point of
+    the redefinition: the old ↓ measures scored an absence as perfection, which
+    is what let a blank canvas score 10/10 on seven properties.
+    """
+    norm = normalize_all({k: 0.0 for k in KEYS})
+    for k in ("levels_of_scale", "boundaries", "positive_space", "good_shape",
+              "local_symmetries", "deep_interlock", "contrast", "gradients",
+              "echoes"):
+        assert norm[k] == pytest.approx(0.0), k
 
 def test_normalize_all_mixed_none_and_numbers():
     raw = {k: 0.0 for k in KEYS}
@@ -323,7 +319,9 @@ def test_normalize_all_mixed_none_and_numbers():
     norm = normalize_all(raw)
     assert norm["echoes"] is None
     assert norm["not_separateness"] is None
-    assert norm["levels_of_scale"] == pytest.approx(10.0)
+    # levels_of_scale is now ↑ on a 0-1 scale (#22): raw 0 is the worst,
+    # not the ideal, so it maps to 0 rather than to 10.
+    assert norm["levels_of_scale"] == pytest.approx(0.0)
 
 
 # --------------------------------------------------------------------------
@@ -411,7 +409,7 @@ def test_json_still_emits_numbers_when_defined():
     raw["echoes"] = None
     payload = json.loads(json.dumps(properties_json(3, 1.25, raw)))
     assert payload["properties"]["echoes"] == {"score": None, "raw": None}
-    assert payload["properties"]["levels_of_scale"]["score"] == 10.0
+    assert payload["properties"]["levels_of_scale"]["score"] == 0.0
 
 
 def test_gui_table_renders_undefined_without_crashing():

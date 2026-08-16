@@ -104,11 +104,21 @@ def connected_graph(centers):
 # --- levels_of_scale ---
 
 
-def test_levels_zero_at_ratio_three():
-    parent = c(0, 0, 0, 30.0)
-    child = c(1, 5, 5, 10.0, parent=0)
-    assert levels_of_scale([parent, child]) == pytest.approx(0.0, abs=1e-10)
+def test_levels_of_scale_is_perfect_anywhere_inside_the_sourced_band():
+    """The source gives a band of 2 to 5, not a point (#22)."""
+    for ratio in (2.0, 3.0, 4.0, 5.0):
+        pair = [c(0, 0, 0, 10.0 * ratio), c(1, 5, 5, 10.0, parent=0)]
+        assert levels_of_scale(pair) == pytest.approx(1.0), f"ratio {ratio}"
 
+
+def test_levels_of_scale_penalises_the_ratios_the_source_names_as_failures():
+    """1.5 is "too close to distinguish"; 10 is "disengaging"."""
+    inside = [c(0, 0, 0, 30.0), c(1, 5, 5, 10.0, parent=0)]
+    too_close = [c(0, 0, 0, 15.0), c(1, 5, 5, 10.0, parent=0)]
+    too_far = [c(0, 0, 0, 100.0), c(1, 5, 5, 10.0, parent=0)]
+    assert levels_of_scale(too_close) < levels_of_scale(inside)
+    assert levels_of_scale(too_far) < levels_of_scale(inside)
+    assert levels_of_scale(too_far) < 0.75
 
 def test_levels_positive_wrong_ratio():
     parent = c(0, 0, 0, 20.0)
@@ -291,19 +301,20 @@ def test_contrast_no_edges_is_undefined():
 # --- gradients ---
 
 
-def test_gradients_zero_uniform():
-    centers = [c(0, 25, 25, 5.0)]
-    assert gradients(np.ones((50, 50)), centers) == pytest.approx(0.0, abs=1e-10)
+def test_gradients_reads_the_rate_of_tonal_change_over_distance():
+    """The source: gradual transitions in colour, size or texture."""
+    gradual = connected_graph([
+        with_region(c(0, 0, 0, 10.0), tone=0.50),
+        with_region(c(1, 15, 0, 10.0), tone=0.52),
+    ])
+    abrupt = connected_graph([
+        with_region(c(0, 0, 0, 10.0), tone=0.05),
+        with_region(c(1, 15, 0, 10.0), tone=0.95),
+    ])
+    assert gradients(None, [], gradual) > gradients(None, [], abrupt)
 
-
-def test_gradients_positive_step():
-    field = np.zeros((50, 50))
-    field[:, 25:] = 1.0
-    assert gradients(field, [c(0, 25, 25, 5.0)]) > 0
-
-
-# --- roughness ---
-
+def test_gradients_is_undefined_without_a_graph():
+    assert gradients(None, [], None) is None
 
 def test_roughness_single_centre_is_undefined():
     assert roughness([c(0, 0, 0, 5)]) is None
