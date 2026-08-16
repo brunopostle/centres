@@ -37,8 +37,9 @@ photographed.
 
 Every frame-derived constant this pipeline has carried turned out to be a bug:
 Canny's absolute 50/150 thresholds (#10), the `min(h, w) / 10` distance cap (#11),
-and dividing by `field.max()` (#27). A *global* scale estimate is correct and
-intended — the characteristic scale of an artwork is a global property of it, so
+and dividing by `field.max()` (#27, still open — the fix was reverted because the
+field's scale and the detection threshold have to be corrected together). A
+*global* scale estimate is correct and intended — the characteristic scale of an artwork is a global property of it, so
 measures in those units move in proportion when the artwork changes. What is not
 acceptable is a scale set by the frame or by a single outlier pixel.
 
@@ -51,17 +52,16 @@ acceptance check passes.
 
 ## Dependency graph
 
-Tracked as GitHub issues [#8–#27](https://github.com/brunopostle/centres/issues). Task IDs below link to them; statuses live on the issues, and this file is the overview and the rationale.
+Tracked as GitHub issues [#8–#28](https://github.com/brunopostle/centres/issues). Task IDs below link to them; statuses live on the issues, and this file is the overview and the rationale.
 
 ```
 done ──  A3 #10  adaptive edge detection
 done ──  A4 #11  scale-relative distance cap
 done ──  A5 #12  propagation fixed point
-done ──  A7 #27  field scaled by the cap, not by its own max
 done ──   G #25  graph nodes keyed by position
 done ──  B1 #14  intensive energy terms, re-derived weights
 done ──  B2 #15  undefined scores instead of a perfect 10
-open ──  A7 #27  REVERTED - broke the synthetic generators, re-scoped
+open ──  A7 #27  attempted, REVERTED - broke the synthetic generators
 
     A1  #8 ──┐                                     ┌─ D2  #22
     A2  #9 ──┼─ C1 #18 ─ C2 #19 ─ C3 #20 ─ D1 #21 ─┼─ D2b #26
@@ -70,7 +70,8 @@ open ──  A7 #27  REVERTED - broke the synthetic generators, re-scoped
     B1 #14, B2 #15, B3 #16 ─ B4 #17   (independent of A/C/D)
 ```
 
-**Ready to start now:** #8, #9, #13, and all of phase B.
+**Ready to start now:** #8, #9, #13, #16, #17, #26, #27. #28 is the open
+theory question and #21 should wait on it.
 
 ### Open questions for the repository owner
 
@@ -92,7 +93,7 @@ open ──  A7 #27  REVERTED - broke the synthetic generators, re-scoped
 | step-count dependence of strong_centres | 1.0 → 10.0 | **1e-6** | ✅ |
 | identity centre counts | 47–205 | 437–624 | recalibrate in #18 |
 
-Merged so far: #10, #11, #12, #25, #27.
+Merged so far: #10, #11, #12, #14, #15, #25. #27 was attempted and reverted.
 
 The measures still do not track their ground truth — that is unchanged by any
 repair so far, and separating starved formulas from wrong ones is #18.
