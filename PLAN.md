@@ -90,17 +90,40 @@ theory question and #21 should wait on it.
   set is too weak to reach it. This is a theory-level question and wants settling
   before #21.
 
-### Where phase A stands
+### Where the instrument stands
 
 | | before | now | target |
 |---|---:|---:|---:|
 | worst property Δ under vignette | 7.4 | **1.38** | ≤1.5 ✅ |
-| worst property Δ under mirror / rot90 | 5.9 | **0.86** | ≤0.05 (#13) |
+| worst property Δ under mirror / rot90 | 5.9 | **0.213** | ≤0.05 (#13) |
 | crop15% like-for-like, worst | +246% | **+32%** | — |
 | step-count dependence of strong_centres | 1.0 → 10.0 | **1e-6** | ✅ |
-| identity centre counts | 47–205 | 437–624 | recalibrate in #18 |
+| r(score, centre count) | +0.99 | **+0.13** | \|r\| < 0.5 ✅ |
+| empty canvas | 7 properties at 10/10 | **15/15 undefined** | ✅ |
+| structureless configuration | the global optimum | **0.000, and collapse loses by 1.3** | ✅ |
 
-Merged so far: #10, #11, #12, #14, #15, #25. #27 was attempted and reverted.
+Triage of the fifteen measures, signal against measurement noise:
+
+| | usable | marginal | NOISE |
+|---|---:|---:|---:|
+| original audit | 10 | 3 | 2 |
+| after the kernel fix (#28) | 7 | 6 | 2 |
+| after edge symmetrisation (#13) | **11** | **3** | **1** |
+
+Merged so far: #10, #11, #12, #14, #15, #25, #26, and the #28 work. #27 was
+attempted and reverted; #13 is partial.
+
+**What has not moved: the measures still do not track their ground truth, and
+noise still outscores every artwork (#29).** Every repair so far has improved the
+instrument's *precision* — its scores are now stable, bounded, and independent of
+the frame, the resolution and the iteration count. None has improved its
+*validity*. That distinction is the whole remaining problem.
+
+A methodological caveat on the sweeps, measured: with only five sample points a
+single adjacent rank swap moves Spearman ρ by 0.1, so ρ ≥ 0.9 tests for
+perfection and small ρ changes carry no information. #19 is widening the sweeps
+to 10–12 points and giving interior-optimum measures (levels of scale, roughness)
+a test that is not monotonicity.
 
 The measures still do not track their ground truth — that is unchanged by any
 repair so far, and separating starved formulas from wrong ones is #18.
