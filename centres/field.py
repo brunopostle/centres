@@ -153,18 +153,45 @@ def build_structural_field(image):
        gradients score from 6.9 to 1.8. A cap in units of the artwork's own
        edge spacing leaves the field on the retained region essentially
        unchanged (see AUDIT.md and the A4 notes in PLAN.md).
+
+    3. Explicit scale — the field is divided by the cap, not by its own maximum.
+
+       Dividing by ``field.max()`` made a single pixel — whichever happened to
+       be furthest from an edge — set the amplitude of the whole image, while
+       ``detect_centers`` applied an absolute LoG threshold to the result. The
+       two did not compose: any local change rescaled the field everywhere and
+       the fixed threshold then admitted or rejected centres everywhere. That,
+       and not local edge loss, was the mechanism by which vignetting destroyed
+       the results: when corners lost edges the distance transform there ran to
+       the cap, ``field.max()`` jumped (varamin 32 to 69), and every centre
+       count moved. The three corpus images that failed worst under vignette
+       were exactly the three whose ``dist.max()`` moved.
+
+       Dividing by the cap instead makes the denominator a property of the
+       artwork — ``CAP_SPACINGS`` times a robust average of region size — so the
+       threshold means a fixed fraction of a typical region rather than a
+       fraction of whatever outlier the framing happened to include. On the
+       corpus the two agree to about 0.2%, because ``dist.max()`` exceeds the
+       cap everywhere, so this is near behaviour-preserving today. What it
+       removes is the silent reversion: without it, the moment the cap stopped
+       biting the frame dependence would return through the back door, which is
+       what forced ``CAP_SPACINGS`` to stay below the largest empty-region
+       distance.
     """
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     edges = _detect_edges(gray)
     # distanceTransform expects 0 = obstacle; Canny gives 255 on edges
     dist = cv2.distanceTransform(255 - edges, cv2.DIST_L2, 5)
     spacing = edge_spacing(dist)
-    if spacing > 0:
-        dist = np.minimum(dist, CAP_SPACINGS * spacing)
+    if spacing <= 0:
+        # No usable medial axis: no edges at all, or every pixel an edge. There
+        # is no structure to measure and no scale to express it in, so the field
+        # is empty rather than an arbitrary constant.
+        return np.zeros(gray.shape, dtype=float)
+    cap = CAP_SPACINGS * spacing
+    dist = np.minimum(dist, cap)
     blur = gaussian_filter(gray.astype(float) / 255.0, sigma=3)
-    field = dist + 0.1 * blur
-    field = field / (field.max() + 1e-8)
-    return field
+    return (dist + 0.1 * blur) / cap
 
 
 def reconstruct_field(shape, centers):

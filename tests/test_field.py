@@ -28,9 +28,31 @@ def test_range_zero_to_one():
     assert field.max() <= 1.0 + 1e-6
 
 
-def test_max_is_one():
+def test_field_is_bounded_in_units_of_the_cap():
+    """The field is expressed as a fraction of the distance cap.
+
+    This replaces a test asserting field.max() == 1.0, which was tautological
+    while the field was divided by its own maximum. Dividing by the cap instead
+    (#27) means 1.0 is a fixed structural quantity — CAP_SPACINGS times the
+    typical edge spacing — so the maximum is only reached when some region is
+    actually that large, and the value carries meaning.
+    """
     field = build_structural_field(make_bgr_with_rect())
-    assert field.max() == pytest.approx(1.0, abs=1e-6)
+    assert field.min() >= 0.0
+    # 0.1 * blur, itself in [0, 1], is added before dividing by the cap
+    assert field.max() <= 1.0 + 0.1
+
+
+def test_region_wider_than_the_cap_saturates():
+    """A region far larger than the cap reaches the top of the scale."""
+    from centres.field import CAP_SPACINGS, edge_spacing
+    import cv2
+
+    img = make_bgr(600, 600, value=20)
+    img[2:598, 2:598] = 20
+    img[0:2, :] = 200  # a thin frame is the only structure
+    field = build_structural_field(img)
+    assert field.max() == pytest.approx(1.0, abs=0.15)
 
 
 def test_field_peaks_inside_bounded_region():
