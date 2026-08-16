@@ -285,7 +285,20 @@ E_H = Σ_i (log(r_p(i) / r_i) - log 3)²
 D_H = E_H / (number of parent-child pairs)     q_H = exp(-D_H / 0.317)
 ```
 
-Natural hierarchies (trees, cities, traditional architecture) exhibit approximately constant scale ratios of 2–4 between successive levels. The target ratio of 3 is the midpoint of this range. Minimising E_H produces the power-law distribution of centre sizes P(r) ∝ r^{-γ} that Alexander repeatedly observed. This term encodes his property *levels of scale*.
+> **⚠ WRONG TARGET, AND WRONG SHAPE.** Salingaros (2025) —
+> `docs/salingaros-2025-fifteen-properties.pdf`, the detailed expansion of the
+> fifteen properties — gives "optimal magnification factors range between
+> approximately **2 to 5**", with 1.5 too close to distinguish and 10 disengaging.
+> That is a **band**, not a point, so a quadratic penalty about a single ratio is
+> the wrong shape whatever the constant. The "2–4" stated here was unsourced.
+> AUDIT.md §12 measures this term's minimum at ratio 2.381 — inside the sourced
+> band — so the measure may be less wrong than the target it is scored against.
+>
+> The source also specifies that scales are "measured **independently in the
+> vertical and horizontal directions**". Nothing in this implementation is
+> directional.
+
+Natural hierarchies were claimed here to exhibit constant scale ratios of 2–4, with the target ratio of 3 as the midpoint of that range. Minimising E_H produces the power-law distribution of centre sizes P(r) ∝ r^{-γ} that Alexander repeatedly observed. This term encodes his property *levels of scale*.
 
 ### 8.3 Reinforcement Energy E_R
 
@@ -334,7 +347,12 @@ E_C = Σ_i (C_i - 0.65)²
 
 C_i ≈ 0.65 means children collectively occupy about 65% of the parent's area — filled without overcrowding. This is intended to encode Alexander's *positive space*: regions well-formed and occupied rather than fragmented or empty.
 
-> **⚠ UNSOURCED.** The value 0.65 is not Alexander's and has no citation. It appears to have been invented and then attributed. Either source it or derive it from the corpus and say so. [#24](https://github.com/brunopostle/centres/issues/24)
+> **⚠ UNSOURCED, AND THE PROPERTY IS ABOUT SOMETHING ELSE.** The value 0.65 does
+> not appear in Salingaros (2025), and neither does any child-area coverage
+> figure. What the source says *positive space* means is convexity: "The
+> experienced space itself … is typically **convex** … while the enclosing solid
+> boundary is mostly **concave**." Area coverage is a different quantity.
+> [#24](https://github.com/brunopostle/centres/issues/24)
 
 ### 8.6 Alignment Energy E_A
 
@@ -347,7 +365,11 @@ E_A = Σ_i (d_i - 0.5)²
 
 The target 0.5 is the midpoint of a supposed 0.3–0.7 range.
 
-> **⚠ UNSOURCED.** "Alexander observed that child centres tend to lie at 0.3–0.7 of the parent radius" carries no citation and appears to be invented. [#24](https://github.com/brunopostle/centres/issues/24)
+> **⚠ UNSOURCED.** No radial-distance figure appears in Salingaros (2025). What
+> the source says *local symmetries* means is **bilateral symmetry about the
+> vertical axis**, nested so that one acts on every distinct scale of the
+> hierarchy. Radial distance of children from parents is not that.
+> [#24](https://github.com/brunopostle/centres/issues/24)
  Too close to the parent's centre (d << 0.3) produces concentric but weakly differentiated structure; too far (d >> 0.7) breaks containment. This encodes *local symmetries* and *deep interlock*.
 
 ### 8.7 Field Energy E_φ

@@ -683,6 +683,99 @@ and if count explains the off-diagonals then the fifteen measures are one
 measure, and the representation is not the problem.
 
 
+## 15. What the source actually says, against what the code computes
+
+Comparison against Salingaros (2025), the detailed expansion of Alexander's
+fifteen properties written explicitly for programming software to detect them —
+`docs/salingaros-2025-fifteen-properties.pdf`. This is the authority the project
+previously lacked, and it changes several verdicts in §13.
+
+### Three findings that overturn earlier conclusions
+
+**1. Gap centres are not an artefact. They are half of Alexander's definition.**
+
+> *Strong Centers:* "Centers may be of two types: either **'defined'**, with
+> something in the middle to focus attention; or **'implied'**, where a complex
+> engaging boundary focuses attention on its **emptier interior**."
+
+§1 treated the 256 detections in the gaps of a lattice as a defect to be
+suppressed, then softened to "arguably correct Alexander". It is not arguable: the
+source names them. `Center.polarity` (#26) is not a filter for discarding gap
+detections — it is the **defined/implied distinction itself**, and both populations
+belong in the analysis. *Thick Boundaries* says the same thing again: "A thick
+boundary also functions as an 'implied' center."
+
+**2. Overlap is required, not penalised.**
+
+> *Strong Centers:* "Many such mutually-reinforcing centers interconnect and
+> **overlap**, rather than being isolated."
+> *Deep Interlock:* "Two regions can **interpenetrate** at a semi-permeable
+> interface."
+
+`locality_energy` penalises overlap and carries the largest weight in the
+functional. It encodes the opposite of what the source requires. This was
+suspected on #28 from the theory alone; it is now sourced.
+
+**3. Emptiness is explicitly not simplicity, and explicitly not good.**
+
+> *Simplicity and Inner Calm:* "Simplicity in nature emerges from coherence and
+> harmony, **not reductionism** … But an **empty, minimalist design has no
+> informational content** and evokes a sense of disengagement and sterility."
+> *The Void:* "**two empty regions will not reinforce each other**."
+
+§2a found the energy functional minimised by the absence of structure. The source
+makes that a contradiction of the theory, not merely of intuition.
+
+### Sourced constants, replacing invented ones
+
+| quantity | THEORY.md said | the source says |
+|---|---|---|
+| scale ratio between levels | "2–4", target **3** | "Optimal magnification factors range between approximately **2 to 5**"; 1.5 too close, 10 disengaging |
+| boundary thickness | *(no measure)* | "the boundary measures roughly **1/3 of what it bounds**" |
+| child-area coverage | **0.65** | *not stated anywhere* |
+| child radial distance | **0.3–0.7** of parent radius | *not stated anywhere* |
+
+Two consequences. **`levels_of_scale` targets the wrong thing in the wrong way**:
+the source gives a *band* (2–5), not a point, so a quadratic penalty about log 3
+is the wrong shape regardless of the constant. §12 found the measure's minimum at
+ratio **2.381** — which is *inside* the sourced band. The measure may be less
+wrong than it appeared; the target was wrong.
+
+And **0.65 and 0.3–0.7 are not in the source.** They should be removed rather than
+re-cited.
+
+### What each property actually requires
+
+| property | the source's operative content | what the code computes |
+|---|---|---|
+| levels of scale | magnification band 2–5, measured **independently in vertical and horizontal** | quadratic penalty about a single ratio of 3, direction-free |
+| strong centres | defined **and** implied centres, nested, overlapping, mutually reinforcing | mean strength of the top quartile |
+| thick boundaries | boundary ≈ 1/3 of what it bounds; boundary is itself an implied centre | field value at midpoints of graph edges |
+| alternating repetition | information **not collapsible to one repeating unit** | dispersion of diffused strengths |
+| positive space | space **convex**, enclosing boundary **concave**; figure/ground duality | deviation from 0.65 child-area coverage |
+| good shape | **compact**, graspable, arising from nested symmetries | fraction of centres having a child |
+| local symmetries | **bilateral about the vertical axis**, nested, one per scale | radial distance of children from parents |
+| deep interlock | interpenetration at a semi-permeable interface | fraction of graph edges whose extents overlap |
+| contrast | **black-white and colour** contrast; figure-ground symmetry of opposites | strength difference across graph edges |
+| gradients | gradual change in **colour, size or texture** | mean squared gradient of the blob rendering |
+| roughness | "**not** coarse-grained" — adaptation privileged over precision | coefficient of variation of nearest-neighbour distances |
+| echoes | motif similarity within **and across** scales | standard deviation of log scale ratios |
+| the void | complex structure **surrounds and defines** the void | gradient magnitude inside the strongest centre |
+| simplicity | coherence, not reductionism; emptiness is sterile | Gini coefficient of strengths |
+| not-separateness | connects to its **environment**, beyond internal coherence | Fiedler value of the graph |
+
+Eleven of the fifteen compute something with no evident relation to the sourced
+definition. That is a stronger statement than §12's, which only established that
+they fail to track their own generators: it says several were never
+operationalisations of the property in the first place.
+
+Three properties are explicitly **directional or tonal** — levels of scale
+(vertical and horizontal measured separately), contrast (colour), gradients
+(colour and texture). The structural field is a direction-free, tone-free distance
+transform, so these cannot be computed from it at all, which is the architectural
+finding of §10 arriving independently from the source.
+
+
 ## Recommended order of work
 
 1. **Keep the harness in front of every change.** `python -m audit` turns "this
