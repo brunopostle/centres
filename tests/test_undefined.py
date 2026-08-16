@@ -59,6 +59,18 @@ def c(id, x, y, scale, strength=1.0, parent=None):
                   strength=strength, parent=parent)
 
 
+def _with_region(centre, **kw):
+    """Attach a synthetic Region; the redefined measures (#22) require one."""
+    from centres.regions import Region
+
+    d = dict(area=100.0, compactness=0.5, solidity=0.5, tone=0.5, tone_spread=0.0,
+             vertical_symmetry=0.5, horizontal_symmetry=0.5, elongation=0.5,
+             orientation=0.0, shape_signature=(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0))
+    d.update(kw)
+    centre.region = Region(**d)
+    return centre
+
+
 def _connected(centers):
     return propagate_strength(build_graph(centers))
 
@@ -82,10 +94,31 @@ def test_pair_measures_undefined_without_hierarchy(fn):
     assert fn([c(0, 0, 0, 30.0), c(1, 10, 0, 10.0)]) is None  # centres, no pairs
 
 
-@pytest.mark.parametrize("fn", [levels_of_scale, positive_space, local_symmetries])
-def test_pair_measures_defined_with_one_pair(fn):
+def test_pair_measures_defined_with_one_pair():
     # The mean of a single deviation is a deviation. One pair is enough.
-    assert fn([c(0, 0, 0, 30.0), c(1, 10, 0, 10.0, parent=0)]) is not None
+    assert levels_of_scale([c(0, 0, 0, 30.0), c(1, 10, 0, 10.0, parent=0)]) is not None
+
+
+def test_redefined_measures_no_longer_depend_on_parent_child_pairs():
+    """positive_space and local_symmetries were pair statistics; they are not now.
+
+    Both read region geometry rather than the hierarchy (#22): positive space is
+    the convexity of the interstitial ground, local symmetries the bilateral
+    symmetry of each region about the vertical axis. A single centre with no
+    parent and no child is enough for both, and a hierarchy with no regions is
+    enough for neither.
+    """
+    ground = _with_region(c(0, 0, 0, 10.0), solidity=0.8)
+    ground.polarity = -0.2
+    assert positive_space([ground]) == pytest.approx(0.8)
+
+    figure = _with_region(c(1, 0, 0, 10.0), vertical_symmetry=0.6)
+    figure.polarity = +0.2
+    assert local_symmetries([figure]) == pytest.approx(0.6)
+
+    paired = [c(0, 0, 0, 30.0), c(1, 10, 0, 10.0, parent=0)]  # no regions
+    assert positive_space(paired) is None
+    assert local_symmetries(paired) is None
 
 
 # --- echoes: the one measure whose boundary is two, not one ---
@@ -103,14 +136,12 @@ def test_echoes_undefined_with_exactly_one_pair():
     assert echoes([c(0, 0, 0, 30.0), c(1, 10, 0, 10.0, parent=0)]) is None
 
 
-def test_echoes_defined_with_two_pairs():
-    centers = [c(0, 0, 0, 90.0), c(1, 5, 0, 30.0, parent=0),
-               c(2, -5, 0, 30.0, parent=0)]
-    assert echoes(centers) == pytest.approx(0.0, abs=1e-10)
-
-
-# --- measures over centres: undefined with none, defined with one ---
-
+def test_echoes_boundary():
+    """Redefined (#22): needs two shapes to compare, not two parent-child pairs."""
+    one = [_with_region(c(0, 0, 0, 10.0))]
+    assert echoes(one) is None
+    two = [_with_region(c(0, 0, 0, 10.0)), _with_region(c(1, 40, 0, 10.0))]
+    assert echoes(two) is not None
 
 def test_strong_centres_boundary():
     assert strong_centres([]) is None
@@ -124,11 +155,14 @@ def test_simplicity_boundary():
 
 
 def test_good_shape_boundary():
-    """Undefined with no centres — the denominator is the centre count. But
-    centres with no hierarchy give a genuine 0: no centre has sub-structure."""
+    """Undefined without a figure region to measure the compactness of (#22)."""
     assert good_shape([]) is None
-    assert good_shape([c(0, 0, 0, 5.0), c(1, 50, 0, 5.0)]) == 0.0
-
+    ground = _with_region(c(0, 0, 0, 10.0))
+    ground.polarity = -0.2
+    assert good_shape([ground]) is None, "ground alone carries no motif shape"
+    figure = _with_region(c(1, 0, 0, 10.0), compactness=0.7)
+    figure.polarity = +0.2
+    assert good_shape([figure]) == pytest.approx(0.7)
 
 def test_the_void_boundary():
     assert the_void(np.ones((50, 50)), []) is None
@@ -183,12 +217,16 @@ def test_boundaries_undefined_when_field_is_empty_at_every_peak():
 
 
 def test_contrast_boundary():
+    """Undefined without edges, and now also without regions to take tone from."""
     assert contrast(build_graph([c(0, 0, 0, 3.0), c(1, 500, 0, 3.0)])) is None
-    # Edges with equal strengths are a genuine zero, not an undefined.
-    G = _connected([c(0, 0, 0, 10.0, strength=1.0), c(1, 15, 0, 10.0, strength=1.0)])
-    assert G.edges
-    assert contrast(G) == pytest.approx(0.0, abs=1e-6)
-
+    bare = _connected([c(0, 0, 0, 10.0), c(1, 15, 0, 10.0)])
+    assert bare.edges
+    assert contrast(bare) is None, "no regions means no tone to compare"
+    toned = _connected([
+        _with_region(c(0, 0, 0, 10.0), tone=0.2),
+        _with_region(c(1, 15, 0, 10.0), tone=0.2),
+    ])
+    assert contrast(toned) == pytest.approx(0.0, abs=1e-9)
 
 def test_deep_interlock_boundary():
     assert deep_interlock([], build_graph([])) is None

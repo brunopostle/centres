@@ -7,7 +7,8 @@ import pytest
 from centres.centers import Center
 from centres.field import build_structural_field
 from centres.graph import build_graph, propagate_strength
-from centres.pipeline import assign_hierarchy, detect_centers
+from centres.pipeline import assign_hierarchy, assign_polarity, detect_centers
+from centres.regions import segment_regions
 from centres.properties import contrast, normalize_all, strong_centres
 
 IMAGES = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images")
@@ -162,14 +163,20 @@ def test_strong_centres_and_contrast_stable_across_step_counts(name):
     and 4.8 -> 5.4 -> 10.0 -> 0.0 across these step counts, because the update
     had gain 1.15 per step and no fixed point.
     """
-    field = build_structural_field(_load(name))
-    detected = assign_hierarchy(detect_centers(field))
+    img = _load(name)
+    field = build_structural_field(img)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    detected = assign_hierarchy(
+        segment_regions(field, assign_polarity(detect_centers(field), gray), gray)
+    )
     assert len(detected) > 20, "expected a non-trivial centre set"
 
     scores = {"strong_centres": [], "contrast": []}
     for steps in STEP_COUNTS:
+        # contrast now reads region tone (#22), so the region must survive the copy
         centers = [
-            Center(id=x.id, x=x.x, y=x.y, scale=x.scale, strength=x.strength, parent=x.parent)
+            Center(id=x.id, x=x.x, y=x.y, scale=x.scale, strength=x.strength,
+                   parent=x.parent, polarity=x.polarity, region=x.region)
             for x in detected
         ]
         G = propagate_strength(build_graph(centers), steps=steps)

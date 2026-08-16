@@ -33,6 +33,29 @@ import networkx as nx
 from .energy import hierarchy_energy, coverage_energy, alignment_energy, field_energy
 
 
+
+def _regions(centers, polarity=None):
+    """Regions worth measuring, optionally restricted to one polarity.
+
+    ``polarity`` is ``+1`` for figure (interiors darker than their surround),
+    ``-1`` for ground, or ``None`` for both. The distinction is Alexander's own:
+    the source names centres of two kinds, "defined" with something in the middle
+    and "implied" where a boundary focuses attention on an emptier interior.
+    """
+    kept = [c for c in centers if c.region is not None and c.region.area > 0]
+
+    # No area floor. Excluding regions below some fraction of the median was
+    # tried and reverted: it deletes the smallest scale level, and the presence
+    # of structure at every scale is the first of the fifteen properties. A
+    # measure that discards the fine scale to tidy its own statistics is
+    # answering a different question from the one asked.
+    if polarity is None:
+        return [c.region for c in kept]
+    if polarity > 0:
+        return [c.region for c in kept if c.polarity > 0]
+    return [c.region for c in kept if c.polarity <= 0]
+
+
 def levels_of_scale(centers):
     """↓  Mean per-pair E_H: deviation from scale ratio ~3 between parent and child.
 
@@ -118,55 +141,70 @@ def alternating_repetition(G):
 
 
 def positive_space(centers):
-    """↓  Mean per-parent E_C: deviation from ideal child coverage (~0.65).
+    """↑  Median solidity of the interstitial ground.
 
-    Mean of (C_i - 0.65)² across all centres that have children. Zero when
-    every parent's children cover exactly 65% of the parent area. Normalised
-    per parent so the score is comparable across different centre counts.
+    Salingaros (2025): "The experienced space itself … is typically **convex**,
+    providing comfort and coherence, while the enclosing solid boundary is mostly
+    **concave**." Solidity is area over convex-hull area, one for a convex region.
 
-    Undefined (``None``) with no parents: coverage is the area of a parent
-    filled by its children, so with no parent-child relation there is no
-    coverage. One parent is enough.
+    *Redefined (#22).* This measure was the mean squared deviation of child-area
+    coverage from **0.65** — a constant that appears nowhere in the source, and a
+    quantity with no relation to convexity. It scored −0.38 against a stimulus
+    sweeping the solidity of the interstitial ground; region solidity scores
+    **+0.829** on the same sweep.
+
+    Measured on the ground population, because that is the "experienced space"
+    the source is talking about: the space between and around the solids.
     """
-    parents = {c.parent for c in centers if c.parent is not None}
-    if not parents:
-        return None
-    return coverage_energy(centers) / len(parents)
-
+    spaces = [r.solidity for r in _regions(centers, polarity=-1)]
+    return float(np.median(spaces)) if spaces else None
 
 def good_shape(centers):
-    """↑  Fraction of centres that contain at least one child in the hierarchy.
+    """↑  Median compactness of the figure regions.
 
-    Centres with sub-structure are interpreted as having sufficient internal
-    coherence to constitute a 'good shape'. Pure leaf nodes — centres with
-    no children — are not forming enclosing regions at their scale.
+    Salingaros (2025): "Harmonious and aesthetically pleasing forms remind us of
+    animal shapes that must be **compact** … Compact shapes are cognitively
+    'graspable'." Compactness is 4*pi*A/P^2, one for a disc and falling as the
+    outline becomes ragged or elongated.
 
-    Undefined (``None``) with no centres — the denominator is the centre count.
-    Note the boundary is *not* "no parent-child pairs": with centres present but
-    no hierarchy the fraction is a genuine 0, meaning no centre has
-    sub-structure, which is a real and low result rather than a missing one.
+    *Redefined (#22).* This measure was the **fraction of centres having at least
+    one child** — a hierarchy statistic containing no shape information of any
+    kind. Against a stimulus sweeping motif circularity it scored +0.16 after
+    controlling for centre count; compactness of the segmented region scores
+    **+0.943** on the same sweep.
+
+    Figure regions only. The interstitial ground between motifs is bounded by
+    those motifs and takes a ragged outline from them, so pooling both
+    populations measures the packing rather than the shapes.
     """
-    if not centers:
-        return None
-    parents_with_children = {c.parent for c in centers if c.parent is not None}
-    return len(parents_with_children) / len(centers)
-
+    shapes = [r.compactness for r in _regions(centers, polarity=+1)]
+    return float(np.median(shapes)) if shapes else None
 
 def local_symmetries(centers):
-    """↓  Mean per-pair E_A: deviation of child distance from 0.5 × r_parent.
+    """↑  Area-weighted mean bilateral symmetry about the vertical axis.
 
-    Mean of (d/r_parent - 0.5)² across all parent-child pairs. Measures
-    alignment of children within their parent. Normalised per pair so the
-    score is comparable across centre sets of different sizes.
+    Salingaros (2025): "**Bilateral symmetry about the vertical axis** respects
+    gravitational stability … Nested symmetries — where a smaller one fits inside
+    a larger one — must act on **every distinct scale** in the scaling hierarchy."
 
-    Undefined (``None``) with no parent-child pairs: the measured quantity is a
-    child's radial position within its parent, which needs a pair to exist.
+    Two things follow, and both are in this measure. The axis is *vertical*, not
+    any axis: the source ties it to gravity, so a design symmetric about a
+    horizontal axis is not the same thing. And it acts at every scale, so the
+    average is weighted by region area rather than counting small and large
+    regions alike.
+
+    *Redefined (#22).* This measure was the mean squared deviation of a child's
+    radial distance from 0.5 of its parent's radius — a figure absent from the
+    source, and one in which no symmetry is computed at all. It scored −0.58
+    against a stimulus sweeping motif symmetry order; region vertical symmetry
+    scores |rho| = 0.900 on the same sweep.
     """
-    pairs = [c for c in centers if c.parent is not None]
-    if not pairs:
+    regions = _regions(centers, polarity=+1)
+    if not regions:
         return None
-    return alignment_energy(centers) / len(pairs)
-
+    values = np.array([r.vertical_symmetry for r in regions])
+    weights = np.array([r.area for r in regions])
+    return float((values * weights).sum() / weights.sum())
 
 def deep_interlock(centers, G):
     """↑  Fraction of connected centre pairs whose spatial extents overlap.
@@ -196,26 +234,36 @@ def deep_interlock(centers, G):
 
 
 def contrast(G):
-    """↑  Mean absolute strength difference between connected centres,
-    weighted by edge weight.
+    """↑  Mean absolute tone difference between adjacent regions.
 
-    Measures whether adjacent centres differ in strength. Zero when all
-    connected centres have equal strength (flat, undifferentiated field).
+    Salingaros (2025): "**black-white and color contrast** for differentiation …
+    Contrast is needed to provide figure-ground symmetry of opposites."
 
-    Undefined (``None``) with no graph edges: contrast is between adjacent
-    centres, so with nothing adjacent there is no difference to take. Note the
-    distinction from the zero case above, which the old return of 0.0 conflated:
-    equal strengths across real edges is genuinely minimal contrast.
+    *Redefined (#22), and previously impossible.* This measure was the weighted
+    mean strength difference across graph edges. Strengths derive from the
+    structural field, the field is a distance transform, and a distance transform
+    **carries no tone at all** — so the measure could not see the quantity it was
+    named for under any formula. The audit measured it as *flat*: across a sweep
+    in which figure/ground tonal separation more than tripled, it moved 0.2%,
+    from 0.06694 to 0.06524.
+
+    Region tone supplies what was missing. Adjacency comes from the reinforcement
+    graph, whose weight now peaks where two centres touch (#28), so an edge is
+    the relation the source means by differentiating one unit from its neighbour.
     """
     if not G.edges:
         return None
-    total, w_sum = 0.0, 0.0
+    diffs = []
     for i, j, data in G.edges(data=True):
-        w = data["weight"]
-        total += w * abs(G.nodes[i]["center"].strength - G.nodes[j]["center"].strength)
-        w_sum += w
-    return total / (w_sum + 1e-8)
-
+        a = G.nodes[i]["center"].region
+        b = G.nodes[j]["center"].region
+        if a is None or b is None or a.area == 0 or b.area == 0:
+            continue
+        diffs.append(data["weight"] * abs(a.tone - b.tone))
+    if not diffs:
+        return None
+    weights = [d["weight"] for _, _, d in G.edges(data=True)]
+    return float(sum(diffs) / (sum(weights) + 1e-12))
 
 def gradients(field, centers):
     """↓  E_φ: mean squared gradient of the wholeness field.
@@ -260,25 +308,36 @@ def roughness(centers):
 
 
 def echoes(centers):
-    """↓  Standard deviation of log-scale ratios between parent-child pairs.
+    """↑  Similarity of motif shape, within and across scales.
 
-    Low value means the same scale ratio recurs consistently across all
-    levels of the hierarchy — the mathematical signature of self-similar
-    echoes (patterns that repeat at different scales).
+    Salingaros (2025): "Similar visual patterns and **shapes** are repeated both
+    on the same scale … as well as **across different scales** … one form 'echoes'
+    a larger or smaller form by means of common visual features."
 
-    Undefined (``None``) with fewer than two parent-child pairs. This is the one
-    measure whose boundary is at two rather than one: a single ratio has a
-    population standard deviation of exactly 0, and 0 is this measure's ideal
-    value, so one pair would be reported as perfect self-similarity. An echo is
-    a relation between at least two occurrences.
+    Measured as the mean pairwise similarity of the log-scaled Hu-moment shape
+    signature, which is invariant to scale, rotation and reflection — so it
+    compares *shape* rather than size, and a small motif echoing a large one of
+    the same form scores as an echo, which is exactly what the source describes.
+
+    *Redefined (#22).* This measure was the standard deviation of log parent/child
+    scale **ratios** — a property of the hierarchy's spacing, not of whether any
+    form resembles any other. It is possible to have perfectly consistent scale
+    ratios and no repeated shape whatever.
     """
-    ratios = [
-        np.log(centers[c.parent].scale / (c.scale + 1e-8))
-        for c in centers
-        if c.parent is not None
-    ]
-    return float(np.std(ratios)) if len(ratios) > 1 else None
-
+    signatures = [r.shape_signature for r in _regions(centers) if r.shape_signature]
+    if len(signatures) < 2:
+        return None
+    # The first four Hu moments carry the gross form; the last three are
+    # dominated by digitisation noise on small regions.
+    M = np.array([s[:4] for s in signatures], dtype=float)
+    if len(M) > 400:  # pairwise distance is O(n^2); a sample suffices
+        M = M[np.random.default_rng(0).choice(len(M), 400, replace=False)]
+    spread = M.std(axis=0)
+    spread[spread < 1e-9] = 1.0
+    Z = M / spread
+    d = np.sqrt(((Z[:, None, :] - Z[None, :, :]) ** 2).sum(-1))
+    iu = np.triu_indices(len(Z), k=1)
+    return float(np.exp(-np.median(d[iu])))
 
 def the_void(field, centers):
     """↓  Mean gradient magnitude within the radius of the strongest centre.

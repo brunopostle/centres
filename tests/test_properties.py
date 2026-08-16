@@ -71,6 +71,30 @@ def well_formed_hierarchy():
     return [parent] + kids
 
 
+def _figure(centre):
+    """Mark a centre as figure, which the polarity-filtered measures require."""
+    centre.polarity = 0.2
+    return centre
+
+
+def with_region(centre, **kw):
+    """Attach a synthetic Region so a hand-built centre can be measured.
+
+    The redefined measures (#22) read region geometry, tone and symmetry, which
+    a bare (x, y, scale, strength) tuple does not carry -- that was the whole
+    finding. Tests that construct centres by hand must supply it.
+    """
+    from centres.regions import Region
+
+    defaults = dict(area=100.0, compactness=0.5, solidity=0.5, tone=0.5,
+                    tone_spread=0.0, vertical_symmetry=0.5,
+                    horizontal_symmetry=0.5, elongation=0.5, orientation=0.0,
+                    shape_signature=(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0))
+    defaults.update(kw)
+    centre.region = Region(**defaults)
+    return centre
+
+
 def connected_graph(centers):
     G = build_graph(centers)
     return propagate_strength(G)
@@ -149,39 +173,59 @@ def test_alternating_repetition_no_edges_is_undefined():
 # --- positive_space ---
 
 
-def test_positive_space_zero_ideal_coverage():
-    child_scale = math.sqrt(0.65) * 10.0
-    parent = c(0, 0, 0, 10.0)
-    child = c(1, 3, 0, child_scale, parent=0)
-    assert positive_space([parent, child]) == pytest.approx(0.0, abs=1e-6)
+def test_positive_space_reads_the_convexity_of_the_ground():
+    """The source: experienced space is convex, its enclosing solid concave."""
+    convex = [with_region(c(0, 0, 0, 10), solidity=1.0)]
+    convex[0].polarity = -0.2
+    ragged = [with_region(c(0, 0, 0, 10), solidity=0.3)]
+    ragged[0].polarity = -0.2
+    assert positive_space(convex) > positive_space(ragged)
+    assert positive_space(convex) == pytest.approx(1.0)
 
 
-# --- good_shape ---
+def test_positive_space_ignores_the_figure_population():
+    figure = [with_region(c(0, 0, 0, 10), solidity=1.0)]
+    figure[0].polarity = +0.2
+    assert positive_space(figure) is None
+
+def test_good_shape_reads_compactness():
+    """The source: compact shapes are cognitively graspable."""
+    disc = [with_region(c(0, 0, 0, 10), compactness=1.0)]
+    disc[0].polarity = +0.2
+    star = [with_region(c(0, 0, 0, 10), compactness=0.2)]
+    star[0].polarity = +0.2
+    assert good_shape(disc) == pytest.approx(1.0)
+    assert good_shape(star) == pytest.approx(0.2)
+
+def test_good_shape_is_undefined_without_figure_regions():
+    ground = [with_region(c(0, 0, 0, 10), compactness=1.0)]
+    ground[0].polarity = -0.2
+    assert good_shape(ground) is None
+
+def test_local_symmetries_reads_vertical_symmetry_and_weights_by_area():
+    """The source names the vertical axis, and every scale.
+
+    A large asymmetric region must outweigh a small symmetric one, because the
+    source requires symmetry to act on every distinct scale rather than only the
+    smallest.
+    """
+    symmetric = [_figure(with_region(c(0, 0, 0, 10), vertical_symmetry=1.0))]
+    assert local_symmetries(symmetric) == pytest.approx(1.0)
+
+    mixed = [
+        _figure(with_region(c(0, 0, 0, 10), vertical_symmetry=1.0, area=10.0)),
+        _figure(with_region(c(1, 50, 0, 10), vertical_symmetry=0.0, area=90.0)),
+    ]
+    assert local_symmetries(mixed) == pytest.approx(0.1)
 
 
-def test_good_shape_high_when_parents_have_children():
-    centers = small_hierarchy()
-    score = good_shape(centers)
-    # 1 out of 3 centres is a parent → 1/3
-    assert score == pytest.approx(1 / 3, abs=1e-6)
-
-
-def test_good_shape_zero_all_leaves():
-    centers = [c(i, float(i * 10), 0, 5.0) for i in range(4)]
-    assert good_shape(centers) == 0.0
-
-
-# --- local_symmetries ---
-
-
-def test_local_symmetries_zero_at_half_radius():
-    parent = c(0, 0, 0, 20.0)
-    child = c(1, 10, 0, 5.0, parent=0)  # d = 0.5
-    assert local_symmetries([parent, child]) == pytest.approx(0.0, abs=1e-10)
-
-
-# --- deep_interlock ---
-
+def test_local_symmetries_distinguishes_the_axis():
+    """Symmetric horizontally but not vertically is not the sourced property."""
+    horizontal_only = [
+        _figure(with_region(c(0, 0, 0, 10), vertical_symmetry=0.2,
+                            horizontal_symmetry=1.0))
+    ]
+    assert local_symmetries(horizontal_only) == pytest.approx(0.2)
 
 def test_deep_interlock_one_when_all_edges_overlap():
     # Two centres whose radii overlap: d=15 < r1+r2=10+10=20
@@ -217,18 +261,31 @@ def test_deep_interlock_empty_graph_is_undefined():
 # --- contrast ---
 
 
-def test_contrast_positive_with_strength_difference():
-    centers = [c(0, 0, 0, 10, strength=2.0), c(1, 15, 0, 10, strength=0.5)]
-    G = connected_graph(centers)
-    if G.has_edge(0, 1):
-        assert contrast(G) > 0
+def test_contrast_reads_tone_not_strength():
+    """The source: black-white and colour contrast.
+
+    Strength derives from the distance-transform field, which carries no tone at
+    all, so the old measure was flat against a tonal sweep (#22).
+    """
+    dark = with_region(c(0, 0, 0, 10.0, strength=1.0), tone=0.05)
+    light = with_region(c(1, 15, 0, 10.0, strength=1.0), tone=0.95)
+    G = connected_graph([dark, light])
+    assert G.edges
+    assert contrast(G) == pytest.approx(0.9, abs=0.02)
+
+def test_contrast_zero_when_tones_match():
+    a = with_region(c(0, 0, 0, 10.0, strength=1.0), tone=0.5)
+    b = with_region(c(1, 15, 0, 10.0, strength=1.0), tone=0.5)
+    G = connected_graph([a, b])
+    assert G.edges
+    assert contrast(G) == pytest.approx(0.0, abs=1e-9)
 
 
-def test_contrast_zero_equal_strengths():
-    centers = [c(0, 0, 0, 10, strength=1.0), c(1, 15, 0, 10, strength=1.0)]
-    G = connected_graph(centers)
-    assert contrast(G) == pytest.approx(0.0, abs=1e-6)
-
+def test_contrast_is_blind_to_strength():
+    """Differing strengths with equal tone is not contrast in the sourced sense."""
+    a = with_region(c(0, 0, 0, 10.0, strength=0.1), tone=0.5)
+    b = with_region(c(1, 15, 0, 10.0, strength=9.0), tone=0.5)
+    assert contrast(connected_graph([a, b])) == pytest.approx(0.0, abs=1e-9)
 
 def test_contrast_no_edges_is_undefined():
     G = build_graph([c(0, 0, 0, 3), c(1, 500, 0, 3)])
@@ -277,23 +334,36 @@ def test_roughness_higher_for_irregular():
 # --- echoes ---
 
 
-def test_echoes_zero_consistent_ratios():
-    # All parent-child pairs have exactly ratio 3 → std=0
-    parent = c(0, 0, 0, 90.0)
-    child1 = c(1, 5, 0, 30.0, parent=0)
-    child2 = c(2, -5, 0, 30.0, parent=0)
-    assert echoes([parent, child1, child2]) == pytest.approx(0.0, abs=1e-10)
+def test_echoes_high_when_shapes_repeat():
+    """The source: similar shapes repeated, within and across scales."""
+    same = [
+        with_region(c(i, i * 40, 0, 10.0), shape_signature=(1.0, 2.0, 3.0, 4.0))
+        for i in range(4)
+    ]
+    assert echoes(same) == pytest.approx(1.0, abs=1e-6)
+
+def test_echoes_lower_when_every_shape_differs():
+    same = [
+        with_region(c(i, i * 40, 0, 10.0), shape_signature=(1.0, 2.0, 3.0, 4.0))
+        for i in range(4)
+    ]
+    varied = [
+        with_region(c(i, i * 40, 0, 10.0),
+                    shape_signature=(1.0 + i, 2.0 - i, 3.0 + 2 * i, 4.0 - i))
+        for i in range(4)
+    ]
+    assert echoes(varied) < echoes(same)
 
 
-def test_echoes_positive_inconsistent_ratios():
-    parent = c(0, 0, 0, 30.0)
-    child1 = c(1, 15, 0, 10.0, parent=0)  # ratio 3
-    child2 = c(2, -5, 0, 2.0, parent=0)  # ratio 15
-    assert echoes([parent, child1, child2]) > 0
-
-
-# --- the_void ---
-
+def test_echoes_ignores_scale():
+    """A small motif echoing a large one of the same form is an echo."""
+    across_scales = [
+        with_region(c(0, 0, 0, 5.0, ), area=50.0,
+                    shape_signature=(1.0, 2.0, 3.0, 4.0)),
+        with_region(c(1, 60, 0, 40.0), area=5000.0,
+                    shape_signature=(1.0, 2.0, 3.0, 4.0)),
+    ]
+    assert echoes(across_scales) == pytest.approx(1.0, abs=1e-6)
 
 def test_the_void_low_for_uniform_field():
     centers = [c(0, 50, 50, 20.0, strength=2.0)]
@@ -378,7 +448,9 @@ def test_compute_all_returns_all_fifteen():
 
 
 def test_compute_all_values_finite():
-    centers = well_formed_hierarchy()
+    centers = [with_region(x) for x in well_formed_hierarchy()]
+    for x in centers:
+        x.polarity = 0.2 if x.parent is not None else -0.2
     G = connected_graph(centers)
     field = reconstruct_field((100, 100), centers)
     for key, val in compute_all(field, centers, G).items():
