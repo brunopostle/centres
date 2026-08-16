@@ -1,5 +1,6 @@
 from .field import build_structural_field, reconstruct_field
 from .graph import build_graph, propagate_strength
+from .regions import segment_regions
 from .energy import total_energy
 from .centers import Center
 import cv2
@@ -62,7 +63,9 @@ def assign_hierarchy(centers):
 def analyze(image):
     field = build_structural_field(image)
     centers = detect_centers(field)
-    centers = assign_polarity(centers, cv2.cvtColor(image, cv2.COLOR_BGR2GRAY))
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    centers = assign_polarity(centers, gray)
+    centers = segment_regions(field, centers, gray)
     centers = assign_hierarchy(centers)
     G = build_graph(centers)
     G = propagate_strength(G)

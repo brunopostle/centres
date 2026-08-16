@@ -32,3 +32,8 @@ class Center:
     strength: float
     parent: int = None
     polarity: float = 0.0
+
+    #: The extent this centre occupies, with shape, tone and symmetry
+    #: descriptors. Populated by ``centres.regions.segment_regions``. See that
+    #: module for why a position and a radius were not enough.
+    region: object = None
