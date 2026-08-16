@@ -201,14 +201,15 @@ def measure_generators():
 
     Both the centre-count stage and the sweep stage need the same ~180 scores, and
     each score is several seconds. They are computed here and shared rather than
-    computed twice.
+    computed twice. The sensitivity matrix needs every measure on every stimulus,
+    so the whole score dicts are kept rather than only the generator's target.
     """
     out = {}
     for name, (fn, values, target, test) in stimuli.SWEEPS.items():
         rows = []
         for v in values:
             n, _, raw, norm = score(fn(v))
-            rows.append((v, n, raw[target], norm[target]))
+            rows.append((v, n, raw, norm))
         out[name] = (target, test, rows)
     return out
 
@@ -306,8 +307,8 @@ def sweeps(measured):
     for name, (target, (kind, arg), rows) in measured.items():
         # A sweep point where the measure is undefined carries no rank
         # information, so it is dropped rather than imputed.
-        pairs = [(v, raw) for v, _, raw, _ in rows if raw is not None]
-        scored = [(v, s) for v, _, _, s in rows if s is not None]
+        pairs = [(v, raw[target]) for v, _, raw, _ in rows if raw[target] is not None]
+        scored = [(v, norm[target]) for v, _, _, norm in rows if norm[target] is not None]
         dropped = len(rows) - len(pairs)
         if len(pairs) < 3:
             print(f"  {name:<18} -> {target:<24} undefined at "
@@ -321,6 +322,68 @@ def sweeps(measured):
         print(f"  {'':<18}    {'':<24} normalised score peaks at {peak:g}"
               f"  (sweep spans {min(v for v, _ in pairs):g} to "
               f"{max(v for v, _ in pairs):g})")
+
+
+
+def sensitivity(measured):
+    """Every measure against every generator: does each respond to its own?
+
+    Knowing that a measure tracks *its own* generator is necessary but nowhere
+    near sufficient. A measure that responds just as strongly to every other
+    generator is not isolating anything -- it is reporting some general property
+    of the stimulus, and the name on it is decoration.
+
+    The diagonal is each measure against the generator built for it. Dominance is
+    |rho_own| / max |rho_other|: above 1 the measure responds most to its own
+    parameter, below 1 something else moves it more.
+
+    Costs nothing extra -- the scores are already computed for the sweep stage.
+    """
+    from scipy.stats import spearmanr
+
+    gens = list(measured.keys())
+    targets = {name: measured[name][0] for name in gens}
+
+    rho = {}
+    for gname in gens:
+        _, _, rows = measured[gname]
+        for m in KEYS:
+            pairs = [(v, raw[m]) for v, _, raw, _ in rows if raw[m] is not None]
+            rho[(m, gname)] = (
+                float(spearmanr([p[0] for p in pairs], [p[1] for p in pairs]).statistic)
+                if len(pairs) >= 3 else float("nan")
+            )
+
+    _header("Sensitivity matrix  (|Spearman rho|, measure x generator)")
+    abbr = {g: g[:6] for g in gens}
+    print(f"  {'measure':<24}" + "".join(f"{abbr[g]:>7}" for g in gens))
+    print("  " + "-" * (24 + 7 * len(gens)))
+    for m in KEYS:
+        own = next((g for g in gens if targets[g] == m), None)
+        cells = []
+        for g in gens:
+            v = rho[(m, g)]
+            cells.append("     ." if np.isnan(v) else
+                         (f"[{abs(v):4.2f}]" if g == own else f"{abs(v):7.2f}"))
+        print(f"  {m:<24}" + "".join(cells))
+    print("\n  [x] marks the generator built for that measure.")
+
+    print(f"\n  {'measure':<24}{'own':>7}{'strongest other':>17}{'dominance':>11}")
+    print("  " + "-" * 60)
+    weak = []
+    for m in KEYS:
+        own = next((g for g in gens if targets[g] == m), None)
+        o = abs(rho[(m, own)])
+        others = [(abs(rho[(m, g)]), g) for g in gens if g != own and not np.isnan(rho[(m, g)])]
+        best, bg = max(others) if others else (float("nan"), "-")
+        dom = o / best if best else float("inf")
+        if not (dom > 1.0):
+            weak.append(m)
+        print(f"  {m:<24}{o:7.2f}{best:10.2f} {bg:<6}{dom:11.2f}")
+    if weak:
+        print(f"\n  {len(weak)} of {len(KEYS)} measures respond more strongly to some other")
+        print(f"  generator than to their own:\n    {', '.join(weak)}")
+    return rho
 
 
 def main():
@@ -343,7 +406,8 @@ def main():
         noise = invariance(imgs)
         triage(cs, noise)
         sweeps(measured)
-    extra = [norm for _, _, _, norm in measured.values()]
+        sensitivity(measured)
+    extra = [norm for _, _, rows in measured.values() for _, _, _, norm in rows]
     extra += [v[2] for v in nulls.values()]
     redundancy(cs, extra)
 
