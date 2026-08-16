@@ -2,6 +2,7 @@ from .field import build_structural_field, reconstruct_field
 from .graph import build_graph, propagate_strength
 from .energy import total_energy
 from .centers import Center
+import cv2
 from skimage.feature import blob_log
 from scipy.spatial.distance import cdist
 import numpy as np
@@ -61,6 +62,7 @@ def assign_hierarchy(centers):
 def analyze(image):
     field = build_structural_field(image)
     centers = detect_centers(field)
+    centers = assign_polarity(centers, cv2.cvtColor(image, cv2.COLOR_BGR2GRAY))
     centers = assign_hierarchy(centers)
     G = build_graph(centers)
     G = propagate_strength(G)
@@ -168,3 +170,58 @@ def evolve(
             progress(t + 1, iterations, current_energy, T, accepted)
 
     return field, centers
+
+
+#: Outer radius of the surround annulus, as a multiple of the centre's own scale.
+#: In units of the centre, not of the image, per the invariant in field.py.
+POLARITY_SURROUND = 2.0
+
+
+def assign_polarity(centers, gray):
+    """Label each centre with the signed contrast between it and its surround.
+
+    For each centre, the Michelson contrast between the mean intensity within its
+    own radius and the mean over the annulus from that radius out to
+    ``POLARITY_SURROUND`` times it:
+
+        polarity = (surround - interior) / (local range)
+
+    where the range is over the same patch. Positive means the interior is darker
+    than what surrounds it.
+
+    Normalising by the local range rather than by the local sum — Michelson
+    contrast, the obvious first choice — is what makes the measure exactly
+    antisymmetric under inversion. Michelson flips sign when an image is
+    inverted but does *not* preserve magnitude, so the same design rendered
+    light-on-dark would score differently from dark-on-light. Which polarity
+    counts as figure is a convention; the magnitude of the distinction should not
+    depend on that convention.
+
+    This is what lets anything downstream tell a motif from the gap between
+    motifs. The two are indistinguishable in the structural field itself, which
+    is a distance transform and carries no tone at all — see ``Center.polarity``
+    and #26.
+    """
+    if not centers:
+        return centers
+    h, w = gray.shape[:2]
+    img = gray.astype(np.float64)
+    for c in centers:
+        r = max(c.scale, 1.0)
+        outer = int(np.ceil(r * POLARITY_SURROUND))
+        x0, x1 = int(max(c.x - outer, 0)), int(min(c.x + outer + 1, w))
+        y0, y1 = int(max(c.y - outer, 0)), int(min(c.y + outer + 1, h))
+        patch = img[y0:y1, x0:x1]
+        if patch.size == 0:
+            continue
+        yy, xx = np.mgrid[y0:y1, x0:x1]
+        d2 = (xx - c.x) ** 2 + (yy - c.y) ** 2
+        inside = d2 <= r * r
+        ring = (d2 > r * r) & (d2 <= (r * POLARITY_SURROUND) ** 2)
+        if not inside.any() or not ring.any():
+            continue
+        interior = patch[inside].mean()
+        surround = patch[ring].mean()
+        spread = float(patch.max() - patch.min())
+        c.polarity = float((surround - interior) / spread) if spread > 1e-9 else 0.0
+    return centers
