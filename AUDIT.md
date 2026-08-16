@@ -514,6 +514,103 @@ features of the measures.
   sets the bar the weaker must clear. At one `zone_width` point the weak zone lost
   its edges outright: 1198 centres → 12.
 
+
+## 13. Triage of the fifteen measures
+
+The verdict for each measure, on the evidence in this document. Required by
+[#21](https://github.com/brunopostle/centres/issues/21), which gates the
+reappraisal work behind the repository owner's agreement.
+
+**ρ** is the ground-truth sweep (§12): does the measure track the quantity it is
+named for, on a stimulus where the answer is known by construction?
+**SNR** is signal against measurement noise (§5): is the spread between artworks
+larger than the spread produced by transformations that cannot change an artwork?
+
+The two ask different questions, and a measure needs both. ρ without SNR is a
+measure that works in the laboratory and not in the field; SNR without ρ is a
+measure that reports something stable that is not what it claims.
+
+| property | ρ | SNR | verdict |
+|---|---:|---:|---|
+| strong centres | **+0.993** | 2.11 | **KEEP** |
+| echoes | +0.790 | 6.09 | **PROVISIONAL** |
+| simplicity | +0.699 | 3.65 | **PROVISIONAL** |
+| roughness | +0.629 | 4.03 | **PROVISIONAL** |
+| the void | +0.804 | **0.84** | **STARVED** |
+| gradients | +0.517 | 1.05 | **REPAIR** |
+| not-separateness | +0.406 | 2.67 | **REPAIR** |
+| levels of scale | *not extremal at 3* | 3.69 | **REPAIR** |
+| alternating repetition | +0.091 | 4.07 | **REDEFINE** |
+| boundaries | +0.455 | 6.13 | **REDEFINE** |
+| positive space | −0.399 | 1.87 | **REDEFINE** |
+| good shape | −0.483 | 3.53 | **REDEFINE** |
+| deep interlock | −0.508 | 1.80 | **REDEFINE** |
+| local symmetries | −0.601 | 3.18 | **REDEFINE** |
+| contrast | **−0.882** *(flat)* | 7.23 | **REDEFINE** |
+
+**One measure is fit to report. Four are reportable with caveats. Ten are not.**
+
+### What the verdicts mean
+
+**KEEP** — tracks its ground truth and separates artworks by more than it separates
+an artwork from its own mirror image. Only `strong_centres` qualifies.
+
+**PROVISIONAL** — tracks in the right direction but loosely (0.6 ≤ ρ < 0.9).
+Usable for comparison between images, not as an absolute statement about one.
+
+**STARVED** — tracks its ground truth on a clean stimulus and is swamped by noise
+on real photographs. This is the category the whole audit was built to identify,
+because its fix is upstream: `the_void` is computed on the *reconstructed*
+Gaussian field rather than on the image, so it measures the blob rendering. Point
+it at the structural field and re-measure before touching the formula.
+
+**REPAIR** — the current representation carries what the measure needs; the formula
+is wrong. `gradients` shares `the_void`'s defect. `not_separateness` is a graph
+property computed on a graph the representation does have. `levels_of_scale` reads
+scale ratios, which the centre set carries — but the LoG ladder quantises them to
+powers of 1.42 while the target ratio is 3, so it may be partly starved by #9;
+re-measure after that lands. Its target of 3 is also unsourced (§11).
+
+**REDEFINE** — the representation cannot carry what the property is about, so no
+formula over the current centre set will do. Each needs #22:
+
+| property | what it needs that `(x, y, scale, strength)` does not carry |
+|---|---|
+| contrast | tone — the field is a distance transform and carries none, which is why it is *flat* rather than merely wrong |
+| good shape | region geometry — the formula is "fraction of centres with a child" and contains no shape information of any kind |
+| local symmetries | image-domain symmetry — symmetry is never computed; the formula measures radial distance of children from parents |
+| positive space | convexity of the interstitial ground — the formula is deviation from 0.65 child-area coverage, which is a different quantity, and 0.65 is unsourced |
+| boundaries | boundary geometry in the image — currently read off the Gaussian rendering, and thickness cannot be separated from feature scale in any case (§12) |
+| deep interlock | boundary geometry — spans 0.2 of 10 across the whole corpus, so it is close to a constant |
+| alternating repetition | periodicity — the formula is dispersion of strengths that have just been through a diffusion, and diffusion destroys alternation |
+
+**RETIRE** — none. Every one of the fifteen is a real property in Alexander's
+sense. What should be retired is seven *formulas*, not seven properties.
+
+### The practical recommendation
+
+Report `strong_centres` outright, and the three provisional measures with their
+uncertainty. **Withhold the other eleven from the output** — behind a flag, or
+removed — until their verdicts are acted on. A tool that reports four measures it
+can defend is more useful for assessing 2D artwork than one that reports fifteen
+it cannot, and the present output invites a reader to compare numbers that do not
+mean what their labels say.
+
+### Two cautions on this table
+
+**The SNR column is measured on six images.** It is the best available estimate of
+each measure's noise floor, but six artworks is a small sample and the corpus is
+all Persian carpets. A measure that separates carpets may not separate paintings.
+
+**Redundancy is not evidence here.** The audit originally reported "3 principal
+components explain 90% of the variance across 15 measures", computed over the six
+corpus images. With 6 samples and 15 variables the correlation matrix has rank at
+most 5, so that finding was largely an artefact of sample size. Recomputed over a
+33-case ensemble the answer is 6 components for 90% and 8 for 95% — the measures
+are *more* independent than the original figure suggested. The harness now
+computes it over the full ensemble.
+
+
 ## Recommended order of work
 
 1. **Keep the harness in front of every change.** `python -m audit` turns "this

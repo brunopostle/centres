@@ -161,10 +161,21 @@ def triage(corpus_scores, noise):
         print(f"  {k:<24}{signal[k]:8.1f}{noise[k]:8.1f}{snr:8.2f}   {v}")
 
 
-def redundancy(corpus_scores):
-    """Are the 15 measures 15 independent quantities?"""
+def redundancy(corpus_scores, extra=()):
+    """Are the 15 measures 15 independent quantities?
+
+    Computed over the corpus *and* every other scored stimulus. Over the six
+    corpus images alone the question cannot be asked: with 6 samples and 15
+    variables the correlation matrix has rank at most 5, so a finding that "3 or 4
+    components explain 90%" is close to vacuous -- there are at most 5 non-zero
+    components to begin with. The original audit reported exactly that, and it was
+    largely an artefact of the sample size. Over a 33-case ensemble the answer is
+    6 components for 90% of the variance and 8 for 95%, so the measures are
+    somewhat more independent than the corpus-only figure suggested.
+    """
     _header("Redundancy")
     rows = [[v[2][k] for k in KEYS] for v in corpus_scores.values()]
+    rows += [[n[k] for k in KEYS] for n in extra]
     complete = [r for r in rows if all(x is not None for x in r)]
     if len(complete) < len(rows):
         print(f"  ({len(rows) - len(complete)} of {len(rows)} images dropped: "
@@ -332,7 +343,9 @@ def main():
         noise = invariance(imgs)
         triage(cs, noise)
         sweeps(measured)
-    redundancy(cs)
+    extra = [norm for _, _, _, norm in measured.values()]
+    extra += [v[2] for v in nulls.values()]
+    redundancy(cs, extra)
 
     print()
     if args.quick:
