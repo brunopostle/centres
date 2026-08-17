@@ -141,15 +141,26 @@ def boundaries(field, centers, G):
     was not measuring boundary thickness, and an accidental correlation is what
     this audit exists to remove.
 
-    **Not yet working, and the diagnosis points at the segmentation.** Against
-    the generator that sweeps this quantity the measure scores near zero, and no
-    aggregation helps — median, mean, 90th percentile and maximum all fail. The
-    generator is not the suspect this time: unlike ``symmetry_order``, it was
-    validated by direct measurement of the rendered image, independent of the
-    pipeline. The likely cause is that a watershed seeded at detected centres
-    does not give a thin band or an interdigitating finger a basin of its own —
-    it is absorbed into the region it borders — so the descriptor never sees the
-    geometry the stimulus varies. That is segmentation work, not descriptor work.
+    **Cannot be measured from the centre set at all, and the reason is
+    structural.** The field is a distance transform, so a region's field value is
+    its distance to the nearest edge, and a band of half-width w produces a
+    maximum of exactly w. On the band-thickness stimulus the dark bands reach a
+    half-width of 3.6 px at the thin end and 14.2 px at the thick end, while the
+    light areas they separate reach 60.2 px throughout. Every LoG maximum
+    therefore lands in the light areas: **not one detected centre sits on a band,
+    at any band thickness.** Measured — all 541 centres at the thin end and all
+    136 at the thick end are on the light tone.
+
+    This is not a seeding problem that a better watershed would fix. A boundary
+    is thin *by definition*, and a representation whose salience is
+    distance-to-nearest-edge is structurally incapable of making a thin thing
+    salient. The centre set can never contain the boundaries.
+
+    Measuring this property requires reading the band structure from the image
+    directly — the connected dark components are the boundaries, their width is
+    twice their own distance transform, and what they bound is the light region
+    they enclose. That needs the image, which ``compute_all`` does not currently
+    receive, so it is a signature change rather than a formula change.
     """
     ratios = [
         r.boundary_ratio for r in _regions(centers) if r.boundary_ratio > 0
@@ -291,14 +302,13 @@ def deep_interlock(centers, G):
     constant.
 
     **Not yet working, and the diagnosis points at the segmentation.** Against
-    the generator that sweeps this quantity the measure scores near zero, and no
-    aggregation helps — median, mean, 90th percentile and maximum all fail. The
-    generator is not the suspect this time: unlike ``symmetry_order``, it was
-    validated by direct measurement of the rendered image, independent of the
-    pipeline. The likely cause is that a watershed seeded at detected centres
-    does not give a thin band or an interdigitating finger a basin of its own —
-    it is absorbed into the region it borders — so the descriptor never sees the
-    geometry the stimulus varies. That is segmentation work, not descriptor work.
+    the generator sweeping interdigitation depth the measure scores +0.086, and
+    no aggregation helps — median, mean, 90th percentile and maximum all fail.
+    The generator is not the suspect: it was validated by direct measurement of
+    the rendered image, independent of the pipeline. The cause is likely the same
+    one that defeats *thick boundaries* above — an interdigitating finger is thin,
+    and a distance-transform field cannot make a thin thing salient, so the
+    fingers never become centres and the watershed never cuts along them.
     """
     complexities = [
         r.interface_complexity for r in _regions(centers) if r.interface_complexity > 0

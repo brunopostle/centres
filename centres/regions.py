@@ -24,6 +24,16 @@ None of compactness, convexity, thickness, interface complexity, shape or tone i
 recoverable from a position and a radius. This module supplies them, by giving
 each centre the region it actually occupies.
 
+**One limit is worth knowing before relying on this.** The regions are seeded at
+detected centres, and a centre is a maximum of the distance transform — so a
+region only exists where something is *far from an edge*. Thin structures are
+therefore invisible to it: a band of half-width w produces a maximum of exactly
+w, and on the band-thickness stimulus the dark bands peak at 3.6 to 14.2 px while
+the light areas they separate peak at 60.2 px. Not one centre lands on a band, at
+any thickness. Properties about thin things — thick boundaries, deep interlock —
+cannot be measured here however the watershed is seeded, and need the band
+structure read from the image instead.
+
 The segmentation is a watershed of the structural field, seeded at the detected
 centres. That is the natural choice here: the field is a distance transform, its
 ridges are the medial axis of the edge map, and watershed on its negation cuts
