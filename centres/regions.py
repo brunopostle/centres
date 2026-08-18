@@ -31,8 +31,9 @@ therefore invisible to it: a band of half-width w produces a maximum of exactly
 w, and on the band-thickness stimulus the dark bands peak at 3.6 to 14.2 px while
 the light areas they separate peak at 60.2 px. Not one centre lands on a band, at
 any thickness. Properties about thin things — thick boundaries, deep interlock —
-cannot be measured here however the watershed is seeded, and need the band
-structure read from the image instead.
+cannot be measured from the centre set however the watershed is seeded, and are
+instead read directly from the image (see ``boundaries`` and ``deep_interlock``
+in ``properties.py``).
 
 The segmentation is a watershed of the structural field, seeded at the detected
 centres. That is the natural choice here: the field is a distance transform, its
@@ -104,17 +105,14 @@ class Region:
     #: In pixels, so use it only as a ratio against another length.
     thickness: float = 0.0
 
-    #: Mean length of this region's shared interfaces with its neighbours, each
-    #: divided by the square root of the smaller region's area. A straight cut
-    #: across a compact region scores about 1; an interdigitating one scores
-    #: several times that. This is *deep interlock* as the source defines it —
-    #: "two regions interpenetrate at a semi-permeable interface … a complex
-    #: (not brusque) interface joins the two regions into a larger whole."
+    #: Superseded and currently unused. Was an attempt at *deep interlock* from
+    #: the watershed's shared interfaces; it failed because thin interdigitating
+    #: fingers get no basin, so ``deep_interlock`` reads the image instead. Left
+    #: on the dataclass as computed region geometry that a future measure might use.
     interface_complexity: float = 0.0
 
-    #: Thickness of this region divided by the equivalent diameter of the largest
-    #: neighbour it borders. This is *thick boundaries*: "the boundary measures
-    #: roughly 1/3 of what it bounds."
+    #: Superseded and currently unused, for the same reason: ``boundaries`` reads
+    #: band thickness from the image, not from the centre regions.
     boundary_ratio: float = 0.0
 
 
