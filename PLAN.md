@@ -55,23 +55,33 @@ acceptance check passes.
 Tracked as GitHub issues [#8–#28](https://github.com/brunopostle/centres/issues). Task IDs below link to them; statuses live on the issues, and this file is the overview and the rationale.
 
 ```
-done ──  A3 #10  adaptive edge detection
-done ──  A4 #11  scale-relative distance cap
-done ──  A5 #12  propagation fixed point
-done ──   G #25  graph nodes keyed by position
-done ──  B1 #14  intensive energy terms, re-derived weights
-done ──  B2 #15  undefined scores instead of a perfect 10
-open ──  A7 #27  attempted, REVERTED - broke the synthetic generators
+DONE   A3 #10  adaptive edge detection        B1 #14  intensive energy terms
+DONE   A4 #11  scale-relative distance cap    B2 #15  undefined, not 10/10
+DONE   A5 #12  propagation fixed point         G #25  graph nodes by position
+DONE   C1 #18  re-run sweeps / invariance     C2 #19  generators for all 15
+DONE   C3 #20  sensitivity matrix             D1 #21  triage the fifteen
+DONE  D2b #26  figure/ground polarity         -- #28  degree of life
+DONE   D2 #22  region layer + 8 of 11 measures redefined against the source
 
-    A1  #8 ──┐                                     ┌─ D2  #22
-    A2  #9 ──┼─ C1 #18 ─ C2 #19 ─ C3 #20 ─ D1 #21 ─┼─ D2b #26
-    A6 #13 ──┘                                     ├─ D3  #23
-                                                   └─ D4  #24
-    B1 #14, B2 #15, B3 #16 ─ B4 #17   (independent of A/C/D)
+OPEN   A1  #8  suppress plateau/structureless detections   (not started)
+OPEN   A2  #9  scale ladder from edge_spacing              (agent MemoryError, unmerged)
+OPEN   A6 #13  isometry invariance   (worst Δ 5.9 -> 0.21; target 0.05, Canny/blur residual)
+OPEN   A7 #27  field scale + detection threshold together  (attempt reverted)
+OPEN   B3 #16  re-derive the remaining reference constants (clamping done)
+OPEN   B4 #17  wire audit thresholds into CI
+OPEN   D3 #23  error bars / median over benign transforms
+OPEN   D4 #24  correct docs   (THEORY.md done; images/README.md stale)
+OPEN      #29  noise outscores every artwork   (the central open problem)
+OPEN      #30  scores not invariant under tone inversion
+OPEN   D2 #22  echoes, alternating repetition, not-separateness still fail
 ```
 
-**Ready to start now:** #8, #9, #13, #16, #17, #26, #27. #28 is the open
-theory question and #21 should wait on it.
+**The instrument is now precise and eight of fifteen measures track their ground
+truth** (was one). The central open problem is #29: the aggregate degree of life
+still ranks noise above every carpet. The clean remaining tasks are #30 (tone
+inversion), the three measures that still fail under #22 (echoes, alternating
+repetition, not-separateness — each needs information no region descriptor
+carries), and the housekeeping in #16/#17/#23/#24.
 
 ### Open questions for the repository owner
 
@@ -110,8 +120,9 @@ Triage of the fifteen measures, signal against measurement noise:
 | after the kernel fix (#28) | 7 | 6 | 2 |
 | after edge symmetrisation (#13) | **11** | **3** | **1** |
 
-Merged so far: #10, #11, #12, #14, #15, #25, #26, and the #28 work. #27 was
-attempted and reverted; #13 is partial.
+Merged: #10 #11 #12 #14 #15 #18 #19 #20 #21 #22 #25 #26 #28, plus the reinforcement
+kernel and the eight measure redefinitions. #27 attempted and reverted; #13
+partial (0.21 vs 0.05 target). Closed on the tracker to match.
 
 **What has not moved: the measures still do not track their ground truth, and
 noise still outscores every artwork (#29).** Every repair so far has improved the
