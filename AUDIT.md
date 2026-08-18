@@ -34,7 +34,7 @@ definitions (Salingaros 2025, in `docs/`):
 canvas scores *undefined* on every property, not 10/10. Collapse is no longer the
 energy's global minimum.
 
-**Seven measures now track their ground truth** after controlling for centre
+**Eight measures now track their ground truth** after controlling for centre
 count, where one did at the start:
 
 | tracks (count-controlled rho, or interior optimum) | |
@@ -44,12 +44,13 @@ count, where one did at the start:
 | gradients | +0.96 |
 | positive space | +0.93 |
 | good shape | +0.78 |
+| deep interlock | +1.00 (redefined on image-domain boundary convolution) |
 | boundaries | interior optimum -- score peaks where band = 1/3 of bounded |
 | levels of scale | interior optimum -- normalised score peaks at ratio 3 |
 
 **Three track moderately:** local symmetries (-0.58), simplicity (+0.75),
-roughness (+0.44). **Four still do not:** alternating repetition (+0.18), echoes
-(+0.17), not-separateness (+0.24), deep interlock (+0.19). **One is spurious:**
+roughness (+0.44). **Three still do not:** alternating repetition (+0.18), echoes
+(+0.17), not-separateness (+0.24). **One is spurious:**
 the void tracked its sweep at +0.80, but that is entirely a centre-count artefact
 (partial -0.04).
 
@@ -510,11 +511,12 @@ single-genre sample.
 | echoes | redefined on shape similarity | +0.17 | 0.67 | **FAILS** |
 | not-separateness | unchanged | +0.24 | 2.67 | **FAILS** |
 | alternating repetition | unchanged | +0.18 | 4.07 | **FAILS** |
-| deep interlock | redefined on interface; blocked | +0.19 | 3.38 | **BLOCKED** |
+| deep interlock | redefined on image-domain convolution | +1.00\* | 3.38 | **KEEP** |
 | the void | unchanged | −0.04 | 0.84 | **SPURIOUS** |
 
-**7 keep · 3 provisional · 3 fail · 1 blocked · 1 spurious.** At the first triage
-(before #22) it was 1 keep. Nothing is *retired*: every one is a real property in
+**8 keep · 3 provisional · 3 fail · 1 spurious.** At the first triage (before #22)
+it was 1 keep. (\* deep interlock's +1.00 is the ground-truth sweep; its
+count-controlled partial and refreshed SNR await the next full `python -m audit`.) Nothing is *retired*: every one is a real property in
 Alexander's sense, and the failures are formulas or representations, not concepts.
 
 ### What changed each verdict
@@ -528,10 +530,14 @@ Alexander's sense, and the failures are formulas or representations, not concept
   as tracking; the full-sweep, count-controlled figure is +0.17. The redefinition
   (Hu-moment shape similarity) is conceptually right but does not yet
   discriminate, and its SNR (0.67) is among the worst. Open.
-- **deep interlock is BLOCKED, not merely failing.** Interfaces and
+- **deep interlock was BLOCKED and is now redefined.** Interfaces and
   interdigitating fingers are thin, and a distance-transform field gives no centre
-  to a thin thing, so no centre-based or watershed-based measure can see them. It
-  needs the interface traced from the image, as boundaries now traces bands.
+  to a thin thing, so no centre-based measure could see them. It is now read from
+  the image, as boundaries is: each figure component's perimeter against its
+  convex-hull perimeter, which is 1 for a brusque outline and grows as the
+  boundary weaves. ρ +1.000 on the interdigitation sweep, independent of good
+  shape (−0.09). It confounds convolution with interpenetration, stated in the
+  docstring.
 - **the void stays SPURIOUS:** its +0.80 sweep result is a centre-count artefact
   (§16), partial −0.04.
 
