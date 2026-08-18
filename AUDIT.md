@@ -511,12 +511,14 @@ single-genre sample.
 | echoes | redefined on shape similarity | +0.17 | 0.67 | **FAILS** |
 | not-separateness | unchanged | +0.24 | 2.67 | **FAILS** |
 | alternating repetition | unchanged | +0.18 | 4.07 | **FAILS** |
-| deep interlock | redefined on image-domain convolution | +1.00\* | 3.38 | **KEEP** |
+| deep interlock | redefined on image-domain convolution | +1.00 | 5.27 | **KEEP** |
 | the void | unchanged | −0.04 | 0.84 | **SPURIOUS** |
 
 **8 keep · 3 provisional · 3 fail · 1 spurious.** At the first triage (before #22)
-it was 1 keep. (\* deep interlock's +1.00 is the ground-truth sweep; its
-count-controlled partial and refreshed SNR await the next full `python -m audit`.) Nothing is *retired*: every one is a real property in
+it was 1 keep. deep interlock's figures are now confirmed on the full run: partial
+correlation +1.00 (survives count control), SNR 5.27, dominance 1.01 — the only
+redefined measure that responds *more* to its own generator than to any other.
+Nine of fifteen diagonals now survive partialling out the centre count, from eight. Nothing is *retired*: every one is a real property in
 Alexander's sense, and the failures are formulas or representations, not concepts.
 
 ### What changed each verdict
