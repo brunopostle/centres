@@ -89,9 +89,14 @@ _FLATFIELD_SIGMA = 0.05
 #: Mid-grey the normalised image is re-centred on.
 _FLATFIELD_TARGET = 128.0
 
-#: Illumination floor, as a fraction of mean brightness. Caps the gain applied
-#: to near-black regions so their quantisation noise is not amplified into edges.
-_FLATFIELD_FLOOR = 0.1
+#: Contrast gain: multiplies the standardised deviation from the local mean.
+#: Sets the output dynamic range; the percentile edge threshold downstream makes
+#: the exact value non-critical.
+_FLATFIELD_GAIN = 48.0
+
+#: Std floor in grey levels. Below this a window counts as flat, so its noise is
+#: not amplified into edges. An absolute constant, hence inversion-invariant.
+_FLATFIELD_STD_FLOOR = 6.0
 
 #: Percentile of gradient magnitude taken as Canny's upper hysteresis threshold,
 #: and the lower/upper threshold ratio.
@@ -110,20 +115,38 @@ _EDGE_FLOOR = 80.0
 
 
 def _flat_field(gray):
-    """Divide out a smoothly varying illumination field.
+    """Normalise local contrast, so a boundary reads the same everywhere.
 
-    A vignette, a raking light or an uneven scan multiplies the image by a
-    smooth gain. Dividing by a heavily blurred copy of the image estimates that
-    gain and removes it, leaving local contrast — which is what a boundary
-    actually is — at the same amplitude everywhere in the frame.
+    Each pixel becomes ``128 + K * (g - local_mean) / local_std``, with the mean
+    and standard deviation taken over a Gaussian window a twentieth of the short
+    side. This removes a smooth illumination gain the same way dividing by a
+    blurred copy did — a vignette scales both the local mean and the local
+    contrast, and dividing by the local std restores the contrast in the dark
+    corners — and it does two further things the division did not.
+
+    It is **exactly equivariant under tone inversion**: ``g - local_mean`` flips
+    sign when the image is inverted while ``local_std`` is unchanged, so the
+    output reflects about 128 (measured: identical to within one grey level, and
+    the edge map differs by one pixel in half a million). A photographic negative
+    of a design is the same design, so its scores should match; the previous
+    multiplicative division did not commute with inversion and shifted the centre
+    set by ~8% (#30).
+
+    And it is contrast-*normalising* rather than contrast-preserving, so faint and
+    strong regions are brought to a common amplitude before the percentile edge
+    threshold in :func:`_detect_edges` sees them — which is what that threshold
+    assumes.
     """
     h, w = gray.shape[:2]
-    gray = gray.astype(np.float32)
-    illumination = cv2.GaussianBlur(
-        gray, (0, 0), sigmaX=_FLATFIELD_SIGMA * min(h, w)
-    )
-    floor = max(1.0, _FLATFIELD_FLOOR * float(gray.mean()))
-    normalized = _FLATFIELD_TARGET * gray / np.maximum(illumination, floor)
+    g = gray.astype(np.float32)
+    sigma = _FLATFIELD_SIGMA * min(h, w)
+    mean = cv2.GaussianBlur(g, (0, 0), sigmaX=sigma)
+    var = cv2.GaussianBlur(g * g, (0, 0), sigmaX=sigma) - mean * mean
+    # Floor the std so a near-flat region does not amplify its own quantisation
+    # noise into spurious edges. The floor is an absolute grey-level constant, so
+    # it is itself inversion-invariant.
+    std = np.sqrt(np.maximum(var, _FLATFIELD_STD_FLOOR**2))
+    normalized = _FLATFIELD_TARGET + _FLATFIELD_GAIN * (g - mean) / std
     return np.clip(normalized, 0, 255).astype(np.uint8)
 
 

@@ -155,36 +155,39 @@ def boundaries(field, centers, G, gray=None):
     """
     if gray is None:
         return None
-    dark = (gray < 128).astype(np.uint8)
-    light = (gray >= 128).astype(np.uint8)
 
-    widths = []
-    n, labels, stats, _ = cv2.connectedComponentsWithStats(dark)
-    for i in range(1, n):
-        area = float(stats[i, cv2.CC_STAT_AREA])
-        if area < 10:
-            continue
-        contours, _ = cv2.findContours(
-            (labels == i).astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
-        )
-        if not contours:
-            continue
-        perimeter = float(cv2.arcLength(max(contours, key=cv2.contourArea), True))
-        if perimeter > 0:
-            widths.append(2.0 * area / perimeter)
+    def widths_and_diameters(mask):
+        widths, diameters = [], []
+        n, labels, stats, _ = cv2.connectedComponentsWithStats(mask)
+        for i in range(1, n):
+            area = float(stats[i, cv2.CC_STAT_AREA])
+            if area < 10:
+                continue
+            contours, _ = cv2.findContours(
+                (labels == i).astype(np.uint8), cv2.RETR_EXTERNAL,
+                cv2.CHAIN_APPROX_NONE,
+            )
+            if contours:
+                p = float(cv2.arcLength(max(contours, key=cv2.contourArea), True))
+                if p > 0:
+                    widths.append(2.0 * area / p)
+            diameters.append(2.0 * np.sqrt(area / np.pi))
+        return widths, diameters
 
-    nl, _, stats_l, _ = cv2.connectedComponentsWithStats(light)
-    diameters = [
-        2.0 * np.sqrt(float(stats_l[i, cv2.CC_STAT_AREA]) / np.pi)
-        for i in range(1, nl)
-        if stats_l[i, cv2.CC_STAT_AREA] > 50
-    ]
-
-    # A boundary is dark and it must actually be darker than what it bounds; if
-    # either population is empty there is nothing here that reads as a boundary.
-    if not widths or not diameters:
+    dark = widths_and_diameters((gray < 128).astype(np.uint8))
+    light = widths_and_diameters((gray >= 128).astype(np.uint8))
+    if not dark[0] or not light[0]:
         return None
-    ratio = float(np.median(widths)) / float(np.median(diameters))
+
+    # Which tone is "the boundary" is a convention that inverting the image would
+    # flip, so it must not change the answer: the boundary is the thinner
+    # population and what it bounds is the thicker, whichever is dark (#30).
+    if float(np.median(dark[0])) <= float(np.median(light[0])):
+        boundary, bounded = dark, light
+    else:
+        boundary, bounded = light, dark
+
+    ratio = float(np.median(boundary[0])) / float(np.median(bounded[1]))
     return float(np.exp(-abs(np.log((ratio + 1e-9) / (1.0 / 3.0)))))
 
 def alternating_repetition(G):
@@ -334,25 +337,36 @@ def deep_interlock(centers, G, gray=None):
     """
     if gray is None:
         return None
-    dark = (gray < 128).astype(np.uint8)
-    n, labels, stats, _ = cv2.connectedComponentsWithStats(dark)
     ratios, weights = [], []
-    for i in range(1, n):
-        area = float(stats[i, cv2.CC_STAT_AREA])
-        if area < 20:
-            continue
-        contours, _ = cv2.findContours(
-            (labels == i).astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
-        )
-        if not contours:
-            continue
-        c = max(contours, key=cv2.contourArea)
-        perimeter = cv2.arcLength(c, True)
-        hull_perimeter = cv2.arcLength(cv2.convexHull(c), True)
-        if hull_perimeter > 0:
-            ratios.append(perimeter / hull_perimeter)
-            weights.append(area)
-    if not ratios:
+    # Both tonal populations, not just the dark one: two interpenetrating regions
+    # share the same interface, so the convolution is the same measured from
+    # either side, and reading both makes the result invariant to which tone is
+    # called figure -- i.e. to inverting the image (#30).
+    populated = 0
+    for mask in ((gray < 128).astype(np.uint8), (gray >= 128).astype(np.uint8)):
+        n, labels, stats, _ = cv2.connectedComponentsWithStats(mask)
+        contributed = False
+        for i in range(1, n):
+            area = float(stats[i, cv2.CC_STAT_AREA])
+            if area < 20:
+                continue
+            contours, _ = cv2.findContours(
+                (labels == i).astype(np.uint8), cv2.RETR_EXTERNAL,
+                cv2.CHAIN_APPROX_NONE,
+            )
+            if not contours:
+                continue
+            c = max(contours, key=cv2.contourArea)
+            perimeter = cv2.arcLength(c, True)
+            hull_perimeter = cv2.arcLength(cv2.convexHull(c), True)
+            if hull_perimeter > 0:
+                ratios.append(perimeter / hull_perimeter)
+                weights.append(area)
+                contributed = True
+        populated += contributed
+    # Interlock is a relation between two regions, so both tones must be present;
+    # a uniform field has nothing to interpenetrate and is undefined, not zero.
+    if not ratios or populated < 2:
         return None
     ratio = float(np.average(ratios, weights=weights))
     return float(1.0 - 1.0 / max(ratio, 1.0))
