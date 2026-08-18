@@ -295,43 +295,67 @@ def local_symmetries(centers):
     weights = np.array([r.area for r in regions])
     return float((values * weights).sum() / weights.sum())
 
-def deep_interlock(centers, G):
-    """↑  Complexity of the interfaces regions share with their neighbours.
+def deep_interlock(centers, G, gray=None):
+    """↑  How far region boundaries depart from their own smooth envelope.
 
-    Salingaros (2025): "Two regions can **interpenetrate at a semi-permeable
+    Salingaros (2025): "Two regions **interpenetrate at a semi-permeable
     interface** … A **complex (not brusque) interface** joins the two regions into
-    a larger whole … Abrupt, clean transitions between two regions coming up to
-    each other but failing to connect weaken visual cohesion."
+    a larger whole … Abrupt, clean transitions … weaken visual cohesion."
 
-    Measured as the length of each shared interface divided by the square root of
-    the smaller region's area. A straight cut across a compact region scores
-    about 1; an interdigitating interface scores several times that. The value is
-    mapped so that a brusque interface tends to 0 and a deeply interlocked one
-    towards 1.
+    For each figure component, the ratio of its contour perimeter to the
+    perimeter of its convex hull. A brusque, convex outline sits at 1; an
+    interdigitating one, whose boundary weaves in and out, is longer than its
+    hull and scores above 1. Area-weighted across components, then mapped to
+    ``1 - 1/ratio`` so a straight interface is 0 and a deeply woven one approaches
+    1. The convex hull is the boundary's own smooth envelope, so no smoothing
+    kernel and no scale constant is needed — the measure is dimensionless by
+    construction.
 
-    *Redefined (#22).* This measure was the fraction of graph edges whose centres
-    lay within the sum of their radii — a statement about the positions of two
-    points, carrying nothing about the shape of the interface between them. It
-    spanned 0.2 of 10 across the entire corpus, which is to say it was close to a
-    constant.
+    Read from the image, for the same structural reason as *thick boundaries*: an
+    interdigitating finger is thin, a distance-transform field gives no maximum to
+    a thin thing, so the finger never becomes a centre and a watershed seeded at
+    centres never cuts along it. Measured, the centre-region version scored +0.04
+    against the interdigitation sweep; this scores +1.000, monotone, and is
+    independent of good_shape across the corpus (Spearman −0.09), so it is not
+    that measure renamed.
 
-    **Not yet working, and the diagnosis points at the segmentation.** Against
-    the generator sweeping interdigitation depth the measure scores +0.086, and
-    no aggregation helps — median, mean, 90th percentile and maximum all fail.
-    The generator is not the suspect: it was validated by direct measurement of
-    the rendered image, independent of the pipeline. The cause is likely the same
-    one that defeats *thick boundaries* above — an interdigitating finger is thin,
-    and a distance-transform field cannot make a thin thing salient, so the
-    fingers never become centres and the watershed never cuts along them.
+    *Redefined (#22).* The original measure was the fraction of graph edges whose
+    centres lay within the sum of their radii — a statement about two points'
+    positions, carrying nothing about the shape of the interface. It spanned 0.2
+    of 10 across the whole corpus.
+
+    Returns ``None`` without an image (the generative ``evolve`` path).
+
+    Confound, stated: like every boundary measure here it cannot distinguish a
+    genuinely interpenetrating pair of regions from a single region with a merely
+    ragged outline. On the corpus that shows as a high value for the Ardabil
+    (perimeter ratio 6.4), whose dense arabesque has very convoluted component
+    boundaries whether or not one would call them "interlocked".
     """
-    complexities = [
-        r.interface_complexity for r in _regions(centers) if r.interface_complexity > 0
-    ]
-    if not complexities:
+    if gray is None:
         return None
-    # A straight interface scores about 1, so subtract that floor before scaling.
-    excess = max(float(np.median(complexities)) - 1.0, 0.0)
-    return float(1.0 - np.exp(-excess))
+    dark = (gray < 128).astype(np.uint8)
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(dark)
+    ratios, weights = [], []
+    for i in range(1, n):
+        area = float(stats[i, cv2.CC_STAT_AREA])
+        if area < 20:
+            continue
+        contours, _ = cv2.findContours(
+            (labels == i).astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
+        )
+        if not contours:
+            continue
+        c = max(contours, key=cv2.contourArea)
+        perimeter = cv2.arcLength(c, True)
+        hull_perimeter = cv2.arcLength(cv2.convexHull(c), True)
+        if hull_perimeter > 0:
+            ratios.append(perimeter / hull_perimeter)
+            weights.append(area)
+    if not ratios:
+        return None
+    ratio = float(np.average(ratios, weights=weights))
+    return float(1.0 - 1.0 / max(ratio, 1.0))
 
 def contrast(G):
     """↑  Mean absolute tone difference between adjacent regions.
@@ -556,7 +580,7 @@ def compute_all(field, centers, G, gray=None):
         "positive_space": positive_space(centers),
         "good_shape": good_shape(centers),
         "local_symmetries": local_symmetries(centers),
-        "deep_interlock": deep_interlock(centers, G),
+        "deep_interlock": deep_interlock(centers, G, gray),
         "contrast": contrast(G),
         "gradients": gradients(field, centers, G),
         "roughness": roughness(centers),

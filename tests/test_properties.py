@@ -239,12 +239,23 @@ def test_local_symmetries_distinguishes_the_axis():
     ]
     assert local_symmetries(horizontal_only) == pytest.approx(0.2)
 
-def test_deep_interlock_reads_interface_complexity():
-    """The source: a complex, not brusque, interface between two regions."""
-    brusque = [_figure(with_region(c(0, 0, 0, 10), interface_complexity=1.0))]
-    interwoven = [_figure(with_region(c(0, 0, 0, 10), interface_complexity=4.0))]
-    assert deep_interlock(brusque, None) == pytest.approx(0.0, abs=1e-9)
-    assert deep_interlock(interwoven, None) > 0.9
+def test_deep_interlock_reads_boundary_convolution_from_the_image():
+    """The source: a complex, not brusque, interface between regions (#22).
+
+    A square (convex, brusque outline) scores ~0; a deeply toothed shape whose
+    boundary weaves well beyond its convex hull scores higher.
+    """
+    square = np.full((200, 200), 245, np.uint8)
+    square[60:140, 60:140] = 30
+    brusque = deep_interlock([], None, gray=square)
+    assert brusque == pytest.approx(0.0, abs=0.05)
+
+    toothed = np.full((200, 200), 245, np.uint8)
+    toothed[60:140, 60:140] = 30
+    for x in range(60, 140, 8):  # comb teeth along the top edge
+        toothed[30:60, x:x + 4] = 30
+    woven = deep_interlock([], None, gray=toothed)
+    assert woven > brusque + 0.1
 
 def test_deep_interlock_no_edges_is_undefined():
     # Two centres far apart: d=100 > r1+r2=5+5=10. They do not even form an
@@ -255,9 +266,8 @@ def test_deep_interlock_no_edges_is_undefined():
     assert deep_interlock(centers, G) is None
 
 
-def test_deep_interlock_is_undefined_without_interfaces():
-    lone = [_figure(with_region(c(0, 0, 0, 10), interface_complexity=0.0))]
-    assert deep_interlock(lone, None) is None
+def test_deep_interlock_is_undefined_without_an_image():
+    assert deep_interlock([], None) is None
 
 def test_deep_interlock_empty_graph_is_undefined():
     assert (

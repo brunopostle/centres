@@ -222,12 +222,13 @@ def test_contrast_boundary():
     assert contrast(toned) == pytest.approx(0.0, abs=1e-9)
 
 def test_deep_interlock_boundary():
-    """Redefined (#22): needs an interface, not a pair of overlapping discs."""
+    """Redefined (#22): reads the image, undefined without one."""
     assert deep_interlock([], None) is None
-    bare = [c(0, 0, 0, 10.0)]
-    assert deep_interlock(bare, None) is None
-    interwoven = [_with_region(c(0, 0, 0, 10.0), interface_complexity=3.0)]
-    assert deep_interlock(interwoven, None) > 0.8
+    uniform = np.full((100, 100), 245, np.uint8)
+    assert deep_interlock([], None, gray=uniform) is None, "no figure component"
+    square = np.full((100, 100), 245, np.uint8)
+    square[30:70, 30:70] = 30
+    assert deep_interlock([], None, gray=square) is not None
 
 def test_alternating_repetition_undefined_without_edges():
     assert alternating_repetition(build_graph([])) is None
