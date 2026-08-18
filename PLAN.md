@@ -65,14 +65,15 @@ DONE   D2 #22  region layer + 8 of 11 measures redefined against the source
 
 OPEN   A1  #8  suppress plateau/structureless detections   (not started)
 OPEN   A2  #9  scale ladder from edge_spacing              (agent MemoryError, unmerged)
-OPEN   A6 #13  isometry invariance   (worst Δ 5.9 -> 0.21; target 0.05, Canny/blur residual)
+OPEN   A6 #13  detection exactly equivariant under isometry AND inversion (merges #30)
+              (isometry Δ 5.9->0.21, inversion Δ 0.18->0.043; both accepted, exactness optional)
 OPEN   A7 #27  field scale + detection threshold together  (attempt reverted)
 OPEN   B3 #16  re-derive the remaining reference constants (clamping done)
 OPEN   B4 #17  wire audit thresholds into CI
 OPEN   D3 #23  error bars / median over benign transforms
 OPEN   D4 #24  correct docs   (THEORY.md done; images/README.md stale)
 OPEN      #29  noise outscores every artwork   (the central open problem)
-OPEN      #30  scores not invariant under tone inversion
+DONE      #30  tone inversion: detector + measures fixed (Δ 0.18->0.043, accepted); merged into #13
 OPEN   D2 #22  echoes, alternating repetition, not-separateness still fail
 ```
 
