@@ -52,7 +52,7 @@ acceptance check passes.
 
 ## Dependency graph
 
-Tracked as GitHub issues [#8–#28](https://github.com/brunopostle/centres/issues). Task IDs below link to them; statuses live on the issues, and this file is the overview and the rationale.
+Tracked as GitHub issues [#8–#30](https://github.com/brunopostle/centres/issues). Task IDs below link to them; statuses live on the issues, and this file is the overview and the rationale.
 
 ```
 DONE   A3 #10  adaptive edge detection        B1 #14  intensive energy terms
@@ -83,23 +83,6 @@ inversion), the three measures that still fail under #22 (echoes, alternating
 repetition, not-separateness — each needs information no region descriptor
 carries), and the housekeeping in #16/#17/#23/#24.
 
-### Open questions for the repository owner
-
-- **#28 — decided, and now the next piece of work.** The reported quantity
-  becomes the **degree of life**, L = −E: Alexander's own term, and the semantics
-  the owner asked for — zero for nothing, higher for more. `E` stays as what
-  `evolve()` minimises. The rename must land *with* the participation change and
-  not before: flipping the sign today would report the Ardabil at −1.4 life and a
-  blank canvas at 0, which is the wrong ordering rather than the wrong offset.
-  The reinforcement kernel, the first of the three sequenced steps, is done.
-- **#28 background — the energy functional is minimised by the absence of structure.** 36
-  equal-scale centres spaced far apart give zero edges, zero parent-child pairs
-  and zero overlap, scoring 1.32 *below* random and below every real artwork.
-  Every term is a deviation penalty that vanishes when its set is empty, so
-  nothing rewards structure existing. `evolve()` avoids it only because its move
-  set is too weak to reach it. This is a theory-level question and wants settling
-  before #21.
-
 ### Where the instrument stands
 
 | | before | now | target |
@@ -124,11 +107,13 @@ Merged: #10 #11 #12 #14 #15 #18 #19 #20 #21 #22 #25 #26 #28, plus the reinforcem
 kernel and the eight measure redefinitions. #27 attempted and reverted; #13
 partial (0.21 vs 0.05 target). Closed on the tracker to match.
 
-**What has not moved: the measures still do not track their ground truth, and
-noise still outscores every artwork (#29).** Every repair so far has improved the
-instrument's *precision* — its scores are now stable, bounded, and independent of
-the frame, the resolution and the iteration count. None has improved its
-*validity*. That distinction is the whole remaining problem.
+**Precision, then validity.** Every phase-A/B repair improved the instrument's
+*precision* — scores are now stable, bounded, and independent of frame, resolution
+and iteration count. The #22 redefinitions then improved *validity*: eight of
+fifteen measures now track their ground truth, where one did. **What has not
+moved is the aggregate**: the degree of life still ranks noise above every carpet
+(#29). Valid individual measures have not yet composed into a valid overall score,
+and that is the whole remaining problem.
 
 A methodological caveat on the sweeps, measured: with only five sample points a
 single adjacent rank swap moves Spearman ρ by 0.1, so ρ ≥ 0.9 tests for
