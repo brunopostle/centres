@@ -77,7 +77,7 @@ DONE      #30  tone inversion: detector + measures fixed (Δ 0.18->0.043, accept
 OPEN   D2 #22  echoes, alternating repetition, not-separateness still fail
 ```
 
-**The instrument is now precise and eight of fifteen measures track their ground
+**The instrument is now precise and ten of fifteen measures track their ground
 truth** (was one). The central open problem is #29: the aggregate degree of life
 still ranks noise above every carpet. The remaining tasks are the three measures
 that still fail under #22 (echoes, alternating repetition, not-separateness — each
@@ -91,6 +91,7 @@ push in #13, and the housekeeping in #16/#17/#23/#24.
 | worst property Δ under vignette | 7.4 | **1.38** | ≤1.5 ✅ |
 | worst property Δ under mirror / rot90 | 5.9 | **0.21** | exact optional (#13) |
 | worst property Δ under tone inversion | 0.18 | **0.043** | accepted (#13) |
+| measures tracking their ground truth | 1 | **10 of 15** | — |
 | crop15% like-for-like, worst | +246% | **+32%** | — |
 | step-count dependence of strong_centres | 1.0 → 10.0 | **1e-6** | ✅ |
 | r(score, centre count) | +0.99 | **+0.13** | \|r\| < 0.5 ✅ |
@@ -112,8 +113,9 @@ partial (0.21 vs 0.05 target). Closed on the tracker to match.
 **Precision, then validity.** Every phase-A/B repair improved the instrument's
 *precision* — scores are now stable, bounded, and independent of frame, resolution
 and iteration count. The #22 redefinitions then improved *validity*: eight of
-fifteen measures now track their ground truth, where one did. **What has not
-moved is the aggregate**: the degree of life still ranks noise above every carpet
+fifteen measures now track their ground truth, where one did — ten after the #30
+detector fix lifted echoes and not-separateness. **What has not moved is the
+aggregate**: the degree of life still ranks noise above every carpet
 (#29). Valid individual measures have not yet composed into a valid overall score,
 and that is the whole remaining problem.
 

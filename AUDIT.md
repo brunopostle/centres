@@ -34,27 +34,43 @@ definitions (Salingaros 2025, in `docs/`):
 canvas scores *undefined* on every property, not 10/10. Collapse is no longer the
 energy's global minimum.
 
-**Eight measures now track their ground truth** after controlling for centre
-count, where one did at the start:
+**Ten measures now track their ground truth** after controlling for centre count
+(partial ρ from §16, or a clean interior optimum), where one did at the start:
 
-| tracks (count-controlled rho, or interior optimum) | |
-|---|---|
-| strong centres | +0.99 |
-| contrast | +1.00 |
-| gradients | +0.96 |
-| positive space | +0.93 |
-| good shape | +0.78 |
-| deep interlock | +1.00 (redefined on image-domain boundary convolution) |
-| boundaries | interior optimum -- score peaks where band = 1/3 of bounded |
-| levels of scale | interior optimum -- normalised score peaks at ratio 3 |
+| measure | count-controlled ρ | field SNR |
+|---|---:|---:|
+| contrast | +1.00 | 4.43 |
+| deep interlock | +1.00 | 4.26 |
+| gradients | +0.96 | 6.24 |
+| strong centres | +0.99 | 3.22 |
+| positive space | +0.90 | 1.55 |
+| echoes | **−0.89** | 0.68 |
+| not-separateness | **+0.83** | 1.08 |
+| simplicity | +0.71 | 3.72 |
+| levels of scale | interior optimum (peaks at 3) | 3.18 |
+| boundaries | interior optimum (peaks at 1/3) | 1.83 |
 
-**Three track moderately:** local symmetries (-0.58), simplicity (+0.75),
-roughness (+0.44). **Three still do not:** alternating repetition (+0.18), echoes
-(+0.17), not-separateness (+0.24). **One is spurious:**
-the void tracked its sweep at +0.80, but that is entirely a centre-count artefact
-(partial -0.04).
+`echoes` and `not-separateness` moved into this group as a *side effect of the #30
+detector fix*: local contrast normalisation made the faint shape-vocabulary and
+bleed stimuli detectable, taking echoes from |0.17| to |0.89| and not-separateness
+from +0.24 to +0.83. (echoes correctly runs *negative* — more distinct shapes
+means less echo — which the harness's positive-monotone flag mislabels.)
 
-**Two findings are unchanged, and are the honest residual:**
+**Three track moderately:** roughness (+0.51), local symmetries (−0.46), good
+shape (+0.39). `good_shape` weakened under count control this run — its raw +0.91
+is substantially count-driven — so it is no longer a clean keep. **One fails:**
+alternating repetition (+0.14). **One is spurious:** the void (+0.80 raw, partial
+−0.07). See §13.
+
+**A new caveat from this run: field SNR is now the binding constraint, not
+tracking.** Four measures that track their ground truth (echoes, not-separateness,
+positive space, boundaries) have poor between-artwork SNR on the six carpets —
+they discriminate the constructed stimuli cleanly and separate real carpets
+weakly. And the image-domain `boundaries`/`deep_interlock` use a fixed grey-128
+threshold, so they shift under gamma and JPEG, which inflates their noise floor
+(a follow-up: the threshold should be relative, e.g. Otsu).
+
+**Two findings are unchanged, and are the honest residual:****Two findings are unchanged, and are the honest residual:**
 
 1. **Noise still scores a higher degree of life than any of the six carpets**
    (section 2b, [#29](https://github.com/brunopostle/centres/issues/29)). The
@@ -435,26 +451,33 @@ Two of the fifteen have an **interior optimum** rather than a monotone target �
 their ideal is in the middle of the sweep, so the right check is where the score
 *peaks*, not a rank correlation. Both peak in the right place.
 
-| generator → measure | test | result |
+| generator → measure | test | ρ (raw / count-controlled) |
 |---|---|---|
-| dominance → strong centres | monotone | **+0.993** |
-| tonal_delta → contrast | monotone | **+1.000** |
-| zone_width → gradients | monotone | **+0.964** |
-| motif_circularity → good shape | monotone | **+0.964** |
-| ground_solidity → positive space | monotone | **+0.930** |
-| border_band → boundaries | optimum(0.3) | **score peaks at 0.3** ✓ |
-| scale_ratio → levels of scale | optimum(3) | **normalised score peaks at 3** ✓ |
-| bilateral_asymmetry → local symmetries | monotone | −0.718 (right direction) |
-| element_kinds → simplicity | monotone | +0.699 |
-| jitter → roughness | monotone | +0.629 |
-| shape_vocabulary → echoes | monotone | +0.406 |
-| bleed → not-separateness | monotone | +0.406 |
-| alternation → alternating repetition | monotone | +0.091 |
-| interlock_depth → deep interlock | monotone | +0.042 |
-| void_size → the void | monotone | +0.804 *(spurious — see §16)* |
+| tonal_delta → contrast | monotone | **+1.00 / +1.00** |
+| interlock_depth → deep interlock | monotone | **+1.00 / +1.00** |
+| dominance → strong centres | monotone | **+0.99 / +0.99** |
+| zone_width → gradients | monotone | **+0.96 / +0.96** |
+| ground_solidity → positive space | monotone | **+0.91 / +0.90** |
+| shape_vocabulary → echoes | monotone (↓) | **−0.85 / −0.89** |
+| bleed → not-separateness | monotone | **+0.78 / +0.83** |
+| element_kinds → simplicity | monotone | +0.72 / +0.71 |
+| border_band → boundaries | optimum(0.3) | score peaks at 0.3 ✓ |
+| scale_ratio → levels of scale | optimum(3) | score peaks at 3 ✓ |
+| jitter → roughness | monotone | +0.66 / +0.51 |
+| bilateral_asymmetry → local symmetries | monotone (↓) | −0.72 / −0.46 |
+| motif_circularity → good shape | monotone | +0.91 / **+0.39** |
+| alternation → alternating repetition | monotone | +0.05 / +0.14 |
+| void_size → the void | monotone | +0.80 / **−0.07** *(spurious, §16)* |
 
-**Nine measures track in the right direction, seven of them at |ρ| ≥ 0.7 or as a
-clean interior optimum.** At the start of the audit exactly one did. The gain came
+The two "(↓)" rows correctly run *negative*: more distinct shapes means less echo,
+more shear means less symmetry. The harness's positive-monotone flag mislabels
+them, but the count-controlled magnitude (0.89, 0.46) is what counts.
+
+**Ten measures track in the right direction, eight of them at |ρ| ≥ 0.7 or as a
+clean interior optimum.** At the start of the audit exactly one did. `echoes` and
+`not-separateness` joined this group only after the #30 local-contrast detector
+fix made their faint stimuli detectable; `good_shape` left the clean-keep group
+this run, its raw +0.91 revealed as substantially count-driven (partial +0.39). The gain came
 from two things: repairing the front end so the centre set is a stable estimate,
 and — for the eleven measures that were computing the wrong quantity entirely —
 redefining them against the sourced definitions on the region layer (§13, #22).
@@ -498,50 +521,58 @@ single-genre sample.
 
 | property | source-aligned formula? | ρ | SNR | verdict |
 |---|---|---:|---:|---|
-| strong centres | yes | +0.99 | 2.11 | **KEEP** |
-| contrast | redefined on region tone | +1.00 | 6.05 | **KEEP** |
-| gradients | redefined on tonal rate | +0.96 | 13.17 | **KEEP** |
-| good shape | redefined on compactness | +0.78 | 1.90 | **KEEP** |
-| positive space | redefined on convexity | +0.93 | 0.69 | **KEEP (low SNR)** |
-| boundaries | redefined on image bands | optimum ✓ | 4.37 | **KEEP** |
-| levels of scale | repaired to the 2–5 band | optimum ✓ | 5.88 | **KEEP** |
-| roughness | unchanged; source-defensible | +0.44 | 4.03 | **PROVISIONAL** |
-| simplicity | unchanged | +0.75 | 3.65 | **PROVISIONAL** |
-| local symmetries | redefined on vertical symmetry | −0.58 | 0.98 | **PROVISIONAL (low SNR)** |
-| echoes | redefined on shape similarity | +0.17 | 0.67 | **FAILS** |
-| not-separateness | unchanged | +0.24 | 2.67 | **FAILS** |
-| alternating repetition | unchanged | +0.18 | 4.07 | **FAILS** |
-| deep interlock | redefined on image-domain convolution | +1.00 | 5.27 | **KEEP** |
-| the void | unchanged | −0.04 | 0.84 | **SPURIOUS** |
+| contrast | redefined on region tone | +1.00 | 4.43 | **KEEP** |
+| deep interlock | redefined on image convolution | +1.00 | 4.26 | **KEEP** |
+| gradients | redefined on tonal rate | +0.96 | 6.24 | **KEEP** |
+| strong centres | yes | +0.99 | 3.22 | **KEEP** |
+| levels of scale | repaired to the 2–5 band | optimum ✓ | 3.18 | **KEEP** |
+| simplicity | unchanged | +0.71 | 3.72 | **KEEP** |
+| positive space | redefined on convexity, both populations | +0.90 | 1.55 | **KEEP (low SNR)** |
+| boundaries | redefined on image bands | optimum ✓ | 1.83 | **KEEP (low SNR)** |
+| echoes | redefined on shape similarity | −0.89 | 0.68 | **KEEP (low SNR)** |
+| not-separateness | unchanged | +0.83 | 1.08 | **KEEP (low SNR)** |
+| roughness | unchanged; source-defensible | +0.51 | 4.16 | **PROVISIONAL** |
+| local symmetries | redefined on vertical symmetry | −0.46 | 0.45 | **PROVISIONAL** |
+| good shape | redefined on compactness | +0.39 | 2.23 | **PROVISIONAL** |
+| alternating repetition | unchanged | +0.14 | 2.28 | **FAILS** |
+| the void | unchanged | −0.07 | 1.51 | **SPURIOUS** |
 
-**8 keep · 3 provisional · 3 fail · 1 spurious.** At the first triage (before #22)
-it was 1 keep. deep interlock's figures are now confirmed on the full run: partial
-correlation +1.00 (survives count control), SNR 5.27, dominance 1.01 — the only
-redefined measure that responds *more* to its own generator than to any other.
-Nine of fifteen diagonals now survive partialling out the centre count, from eight. Nothing is *retired*: every one is a real property in
+**10 keep · 3 provisional · 1 fail · 1 spurious.** At the first triage (before #22)
+it was 1 keep. Eleven of fifteen diagonals now survive partialling out the centre
+count. The four "KEEP (low SNR)" measures track their constructed ground truth by
+partial correlation but separate the six real carpets weakly — validity on a
+stimulus is necessary, and here it is outrunning field discrimination, which is
+the next thing to characterise (and needs a corpus wider than six Persian carpets).
+
+The #30 detector fix (local contrast normalisation) was the biggest mover this
+run: it lifted `echoes` from |0.17| to |0.89| and `not-separateness` from +0.24 to
++0.83 by making their faint stimuli detectable. `good_shape` went the other way —
+its raw +0.91 is now revealed as substantially count-driven (partial +0.39). Nothing is *retired*: every one is a real property in
 Alexander's sense, and the failures are formulas or representations, not concepts.
 
 ### What changed each verdict
 
-- **Six measures moved KEEP** on the #22 redefinitions: contrast, gradients, good
-  shape, positive space and boundaries were each computing a different quantity
-  from the property named on them, and now compute the sourced one; levels of
-  scale was repaired from a point target of 3 to the sourced band of 2–5, and its
-  score now peaks in the right place.
-- **echoes moved the wrong way from the first triage's optimism.** It was recorded
-  as tracking; the full-sweep, count-controlled figure is +0.17. The redefinition
-  (Hu-moment shape similarity) is conceptually right but does not yet
-  discriminate, and its SNR (0.67) is among the worst. Open.
-- **deep interlock was BLOCKED and is now redefined.** Interfaces and
-  interdigitating fingers are thin, and a distance-transform field gives no centre
-  to a thin thing, so no centre-based measure could see them. It is now read from
-  the image, as boundaries is: each figure component's perimeter against its
-  convex-hull perimeter, which is 1 for a brusque outline and grows as the
-  boundary weaves. ρ +1.000 on the interdigitation sweep, independent of good
-  shape (−0.09). It confounds convolution with interpenetration, stated in the
-  docstring.
+- **The #22 redefinitions moved five measures to KEEP** by making them compute the
+  sourced quantity rather than a different one: contrast (region tone), gradients
+  (tonal rate), positive space (convexity), boundaries and deep interlock (image
+  band width and boundary convolution). levels of scale was repaired from a point
+  target of 3 to the sourced band of 2–5, and its score peaks in the right place.
+- **The #30 detector fix then moved two more to KEEP**, as a side effect. Local
+  contrast normalisation made the faint shape-vocabulary and bleed stimuli
+  detectable, taking echoes from a count-controlled |0.17| to |0.89| and
+  not-separateness from +0.24 to +0.83. Both track their ground truth well;
+  their limitation is now field SNR (0.68, 1.08), not tracking.
+- **echoes correctly runs negative** — more distinct shapes, less echo. The
+  harness's positive-monotone flag mislabels it as failing; the count-controlled
+  magnitude, 0.89, is the number that matters.
+- **good shape weakened under count control this run:** raw +0.91, partial +0.39.
+  Its region-compactness redefinition tracks the clean stimulus, but on the mixed
+  ensemble much of that is centre-count covariation, so it drops to PROVISIONAL.
+- **deep interlock is read from the image** — each component's perimeter against
+  its convex hull, 1 for a brusque outline and growing as the boundary weaves.
+  Partial +1.00, SNR 4.26, independent of good shape.
 - **the void stays SPURIOUS:** its +0.80 sweep result is a centre-count artefact
-  (§16), partial −0.04.
+  (§16), partial −0.07.
 
 ### The caveat that outranks the table
 
