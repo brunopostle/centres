@@ -142,26 +142,27 @@ def test_strong_centres_empty():
 # --- boundaries ---
 
 
-def test_boundaries_low_when_field_drops_between_centres():
-    # Two centres far enough apart that the field between them is low
-    centers = [c(0, 10, 50, 5.0, strength=1.0), c(1, 90, 50, 5.0, strength=1.0)]
-    field = reconstruct_field((100, 100), centers)
-    G = connected_graph(centers)
-    if G.has_edge(0, 1):
-        score = boundaries(field, centers, G)
-        assert score < 1.0  # midpoint weaker than peaks
+def test_boundaries_reads_band_width_from_the_image():
+    """The source: a boundary is roughly 1/3 of what it bounds (#22).
 
+    Read from the grey image, not the centre set. A band a third as wide as the
+    columns it bounds must score higher than a hairline of the same layout.
+    """
+    third = np.full((210, 210), 245, np.uint8)
+    for x in range(30, 210, 40):  # 10px bands every 40px -> band is ~1/3 of the gap
+        third[:, x:x + 10] = 30
+    hairline = np.full((210, 210), 245, np.uint8)
+    for x in range(30, 210, 40):
+        hairline[:, x:x + 2] = 30
+    near = boundaries(None, [], None, gray=third)
+    thin = boundaries(None, [], None, gray=hairline)
+    assert near is not None and thin is not None
+    assert near > thin
 
-def test_boundaries_no_edges_is_undefined():
+def test_boundaries_is_undefined_without_an_image():
+    """The generative path has centres but no image to read boundaries from."""
     centers = [c(0, 0, 0, 3.0), c(1, 500, 0, 3.0)]
-    field = reconstruct_field((100, 100), centers)
-    G = build_graph(centers)
-    assert not G.has_edge(0, 1)
-    assert boundaries(field, centers, G) is None
-
-
-# --- alternating_repetition ---
-
+    assert boundaries(None, centers, connected_graph(centers)) is None
 
 def test_alternating_repetition_high_with_varied_neighbours():
     # Centre with neighbours of very different strengths
@@ -463,6 +464,8 @@ def test_compute_all_values_finite():
         x.polarity = 0.2 if x.parent is not None else -0.2
     G = connected_graph(centers)
     field = reconstruct_field((100, 100), centers)
-    for key, val in compute_all(field, centers, G).items():
+    banded = np.full((100, 100), 245, np.uint8)
+    banded[:, 45:55] = 30  # a boundary for the image-domain measure to read
+    for key, val in compute_all(field, centers, G, gray=banded).items():
         assert val is not None, f"{key} is undefined for a well-formed hierarchy"
         assert np.isfinite(val), f"{key} is not finite"

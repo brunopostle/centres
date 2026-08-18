@@ -27,6 +27,7 @@ states where its own boundary lies; the boundary differs per measure and is not
 a single blanket rule.
 """
 
+import cv2
 import numpy as np
 import networkx as nx
 
@@ -120,58 +121,71 @@ def strong_centres(centers):
     return float(s[s >= np.percentile(s, 75)].mean())
 
 
-def boundaries(field, centers, G):
-    """↑  How close boundary regions come to a third of what they bound.
+def boundaries(field, centers, G, gray=None):
+    """↑  How close the artwork's boundaries come to a third of what they bound.
 
     Salingaros (2025): "Effective boundaries are proportionally wide to what they
     enclose; typically, the boundary **measures roughly 1/3 of what it bounds**."
-    That is a ratio with a stated target, so the measure is how near the artwork's
-    boundary regions come to it.
+    A ratio with a stated target, so the score is how near the boundaries come to
+    it, highest at 1/3 and falling away on either side — a hairline boundary and
+    one as wide as its interior are both failures, and the source says so: "a
+    thick boundary also functions as an 'implied' center".
 
-    A region's own characteristic width is 2A/P; what it bounds is the equivalent
-    diameter of the largest region it borders. The score is highest when that
-    ratio sits at 1/3, falling away on either side — a hairline boundary and a
-    boundary as wide as its interior are both failures, and the source says so:
-    "a thick boundary also functions as an 'implied' center".
+    Read from the image, not from the centre set, and this is essential rather
+    than incidental. The structural field is a distance transform, so a region's
+    salience is its distance to the nearest edge, and a boundary is thin *by
+    definition* — measured, not one detected centre lands on a band at any
+    thickness, because a band of half-width w peaks at w while the areas it
+    separates peak far higher. A representation whose salience is
+    distance-to-nearest-edge is structurally incapable of making a thin thing
+    salient, so no centre-based measure can see a boundary. The boundaries are
+    instead the dark connected components of the image; their width is twice the
+    component area over its perimeter, and what they bound is the light regions
+    they enclose.
 
     *Redefined (#22).* This measure was the field value at the midpoint between
-    connected centres, read off the reconstructed Gaussian rendering rather than
-    the image, and it involved no thickness and no ratio. That formula scored
-    +0.62 against the band-thickness sweep, better than this one does — but it
-    was not measuring boundary thickness, and an accidental correlation is what
-    this audit exists to remove.
+    connected centres, read off the reconstructed Gaussian rendering. That scored
+    +0.62 against the band-thickness sweep, better than the centre-region version
+    that replaced it first — but it was an accidental correlation, measuring no
+    thickness and no ratio. Read from the image this scores +1.000 on the same
+    sweep, and its score peaks where the band is a third of what it bounds.
 
-    **Cannot be measured from the centre set at all, and the reason is
-    structural.** The field is a distance transform, so a region's field value is
-    its distance to the nearest edge, and a band of half-width w produces a
-    maximum of exactly w. On the band-thickness stimulus the dark bands reach a
-    half-width of 3.6 px at the thin end and 14.2 px at the thick end, while the
-    light areas they separate reach 60.2 px throughout. Every LoG maximum
-    therefore lands in the light areas: **not one detected centre sits on a band,
-    at any band thickness.** Measured — all 541 centres at the thin end and all
-    136 at the thick end are on the light tone.
-
-    This is not a seeding problem that a better watershed would fix. A boundary
-    is thin *by definition*, and a representation whose salience is
-    distance-to-nearest-edge is structurally incapable of making a thin thing
-    salient. The centre set can never contain the boundaries.
-
-    Measuring this property requires reading the band structure from the image
-    directly — the connected dark components are the boundaries, their width is
-    twice their own distance transform, and what they bound is the light region
-    they enclose. That needs the image, which ``compute_all`` does not currently
-    receive, so it is a signature change rather than a formula change.
+    Returns ``None`` when the image is not available — the generative ``evolve``
+    path has a centre set but no image, and boundaries cannot be read without one.
     """
-    ratios = [
-        r.boundary_ratio for r in _regions(centers) if r.boundary_ratio > 0
-    ]
-    if not ratios:
+    if gray is None:
         return None
-    # Distance from the sourced target, in log units so that a boundary half the
-    # target width and one twice it are equally wrong.
-    target = 1.0 / 3.0
-    deviations = np.abs(np.log(np.array(ratios) / target))
-    return float(np.exp(-np.median(deviations)))
+    dark = (gray < 128).astype(np.uint8)
+    light = (gray >= 128).astype(np.uint8)
+
+    widths = []
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(dark)
+    for i in range(1, n):
+        area = float(stats[i, cv2.CC_STAT_AREA])
+        if area < 10:
+            continue
+        contours, _ = cv2.findContours(
+            (labels == i).astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
+        )
+        if not contours:
+            continue
+        perimeter = float(cv2.arcLength(max(contours, key=cv2.contourArea), True))
+        if perimeter > 0:
+            widths.append(2.0 * area / perimeter)
+
+    nl, _, stats_l, _ = cv2.connectedComponentsWithStats(light)
+    diameters = [
+        2.0 * np.sqrt(float(stats_l[i, cv2.CC_STAT_AREA]) / np.pi)
+        for i in range(1, nl)
+        if stats_l[i, cv2.CC_STAT_AREA] > 50
+    ]
+
+    # A boundary is dark and it must actually be darker than what it bounds; if
+    # either population is empty there is nothing here that reads as a boundary.
+    if not widths or not diameters:
+        return None
+    ratio = float(np.median(widths)) / float(np.median(diameters))
+    return float(np.exp(-abs(np.log((ratio + 1e-9) / (1.0 / 3.0)))))
 
 def alternating_repetition(G):
     """↑  Mean standard deviation of strengths across each centre's neighbours.
@@ -527,7 +541,7 @@ def not_separateness(G):
     return float(np.linalg.eigvalsh(L)[1])
 
 
-def compute_all(field, centers, G):
+def compute_all(field, centers, G, gray=None):
     """Return raw scores for all 15 of Alexander's structural properties.
 
     A value is ``None`` where that property is undefined for these inputs —
@@ -537,7 +551,7 @@ def compute_all(field, centers, G):
     return {
         "levels_of_scale": levels_of_scale(centers),
         "strong_centres": strong_centres(centers),
-        "boundaries": boundaries(field, centers, G),
+        "boundaries": boundaries(field, centers, G, gray),
         "alternating_repetition": alternating_repetition(G),
         "positive_space": positive_space(centers),
         "good_shape": good_shape(centers),

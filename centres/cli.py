@@ -119,7 +119,7 @@ def _emit(args, n_centers, energy, raw_scores):
 def cmd_analyse(args):
     img = load_and_rescale(args.image, args.max_size)
     field, centers, G, energy = analyze(img)
-    raw = compute_all(field, centers, G)
+    raw = compute_all(field, centers, G, cv2.cvtColor(img, cv2.COLOR_BGR2GRAY))
     _emit(args, len(centers), energy, raw)
     if not args.json and (not args.no_display or args.save):
         visualize(field, centers, G, img, save_path=args.save if args.save else None)

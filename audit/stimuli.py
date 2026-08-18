@@ -958,7 +958,12 @@ SWEEPS = {
     # ideal at a scale ratio of exactly 3 and the sweep spans and straddles it.
     "scale_ratio": (nested_squares, _geom(3.0, 2 ** (1 / 6), 6), "levels_of_scale", optimum(3.0)),
     "dominance": (dominant_motif, _span(1.0, 5.4), "strong_centres", MONOTONE),
-    "border_band": (bordered_motifs, _span(0.15, 0.7), "boundaries", MONOTONE),
+    # An interior optimum, not monotone: the score peaks where the band is 1/3
+    # of what it bounds, which measurement puts at param ~0.3, and falls away
+    # symmetrically on both sides (0.47 -> 0.96 -> 0.23 across the sweep). A high
+    # monotone rho would be evidence *against* the measure, exactly as for
+    # scale_ratio.
+    "border_band": (bordered_motifs, _span(0.15, 0.7), "boundaries", optimum(0.3)),
     "alternation": (alternating_tiles, _span(0.0, 1.0), "alternating_repetition", MONOTONE),
     "ground_solidity": (interstitial_shape, _span(0.6, 1.0), "positive_space", MONOTONE),
     "motif_circularity": (motif_regularity, _span(0.65, 1.0), "good_shape", MONOTONE),

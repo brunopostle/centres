@@ -34,7 +34,7 @@ def score(img, max_size=1024):
     if s < 1.0:
         img = cv2.resize(img, (int(w * s), int(h * s)), interpolation=cv2.INTER_AREA)
     field, centers, G, energy = analyze(img)
-    raw = compute_all(field, centers, G)
+    raw = compute_all(field, centers, G, cv2.cvtColor(img, cv2.COLOR_BGR2GRAY))
     return len(centers), -energy, raw, normalize_all(raw)
 
 

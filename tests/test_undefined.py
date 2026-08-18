@@ -194,22 +194,20 @@ def test_roughness_boundary():
 
 
 def test_boundaries_boundary():
-    """Redefined (#22): needs a boundary ratio, not a graph edge."""
-    assert boundaries(None, [], None) is None
-    bare = [c(0, 0, 0, 10.0)]
-    assert boundaries(None, bare, None) is None, "no region means no thickness"
-    at_target = [_with_region(c(0, 0, 0, 10.0), boundary_ratio=1.0 / 3.0)]
-    assert boundaries(None, at_target, None) == pytest.approx(1.0)
-    too_thin = [_with_region(c(0, 0, 0, 10.0), boundary_ratio=0.02)]
-    assert boundaries(None, too_thin, None) < 0.3
+    """Redefined (#22): reads the image, undefined without one."""
+    assert boundaries(None, [], None) is None, "no image, no boundaries"
+    uniform = np.full((100, 100), 245, np.uint8)
+    assert boundaries(None, [], None, gray=uniform) is None, "no dark band present"
+    banded = np.full((100, 100), 245, np.uint8)
+    banded[:, 45:55] = 30
+    assert boundaries(None, [], None, gray=banded) is not None
 
-def test_boundaries_undefined_when_field_is_empty_at_every_peak():
-    """Edges exist, but the field is flat zero, so no ratio can be formed."""
-    centers = [c(0, 30, 50, 6.0), c(1, 55, 50, 6.0)]
-    G = _connected(centers)
-    assert G.edges
-    assert boundaries(np.zeros((100, 100)), centers, G) is None
-
+def test_boundaries_undefined_without_both_populations():
+    """A boundary is dark and bounds something light; needs both to form a ratio."""
+    all_dark = np.zeros((100, 100), np.uint8)
+    assert boundaries(None, [], None, gray=all_dark) is None
+    all_light = np.full((100, 100), 245, np.uint8)
+    assert boundaries(None, [], None, gray=all_light) is None
 
 def test_contrast_boundary():
     """Undefined without edges, and now also without regions to take tone from."""
