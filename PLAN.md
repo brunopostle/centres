@@ -79,17 +79,18 @@ OPEN   D2 #22  echoes, alternating repetition, not-separateness still fail
 
 **The instrument is now precise and eight of fifteen measures track their ground
 truth** (was one). The central open problem is #29: the aggregate degree of life
-still ranks noise above every carpet. The clean remaining tasks are #30 (tone
-inversion), the three measures that still fail under #22 (echoes, alternating
-repetition, not-separateness — each needs information no region descriptor
-carries), and the housekeeping in #16/#17/#23/#24.
+still ranks noise above every carpet. The remaining tasks are the three measures
+that still fail under #22 (echoes, alternating repetition, not-separateness — each
+needs information no region descriptor carries), the optional detector-exactness
+push in #13, and the housekeeping in #16/#17/#23/#24.
 
 ### Where the instrument stands
 
 | | before | now | target |
 |---|---:|---:|---:|
 | worst property Δ under vignette | 7.4 | **1.38** | ≤1.5 ✅ |
-| worst property Δ under mirror / rot90 | 5.9 | **0.213** | ≤0.05 (#13) |
+| worst property Δ under mirror / rot90 | 5.9 | **0.21** | exact optional (#13) |
+| worst property Δ under tone inversion | 0.18 | **0.043** | accepted (#13) |
 | crop15% like-for-like, worst | +246% | **+32%** | — |
 | step-count dependence of strong_centres | 1.0 → 10.0 | **1e-6** | ✅ |
 | r(score, centre count) | +0.99 | **+0.13** | \|r\| < 0.5 ✅ |
@@ -122,8 +123,6 @@ perfection and small ρ changes carry no information. #19 is widening the sweeps
 to 10–12 points and giving interior-optimum measures (levels of scale, roughness)
 a test that is not monotonicity.
 
-The measures still do not track their ground truth — that is unchanged by any
-repair so far, and separating starved formulas from wrong ones is #18.
 
 ### Changes since the plan was first written
 
