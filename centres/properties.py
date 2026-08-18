@@ -225,10 +225,17 @@ def positive_space(centers):
     sweeping the solidity of the interstitial ground; region solidity scores
     **+0.829** on the same sweep.
 
-    Measured on the ground population, because that is the "experienced space"
-    the source is talking about: the space between and around the solids.
+    Measured over every substantial region of both tonal populations: the source
+    applies this to "All spaces, both built and open", and using both makes it
+    invariant to tone inversion (#30).
     """
-    ground = _regions(centers, polarity=-1)
+    # Every region's own convexity, over both tonal populations. The source
+    # applies positive space to "All spaces, both built and open … the duality
+    # between figure and background", so it is not a ground-only property; and
+    # reading both populations makes it invariant to which tone is called figure,
+    # i.e. to inverting the image (#30). Restricting to one polarity scored the
+    # same +1.000 on the ground_solidity sweep but moved 0.07 under inversion.
+    ground = _regions(centers)
     if not ground:
         return None
     # The substantial ground regions only. Watershed fragments the interstitial

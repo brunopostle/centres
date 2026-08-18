@@ -63,6 +63,11 @@ def perspective(img, amount=0.06):
     return cv2.warpPerspective(img, cv2.getPerspectiveTransform(src, dst), (w, h))
 
 
+def invert(img):
+    """Tone inversion: a photographic negative. Cannot change structure (#30)."""
+    return 255 - img
+
+
 #: Exact isometries. Any variation here is pure measurement noise.
 ISOMETRY = {"identity": identity, "mirror": mirror, "rot90": rot90}
 
@@ -70,6 +75,7 @@ ISOMETRY = {"identity": identity, "mirror": mirror, "rot90": rot90}
 BENIGN = dict(ISOMETRY, **{
     "gamma1.3": gamma,
     "jpeg50": jpeg,
+    "invert": invert,
 })
 
 #: What happens to real photographs of real objects.

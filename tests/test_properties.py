@@ -195,10 +195,15 @@ def test_positive_space_reads_the_convexity_of_the_ground():
     assert positive_space(convex) == pytest.approx(1.0)
 
 
-def test_positive_space_ignores_the_figure_population():
-    figure = [with_region(c(0, 0, 0, 10), solidity=1.0)]
+def test_positive_space_reads_both_populations():
+    """The source applies positive space to all spaces, built and open (#22/#30).
+
+    Measuring both tonal populations is what makes it invariant to inversion, so
+    a figure region is no longer ignored.
+    """
+    figure = [with_region(c(0, 0, 0, 10), solidity=0.8)]
     figure[0].polarity = +0.2
-    assert positive_space(figure) is None
+    assert positive_space(figure) == pytest.approx(0.8)
 
 def test_good_shape_reads_compactness():
     """The source: compact shapes are cognitively graspable."""
