@@ -10,6 +10,7 @@ from centres.pipeline import analyze
 from centres.properties import compute_all, normalize_all
 
 from . import stimuli, transforms
+from . import redundancy as rdcy
 
 KEYS = [
     "levels_of_scale", "strong_centres", "boundaries", "alternating_repetition",
@@ -124,6 +125,81 @@ def corpus(controls=None):
         print(f"  Pearson r(degree of life, centre count), + controls   = "
               f"{np.corrcoef(ns2, ls2)[0, 1]:+.4f}   (target |r| < 0.5)")
     return out
+
+
+#: The three dense-noise controls the score must be ranked *below*. ``flat_grey``
+#: detects nothing and ``regular_grid`` is a mechanical lattice, not noise; both
+#: are reported by ``null_controls`` and neither is the #29 comparison, which is
+#: specifically composed structure against a dense random field.
+NOISE_CONTROLS = ("white_noise", "smooth_noise", "random_blobs")
+
+
+def _analyze_scaled(img, max_size=1024):
+    """Resize exactly as ``score`` does, then return life and the redundancy stats.
+
+    Kept separate from ``score`` because the discrimination stage needs the centre
+    set (to take the distribution entropies) and ``score`` deliberately returns
+    only scalars. The resize must match ``score`` so the degree of life reported
+    here is the same number the corpus table shows.
+    """
+    h, w = img.shape[:2]
+    s = min(max_size / max(h, w), 1.0)
+    if s < 1.0:
+        img = cv2.resize(img, (int(w * s), int(h * s)), interpolation=cv2.INTER_AREA)
+    _, centers, _, energy = analyze(img)
+    return (-energy,
+            rdcy.strength_entropy(centers),
+            rdcy.scale_entropy(centers))
+
+
+def discrimination():
+    """Does the reported score rank artworks above dense noise?  (#29)
+
+    The central open problem. Section 2b showed uniform noise scoring a higher
+    degree of life than every carpet, and it is not an artefact of one functional:
+    no *local* measure separates the two, because dense noise is not short of
+    local structure — it has more edges, more parents and more neighbours than any
+    carpet. This stage states that failure as a number the harness prints on every
+    run, and alongside it measures the two global-redundancy discriminators from
+    ``audit.redundancy`` that *do* separate the corpus from noise — neither yet in
+    the score, for the reasons that module and #29/#9/#34 record.
+
+    The metric is rank separation: the fraction of (artwork, noise) pairs ordered
+    the way life demands. 1.0 is complete separation, 0.5 none, 0.0 fully inverted.
+    """
+    _header("Discrimination: does the score rank artworks above noise?  (#29)")
+
+    art = {f: _analyze_scaled(cv2.imread(os.path.join(IMAGES, f)))
+           for f in sorted(os.listdir(IMAGES)) if f.endswith((".jpg", ".png"))}
+    noise = {name: _analyze_scaled(getattr(stimuli, name)()) for name in NOISE_CONTROLS}
+    grid = _analyze_scaled(stimuli.regular_grid())  # a mechanical reference point
+
+    def col(d, i):
+        return [v[i] for v in d.values()]
+
+    def line(name, art_vals, noise_vals, higher_is_life, note=""):
+        a, z = _defined(art_vals), _defined(noise_vals)
+        sep = rdcy.pairwise_order(a, z, higher_is_life)
+        arrow = "higher" if higher_is_life else "lower"
+        print(f"  {name:<22} art [{min(a):+.3f},{max(a):+.3f}]  "
+              f"noise [{min(z):+.3f},{max(z):+.3f}]  ({arrow}=life)")
+        print(f"  {'':<22} rank separation art-over-noise = {sep:.3f}"
+              f"   {'(complete)' if sep == 1.0 else '(FAILS #29)' if sep < 1.0 and higher_is_life else ''}"
+              f"{note}")
+        return sep
+
+    print("  reported degree of life:")
+    line("  degree of life", col(art, 0), col(noise, 0), True)
+    print("\n  candidate global-redundancy discriminators (NOT in the score; see audit/redundancy.py):")
+    se = line("  strength_entropy", col(art, 1), col(noise, 1), False,
+              note="   transform-stable")
+    line("  scale_entropy", col(art, 2), col(noise, 2), False,
+         note="   transform-FRAGILE (#9)")
+    print(f"\n  mechanical reference: regular_grid  "
+          f"strength_entropy {grid[1]:.3f}, scale_entropy {grid[2]:.3f}  "
+          f"(below the carpets — the target is an interior optimum, not least entropy; #34)")
+    return {"life_sep": rdcy.pairwise_order(col(art, 0), col(noise, 0), True),
+            "strength_entropy_sep": se}
 
 
 def invariance(images, group=transforms.BENIGN, label="benign"):
@@ -478,6 +554,7 @@ def main():
 
     nulls = null_controls()
     cs = corpus(nulls)
+    discrimination()
     measured = measure_generators()
     generators(measured)
     if not args.quick:

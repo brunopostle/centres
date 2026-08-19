@@ -11,8 +11,9 @@ Everything below is reproducible with `python -m audit`.
 >
 > It grew as an investigation, oldest first, so it is part history and part
 > current state. **§0 below is the current state** — the summary that supersedes
-> the older headlines. **§12 (sweeps), §13 (triage) and §14-16 are current**, last
-> refreshed against the full `python -m audit` after the #22 redefinitions.
+> the older headlines. **§12 (sweeps), §13 (triage), §14-16, and §17 (the noise
+> problem, #29) are current**, last refreshed against the full `python -m audit`
+> after the #22 redefinitions.
 > **§1-11 are the original pre-repair findings**, kept as the record of how the
 > pipeline got here; each is superseded in kind by a later section. Where an old
 > number and a §0/§12/§13 number disagree, the later one is right.
@@ -70,12 +71,19 @@ weakly. And the image-domain `boundaries`/`deep_interlock` use a fixed grey-128
 threshold, so they shift under gamma and JPEG, which inflates their noise floor
 (a follow-up: the threshold should be relative, e.g. Otsu).
 
-**Two findings are unchanged, and are the honest residual:****Two findings are unchanged, and are the honest residual:**
+**Two findings are unchanged, and are the honest residual:**
 
 1. **Noise still scores a higher degree of life than any of the six carpets**
    (section 2b, [#29](https://github.com/brunopostle/centres/issues/29)). The
    redefined measures fixed *what each property measures*; they did not make the
-   *aggregate* rank art above noise.
+   *aggregate* rank art above noise. **Section 17 now says why, and what is
+   missing:** no *local* measure separates the two — noise wins eleven of the
+   fifteen individual properties, because dense noise is abundant in local
+   structure, not short of it — but a *global* redundancy statistic (the entropy
+   of the centre population) separates every carpet from every noise field cleanly
+   and stably. The missing ingredient is an organised-complexity term, blocked on
+   #9 and #34; the new `discrimination` audit stage now reports the separation on
+   every run.
 2. **The SNR sample is six carpets, all Persian.** A measure that separates
    carpets need not separate paintings, and several that track their ground truth
    still have poor between-artwork SNR (positive space 0.69, local symmetries
@@ -821,6 +829,120 @@ field carries no tone (§12, §15).
 
 That leaves **one measure with a defensible ground-truth result**, `strong_centres`
 at +0.99 raw and +0.99 partial — though §14 still shows it is not isolating.
+
+
+## 17. The noise problem is a *locality* problem: the missing ingredient is global redundancy
+
+*The current attack on [#29](https://github.com/brunopostle/centres/issues/29),
+the central open problem. Measured with the `discrimination` stage now in
+`python -m audit`, and reproducible from `audit/redundancy.py`.*
+
+Two routes on #29 had already been tried and had failed: re-weighting the six
+energy terms (§2b — art loses on four of five, so nothing but making the score a
+synonym for `gradients` flips the order) and figure/ground polarity (§15, #26 —
+polarity magnitude and alternation both fail to separate art from noise). This
+section reframes the problem in a way that says why both failed, and points at
+what is left.
+
+### The failure is not the energy functional. It is every local measure at once.
+
+The reported degree of life is built from *local* relations — a parent, a graph
+neighbour, an adjacent region. Measured directly, **no local measure separates a
+carpet from dense noise, and it is not close.** Scoring the six carpets against
+the three noise controls on all fifteen individual normalised properties (not the
+energy terms — the separately-validated `properties.py` measures):
+
+| | art mean | noise mean | who wins |
+|---|---:|---:|---|
+| not-separateness | 1.6 | 9.1 | noise, by 7.4 |
+| alternating repetition | 6.1 | 10.0 | noise |
+| the void | 5.9 | 7.8 | noise |
+| levels of scale | 5.7 | 8.1 | noise |
+| deep interlock | 3.9 | 5.7 | noise |
+| roughness | 7.2 | 8.3 | noise |
+| local symmetries | 4.7 | 6.1 | noise |
+| positive space | 4.6 | 5.5 | noise |
+| strong centres | 0.7 | 1.1 | noise |
+| good shape | 1.9 | 3.2 | noise |
+| contrast | 0.9 | 1.2 | noise |
+| boundaries | 9.2 | 6.9 | *art, by 2.2* |
+| gradients | 6.3 | 6.0 | art, by 0.3 |
+| echoes | 1.4 | 1.3 | art, by 0.1 |
+| simplicity | 2.2 | 2.1 | art, by 0.1 |
+
+**Noise wins eleven of fifteen**, and the four it loses it loses by tenths (only
+`boundaries` by a margin, and no measure separates the two populations cleanly).
+This is the mechanism behind §2b stated in full generality: **local structure is
+not scarce in noise, it is abundant.** A dense random field has more edges, more
+parents, more neighbours and more of every local relation than a composed artwork,
+so any statistic taken one relation at a time rewards it. Both prior routes stayed
+local, and that is why they could not work. It also refutes the strongest
+pessimistic reading — "a centre representation cannot separate structure from
+noise" — because, as the next part shows, the information *is* in the centre set;
+it is the local *aggregation* that discards it.
+
+### What a carpet has that noise does not: redundancy
+
+A carpet is built from a small vocabulary of things that recur — a few scales, a
+few strengths, a few motifs, repeated across the whole field. Noise spreads across
+every scale and strength there is. That is a **global** property of the centre
+population's *distribution*, invisible to any per-relation measure. Measured as the
+Shannon entropy of the centre population (`audit/redundancy.py`):
+
+| discriminator | carpet range | noise range | mechanical `regular_grid` | rank separation |
+|---|---|---|---:|---:|
+| **strength entropy** | 1.99 – 2.38 | 2.53 – 2.74 | 1.09 | **1.000** |
+| scale entropy | 1.41 – 1.60 | 1.74 – 1.91 | 1.01 | 1.000 |
+
+Both separate **every** carpet from **every** noise field — a clean rank
+separation of 1.000, where the reported degree of life scores 0.000 (fully
+inverted, noise above every carpet). Measured over a wider panel — the six carpets,
+about twenty structured synthetic images, and fifteen noise fields (five seeds each
+of white, smooth and blob noise) — the separation is 90/90 pairs for both. And it
+is **not a centre-count artefact**: the Varamin (798 centres) and a white-noise
+field (780 centres) have almost identical counts but sit 0.44 apart in scale
+entropy (1.43 against 1.88) and 0.4 apart in strength entropy (2.24 against 2.63).
+
+### Why this is an interior optimum, and why that blocks the fix
+
+The obvious move — "reward low entropy" — is wrong, and the mechanical lattice
+says why. `regular_grid` sits at the **low**-entropy extreme, *below* the carpets
+(strength entropy 1.09 against 2.0–2.4): a perfect grid is maximally redundant.
+Least entropy is the rigid lattice; most is the random field; **living order is
+between them** — Alexander's organised complexity, and the same order/disorder
+balance the `roughness` property already encodes as an interior optimum. So the
+redundancy term the score is missing is an interior optimum, and **the location of
+that optimum is an empirical quantity.** With a corpus of six near-identical
+Persian carpets it can only be *fitted*, not measured — which is
+[#34](https://github.com/brunopostle/centres/issues/34), and fitting a constant to
+the corpus is exactly the frame-versus-artwork error the project invariant forbids.
+
+A second obstacle is specific to the cleaner of the two measures. `scale_entropy`
+separates more crisply at rest, but it rides the detector's **absolute-pixel**
+scale ladder (`min_sigma=2, max_sigma=48`), and that ladder is
+[#9](https://github.com/brunopostle/centres/issues/9). Under a resize the
+detections shift along the ladder and clip at its ends, and the separation
+**breaks**: the worst transformed carpet reaches scale entropy 1.743 against a
+noise floor of 1.741. `strength_entropy` has no such dependence — its histogram is
+ranged to the data, so it is invariant to a monotone rescaling of the strengths —
+and it **holds under every practical transform**: mirror, rot90, gamma, JPEG, tone
+inversion, crop, pad, vignette, perspective and a resize to 512 px all leave the
+highest transformed carpet (2.39) below the noise floor (2.54).
+
+### Where this leaves #29
+
+The resolution is now specific rather than open-ended: **the aggregate needs a
+global-redundancy term of the organised-complexity kind — an interior optimum in
+the entropy of the centre population — and it is blocked on two filed issues.** #9,
+so the crisp `scale_entropy` version survives a resize; and #34, so the optimum can
+be located on a corpus wide enough (and varied enough — not six rugs) that its
+position is measured rather than fitted. `strength_entropy` is the transform-stable
+candidate to build it from once #34 lands. None of this is wired into the reported
+score, deliberately: adopting a corpus-fitted constant now would trade a wrong
+answer for an overfitted one. What *is* wired in is the measurement — the
+`discrimination` stage prints the rank separation of the score and of both
+candidates on every run, so #29 is no longer a paragraph in a document but a number
+the harness reports.
 
 
 ## Recommended order of work

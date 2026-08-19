@@ -72,13 +72,13 @@ OPEN   B3 #16  re-derive the remaining reference constants (clamping done)
 OPEN   B4 #17  wire audit thresholds into CI
 OPEN   D3 #23  error bars / median over benign transforms
 OPEN   D4 #24  correct docs   (THEORY.md done; images/README.md stale)
-OPEN      #29  noise outscores every artwork   (the central open problem)
+OPEN      #29  noise outscores every artwork   (central problem; diagnosed, blocked on #9+#34)
 DONE      #30  tone inversion: detector + measures fixed (Δ 0.18->0.043, accepted); merged into #13
 OPEN   D2 #22  alternating repetition still fails (needs periodicity, no region cue)
 OPEN      #31  image-domain boundaries/deep_interlock shift under gamma/JPEG (fixed 128 threshold -> Otsu)
 OPEN      #32  render the synthetic stimuli as images for inspection
 OPEN      #33  sweep harness mislabels negatively-tracking measures (echoes, local_symmetries)
-OPEN      #34  widen the corpus - field SNR, not tracking, is now the binding constraint
+OPEN      #34  widen the corpus - field SNR + locate the #29 organised-complexity optimum
 OPEN      #35  remove the dead interface_complexity/boundary_ratio computation
 ```
 
@@ -88,12 +88,24 @@ for a new session to start:
 
 1. **#29 — the aggregate still ranks noise above every carpet.** Individual
    validity has not composed into a valid overall degree of life. This is the
-   central open problem.
+   central open problem, and it is now **diagnosed** (AUDIT.md §17, and a
+   `discrimination` stage now in `python -m audit`). The failure is *locality*:
+   noise wins eleven of the fifteen individual local properties, because dense
+   noise is abundant in local structure, so neither re-weighting the energy terms
+   nor any per-relation measure can separate art from noise. What *does* separate
+   them — cleanly (every carpet below every noise field) and stably (under every
+   practical transform) — is a **global** redundancy statistic: the entropy of the
+   centre population's strength distribution. The missing ingredient is an
+   organised-complexity term (an *interior optimum* in that entropy — a mechanical
+   grid sits at the low extreme, noise at the high, life between). It is not yet in
+   the score because it is blocked on the two below: #9 (so the crisper
+   scale-entropy version survives a resize) and #34 (so the optimum is located on a
+   real corpus rather than fitted to six rugs). See `audit/redundancy.py`.
 2. **#34 — field SNR, not tracking, is now the limit, and the corpus is six
    Persian carpets.** Four measures that track their constructed ground truth
    separate real carpets weakly, and n=6 cannot tell a weak measure from a corpus
-   too small to exercise it. Widening the corpus is a precondition for making real
-   headway on #29.
+   too small to exercise it. Widening the corpus is a precondition for #29: the
+   organised-complexity optimum in point 1 cannot be located without it.
 
 Then: the tone-robustness bug #31 (a clean, well-specified fix), the visualisation
 #32 and harness label #33 (both small), one measure that still fails (`alternating
