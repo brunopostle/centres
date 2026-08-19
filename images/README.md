@@ -1,6 +1,6 @@
 # Test images
 
-Photographs of Persian carpets used for testing the `centres` analysis pipeline. All sourced from Wikimedia Commons and resized to a maximum of 1024 px on the longest side.
+Photographs of Persian carpets and tile patterns used for testing the `centres` analysis pipeline. Sourced from Wikimedia Commons, Flickr, and The Metropolitan Museum of Art's Open Access collection, and resized to a maximum of 1024 px on the longest side.
 
 ---
 
@@ -8,7 +8,7 @@ Photographs of Persian carpets used for testing the `centres` analysis pipeline.
 
 ![Ardabil Carpet](ardabil.jpg)
 
-One of the world's most celebrated carpets, completed in 1539–40 and now held at the Victoria and Albert Museum, London. The composition is dominated by a large central medallion — the famous sun disc — surrounded by a dense arabesque field and a pair of hanging mosque lamps. Its hierarchical organisation, with a single dominant focus supported by a richly articulated field, makes it a canonical example of Alexander's strong-centre structure.
+One of the world's most celebrated carpets, completed in 1539–40 and now held at the Victoria and Albert Museum, London. The composition is dominated by a large central medallion — the famous sun disc — surrounded by a dense arabesque field and a pair of hanging mosque lamps.
 
 *Public Domain · [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Ardabil_Carpet.jpg)*
 
@@ -18,7 +18,7 @@ One of the world's most celebrated carpets, completed in 1539–40 and now held 
 
 ![Pazyryk Carpet](pazyryk.jpg)
 
-The world's oldest known pile carpet, found frozen in a Scythian burial mound in the Altai Mountains and now in the Hermitage Museum, Saint Petersburg. Its design consists of a repeating animal frieze (deer, riders on horseback) arranged in concentric border bands around a simple field. The composition is flat and highly regular — consistent with its near-uniform roughness score and the relatively open, gridded character the analysis detects.
+The world's oldest known pile carpet, found frozen in a Scythian burial mound in the Altai Mountains and now in the Hermitage Museum, Saint Petersburg. Its design consists of a repeating animal frieze (deer, riders on horseback) arranged in concentric border bands around a simple field.
 
 *Public Domain · Photo: Schreiber · [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Pazyryk_carpet.jpg)*
 
@@ -28,7 +28,7 @@ The world's oldest known pile carpet, found frozen in a Scythian burial mound in
 
 ![Bijar Rug](bidjar.jpg)
 
-A finely knotted rug from the Kurdish weaving town of Bijar, known for producing the stiffest and most durable pile carpets in Persia. The design features a large central medallion on a continuous floral field. The dense, symmetrical field produces the most regular scale hierarchy of the six carpets (lowest levels-of-scale score) and the highest simplicity — a clear dominant structure with a well-articulated supporting field.
+A finely knotted rug from the Kurdish weaving town of Bijar, known for producing the stiffest and most durable pile carpets in Persia. The design features a large central medallion on a continuous floral field.
 
 *[CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) · BerndtF · [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Fine_Bidjar_rug.jpg)*
 
@@ -38,7 +38,7 @@ A finely knotted rug from the Kurdish weaving town of Bijar, known for producing
 
 ![Ghashghai Rug](ghashghai.jpg)
 
-A tribal rug woven by the Qashqai confederacy of south-western Iran. Qashqai weaving is characterised by a rich, slightly irregular field of stylised animals and medallions, with bold borders. The large centre count (390) reflects the intricacy of the field, and the relatively low boundaries score indicates the dense packing of well-demarcated motif elements.
+A tribal rug woven by the Qashqai confederacy of south-western Iran. Qashqai weaving is characterised by a rich, slightly irregular field of stylised animals and medallions, with bold borders.
 
 *[CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) · Berndt Fernow · [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Ghashghai_rug.jpg)*
 
@@ -48,7 +48,7 @@ A tribal rug woven by the Qashqai confederacy of south-western Iran. Qashqai wea
 
 ![Sanguszko Carpet](sanguszko.jpg)
 
-A Safavid court carpet from Kashan, named after the Polish-Lithuanian noble family that once owned it, now in the Miho Museum. Its composition is dominated by a large central hunting scene medallion with relatively sparse field between the figural motifs. The analysis gives it the highest strong-centres score (3.55) of any carpet in the set and the lowest the-void score — a calm, concentrated interior — consistent with the large open field surrounding its dominant medallion.
+A Safavid court carpet from Kashan, named after the Polish-Lithuanian noble family that once owned it, now in the Miho Museum. Its composition is dominated by a large central hunting scene medallion with relatively sparse field between the figural motifs.
 
 *Public Domain · [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Sanguszko_carpet_01.jpg)*
 
@@ -58,21 +58,188 @@ A Safavid court carpet from Kashan, named after the Polish-Lithuanian noble fami
 
 ![Varamin Carpet](varamin.jpg)
 
-A village carpet from the Varamin region south-east of Tehran. Varamin rugs are known for their dense, continuously repeating Mina Khani floral field — a pattern of interconnected flower heads and diamond lattices covering the entire ground without a central focal point. The analysis detects 1010 centres, the most of any carpet, and the highest contrast and alternating repetition scores — consistent with the strongly rhythmic, non-hierarchical field design.
+A village carpet from the Varamin region south-east of Tehran. Varamin rugs are known for their dense, continuously repeating Mina Khani floral field — a pattern of interconnected flower heads and diamond lattices covering the entire ground without a central focal point.
 
 *[CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) · Pouyakhani · [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Varamin_Carpet.jpg)*
 
 ---
 
+## Additional carpets
+
+### Indo-Persian Carpet with Medallions — ca. 1680, Mughal India
+
+![Indo-Persian Carpet with Medallions](indo_persian_carpet.jpg)
+
+Wool pile on cotton foundation, from the Robert Lehman Collection. A large-format carpet with a repeating medallion lattice down a long central field, flanked by dense floral border bands.
+
+*Public Domain (CC0) · The Metropolitan Museum of Art, Open Access · [Object 461320](https://www.metmuseum.org/art/collection/search/461320)*
+
+---
+
+### Persian Carpet — carpet museum
+
+![Persian Carpet](persian_carpet_s1ingshot_a.jpg)
+
+*[CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) · s1ingshot (Berlin, Germany) · via [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Persian_carpet_(20822793819).jpg), mirrored from [Flickr](https://www.flickr.com/photos/s1ingshot/20822793819/)*
+
+---
+
+### Persian Carpet
+
+![Persian Carpet](persian_carpet_s1ingshot_b.jpg)
+
+*[CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) · s1ingshot · [Flickr](https://www.flickr.com/photos/26484838@N06/20388518283)*
+
+---
+
+### Persian Carpet, Tehran
+
+![Persian Carpet, Tehran](persian_carpet_tehran_ninara.jpg)
+
+*[CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) · Ninara · via [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Persian_carpet,_Tehran_(16674324642).jpg), mirrored from [Flickr](https://www.flickr.com/photos/ninara/16674324642/)*
+
+---
+
+### Persian Carpet, Tehran (Tabriz carpet)
+
+![Persian Carpet, Tehran (Tabriz)](persian_carpet_tabriz_ninara.jpg)
+
+*[CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) · Ninara · via [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Persian_carpet,_Tehran_(16487725838).jpg), mirrored from [Flickr](https://www.flickr.com/photos/ninara/16487725838/)*
+
+---
+
+### Persian Carpet (×3) — Ninara
+
+![Persian Carpet](persian_carpet_ninara_a.jpg)
+![Persian Carpet](persian_carpet_ninara_b.jpg)
+![Persian Carpet](persian_carpet_ninara_c.jpg)
+
+Three further carpet photographs by the same photographer.
+
+*[CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) · Ninara · [Flickr (a)](https://www.flickr.com/photos/37583176@N00/51759435226) · [Flickr (b)](https://www.flickr.com/photos/37583176@N00/51760295630) · [Flickr (c)](https://www.flickr.com/photos/37583176@N00/51760083254)*
+
+---
+
+### Detail, Persian Carpet (×2) — National Carpet Museum, Tehran
+
+![Detail, Persian Carpet](persian_carpet_detail_a.jpg)
+![Detail, Persian Carpet](persian_carpet_detail_b.jpg)
+
+Close-up detail shots showing fine knot-level field pattern, useful for testing the pipeline at a very different characteristic scale from the full-carpet photographs above.
+
+*[CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) · A.Davey · via [Wikimedia Commons (a)](https://commons.wikimedia.org/wiki/File:Detail,_Persian_Carpet_(4737150366).jpg) / [(b)](https://commons.wikimedia.org/wiki/File:Detail,_Persian_Carpet_(4736601357).jpg), mirrored from Flickr*
+
+---
+
+### Persian Carpet — radial tile/mosaic ceiling
+
+![Persian Carpet](persian_carpet_garryknight.jpg)
+
+Despite the title, this is a photograph of a radially-patterned mosaic tile ceiling (not a woven carpet) — included here as a distinct concentric/radial structural motif.
+
+*[CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) · Garry Knight · [Flickr](https://www.flickr.com/photos/8176740@N05/6648386663)*
+
+---
+
+## Tile patterns
+
+All tile images below are from The Metropolitan Museum of Art's Open Access collection (CC0 / Public Domain), Islamic Art department unless noted.
+
+### Tile Panel — 18th century, Syria
+![Tile Panel, Syria](tile_panel_syria.jpg)
+Stonepaste, underglaze painted. Rogers Fund, 1907.
+*Public Domain (CC0) · The Met · [Object 445002](https://www.metmuseum.org/art/collection/search/445002)*
+
+---
+
+### Tile Panel — late 13th–14th century, Iran
+![Tile Panel, Iran](tile_panel_iran.jpg)
+Stonepaste, molded under transparent glaze. Rogers Fund, 1937.
+*Public Domain (CC0) · The Met · [Object 454361](https://www.metmuseum.org/art/collection/search/454361)*
+
+---
+
+### Tile from a Frieze — 1308, Iran
+![Tile from a Frieze](tile_frieze_iran.jpg)
+Composite body, overglaze luster-painted. Gift of Emile Rey, 1912.
+*Public Domain (CC0) · The Met · [Object 454439](https://www.metmuseum.org/art/collection/search/454439)*
+
+---
+
+### Tile Panel — 17th century, Caucasus or Iran
+![Tile Panel, Caucasus](tile_panel_caucasus.jpg)
+Stonepaste, polychrome underglaze painted under colorless glaze. Rogers Fund, 1911.
+*Public Domain (CC0) · The Met · [Object 446167](https://www.metmuseum.org/art/collection/search/446167)*
+
+---
+
+### Tile from an Inscriptional Frieze — early 14th century, Iran
+![Tile from an Inscriptional Frieze](tile_inscriptional_frieze.jpg)
+Stonepaste, modeled, overglaze-painted and gilded (lajvardina). Edward C. Moore Collection, Bequest of Edward C. Moore, 1891.
+*Public Domain (CC0) · The Met · [Object 444708](https://www.metmuseum.org/art/collection/search/444708)*
+
+---
+
+### Tiles — ca. 1620
+![Tiles](tile_panel_delft.jpg)
+Tin-glazed earthenware, likely Dutch delftware. Fletcher Fund, 1927. (European Sculpture and Decorative Arts department.)
+*Public Domain (CC0) · The Met · [Object 196222](https://www.metmuseum.org/art/collection/search/196222)*
+
+---
+
+### Tile — late 16th–early 17th century, Syria
+![Tile, Syria](tile_syria_a.jpg)
+Artificial paste, painted and glazed. Rogers Fund, 1970.
+*Public Domain (CC0) · The Met · [Object 452070](https://www.metmuseum.org/art/collection/search/452070)*
+
+---
+
+### Tile with Floral Cartouche Design on Ebru Background — late 16th century, Turkey
+![Tile with Ebru Background](tile_ebru_turkey.jpg)
+Stonepaste, polychrome painted under transparent glaze. Gift of William B. Osgood Field, 1902.
+*Public Domain (CC0) · The Met · [Object 444901](https://www.metmuseum.org/art/collection/search/444901)*
+
+---
+
+### Tile Panels — second half 16th century, Turkey (×4)
+![Tile Panel, Turkey](tile_panel_turkey_a.jpg)
+![Tile Panel, Turkey](tile_panel_turkey_b.jpg)
+![Tile Panel, Turkey](tile_panel_turkey_c.jpg)
+![Tile Panel, Turkey](tile_panel_turkey_d.jpg)
+Stonepaste, polychrome painted under transparent glaze. Gift of J. Pierpont Morgan, 1917.
+*Public Domain (CC0) · The Met · [Object 447016](https://www.metmuseum.org/art/collection/search/447016) · [447015](https://www.metmuseum.org/art/collection/search/447015) · [447013](https://www.metmuseum.org/art/collection/search/447013) · [447014](https://www.metmuseum.org/art/collection/search/447014)*
+
+---
+
+### Reconstruction of Geometric Decoration — ca. 1386–1347 BCE, Egypt
+![Reconstruction of Geometric Decoration](tile_geometric_egypt.jpg)
+Faience, modern plaster, gold paint. From the floor of the Temple of Amun, Malqata (Thebes); MMA excavations, 1916–17. Rogers Fund, 1917. (Egyptian Art department.)
+*Public Domain (CC0) · The Met · [Object 551605](https://www.metmuseum.org/art/collection/search/551605)*
+
+---
+
+### Panel of Tiles (99) — early 19th century, Mexico
+![Panel of Tiles](tile_panel_mexico.jpg)
+*Public Domain (CC0) · The Met · [Object 193413](https://www.metmuseum.org/art/collection/search/193413)*
+
+---
+
+### Tile — first half 17th century, Syria
+![Tile, Syria](tile_syria_b.jpg)
+Stonepaste, painted and glazed. Gift of Mrs. Frederick F. Thompson, 1915.
+*Public Domain (CC0) · The Met · [Object 446689](https://www.metmuseum.org/art/collection/search/446689)*
+
+---
+
 ## License notes
 
-Public Domain images have no restrictions on use. Images under CC BY-SA 3.0 require attribution to the author listed above and must be shared under the same licence if redistributed.
+Public Domain and CC0 images have no restrictions on use. Images under CC BY 2.0 or CC BY-SA 3.0 require attribution to the author listed above each entry; CC BY-SA 3.0 works must also be shared under the same licence if redistributed.
 
 ---
 
 ## Structural analysis
 
-Results of running `centres analyse` on each image. Scores are on a 0–10 wholeness scale (10 = most present) with consistent direction — higher is always better. The raw computed value is shown alongside in `--json` output.
+The table and commentary below describe only the original six carpets (`ardabil`, `pazyryk`, `bidjar`, `ghashghai`, `sanguszko`, `varamin`); the additional carpets and tile images above have not yet been run through the analysis. Results of running `centres analyse` on each image. Scores are on a 0–10 wholeness scale (10 = most present) with consistent direction — higher is always better. The raw computed value is shown alongside in `--json` output.
 
 | Property | ardabil | pazyryk | bidjar | ghashghai | sanguszko | varamin |
 |---|---:|---:|---:|---:|---:|---:|
