@@ -97,15 +97,21 @@ for a new session to start:
    practical transform) — is a **global** redundancy statistic: the entropy of the
    centre population's strength distribution. The missing ingredient is an
    organised-complexity term (an *interior optimum* in that entropy — a mechanical
-   grid sits at the low extreme, noise at the high, life between). It is not yet in
-   the score because it is blocked on the two below: #9 (so the crisper
-   scale-entropy version survives a resize) and #34 (so the optimum is located on a
-   real corpus rather than fitted to six rugs). See `audit/redundancy.py`.
-2. **#34 — field SNR, not tracking, is now the limit, and the corpus is six
-   Persian carpets.** Four measures that track their constructed ground truth
-   separate real carpets weakly, and n=6 cannot tell a weak measure from a corpus
-   too small to exercise it. Widening the corpus is a precondition for #29: the
-   organised-complexity optimum in point 1 cannot be located without it.
+   grid sits at the low extreme, noise at the high, life between). See
+   `audit/redundancy.py`. **The load-bearing caveat (AUDIT §17):** carpets are
+   hyper-redundant, so on this corpus "few recurring strengths" and "alive" are
+   confounded — the measure may be reading *repetition*, not wholeness, and the
+   separation erodes on the least-redundant synthetics (they reach 2.38–2.42 against
+   a noise floor of ~2.59). Whether it survives on non-repetitive art is untested
+   and is the whole question. Nothing is wired into the score.
+2. **#34 — now the decisive precondition for #29, not just an SNR limit.** The
+   corpus must settle the caveat above (wholeness vs repetition) before the
+   redundancy term is worth building, and must be wide enough to *locate* the
+   interior optimum rather than fit it. That needs varied real artworks —
+   **which cannot be fetched in this execution environment: the egress policy
+   denies image hosts (`upload.wikimedia.org` → 403).** #34 therefore needs the
+   repository owner to add images out of band, or an allowlisted source. #9 is the
+   second blocker (so the crisper scale-entropy version survives a resize).
 
 Then: the tone-robustness bug #31 (a clean, well-specified fix), the visualisation
 #32 and harness label #33 (both small), one measure that still fails (`alternating

@@ -50,6 +50,17 @@ constant into the score is exactly the frame-versus-artwork error the project
 invariant forbids. So the resolution of #29 is: a redundancy term of this kind,
 once #9 makes the scale version stable and #34 supplies a corpus wide enough to
 locate the optimum without fitting it to six near-identical rugs.
+
+**The caveat that decides whether any of this generalises.** A carpet is
+hyper-redundant, so on this corpus "few recurring strengths" and "alive" cannot be
+told apart. Measured on the synthetic generators, the separation *erodes* as a
+composition's redundancy falls: the least-redundant compositions
+(``element_vocabulary(12)``, a non-periodic medallion) reach strength entropy 2.38
+–2.42 against a noise floor of ~2.59 — a margin smaller than the measure's own
+transform spread. So this may be reading *repetitiveness* rather than *wholeness*,
+and would then fail on non-repetitive art (a painting, a portrait). Deciding it
+needs varied real artworks, i.e. #34; until then this is a lead, not a solution.
+See AUDIT.md §17.
 """
 
 import numpy as np

@@ -903,6 +903,38 @@ is **not a centre-count artefact**: the Varamin (798 centres) and a white-noise
 field (780 centres) have almost identical counts but sit 0.44 apart in scale
 entropy (1.43 against 1.88) and 0.4 apart in strength entropy (2.24 against 2.63).
 
+### The load-bearing caveat: is it measuring wholeness, or repetitiveness?
+
+This is the finding's central risk, and it is not yet closed. A Persian carpet is
+*hyper-redundant* — a small vocabulary of motifs tiled across the whole field — so
+"the strengths fall into few recurring values" and "the composition is alive" are
+confounded on this corpus. If strength entropy is really reading repetition rather
+than wholeness, it will separate ornament from noise and **fail on any composed
+image that is not repetitive** — a painting, a portrait, a landscape — because
+those have varied centres and therefore high strength entropy, like noise.
+
+Measured, as far as the synthetic generators allow (real non-repetitive art cannot
+be fetched in this environment — see #34), **the caveat bites**: as a composition's
+redundancy falls, its strength entropy climbs toward the noise floor.
+
+| composed stimulus | strength entropy | vs noise floor 2.53–2.74 |
+|---|---:|---|
+| `dominant_motif(5.4)` (one motif dominates) | 0.83 | far below |
+| `element_vocabulary(6)` | 2.07 | below |
+| `nested_squares(3.0)` | 1.89 | below |
+| `element_vocabulary(12)` (12 distinct shapes) | **2.38** | margin ~0.2 |
+| non-periodic medallion (hand-built) | **2.42** | margin ~0.15 |
+
+The least-redundant compositions land within ~0.2 of the noise floor — *smaller
+than the measure's own transform spread* (§ invariance below), so under a resize
+they would cross it. The clean 90/90 separation held **because the corpus is six
+highly-repetitive carpets.** So the honest scope of the result is narrower than
+"separates art from noise": it separates *dense redundant ornament* from noise,
+with a margin that erodes as compositional variety rises, and its generalisation
+to non-repetitive art is untested and at genuine risk. That test needs a corpus of
+varied real artworks — #34 — and until it is run, the redundancy direction is a
+lead, not a solution.
+
 ### Why this is an interior optimum, and why that blocks the fix
 
 The obvious move — "reward low entropy" — is wrong, and the mechanical lattice
@@ -931,18 +963,30 @@ highest transformed carpet (2.39) below the noise floor (2.54).
 
 ### Where this leaves #29
 
-The resolution is now specific rather than open-ended: **the aggregate needs a
-global-redundancy term of the organised-complexity kind — an interior optimum in
-the entropy of the centre population — and it is blocked on two filed issues.** #9,
-so the crisp `scale_entropy` version survives a resize; and #34, so the optimum can
-be located on a corpus wide enough (and varied enough — not six rugs) that its
-position is measured rather than fitted. `strength_entropy` is the transform-stable
-candidate to build it from once #34 lands. None of this is wired into the reported
-score, deliberately: adopting a corpus-fitted constant now would trade a wrong
-answer for an overfitted one. What *is* wired in is the measurement — the
-`discrimination` stage prints the rank separation of the score and of both
-candidates on every run, so #29 is no longer a paragraph in a document but a number
-the harness reports.
+The problem is now specific rather than open-ended, and so are its blockers.
+**The direction is a global-redundancy term of the organised-complexity kind — an
+interior optimum in the entropy of the centre population — but three things stand
+between it and the score, in order:**
+
+1. **#34, and it is now the *decisive* precondition, not merely a calibration
+   one.** The caveat above means the corpus must settle whether the measure reads
+   wholeness or only repetition *before* the term is worth building. That needs
+   varied real artworks — and in this execution environment they cannot be
+   fetched: the egress policy denies image hosts (`upload.wikimedia.org` returns a
+   403), so #34 needs the repository owner to add images out of band, or an
+   allowlisted source.
+2. **#9**, so the crisper `scale_entropy` version survives a resize instead of
+   riding the absolute-pixel ladder.
+3. **The interior optimum's location**, which only a corpus wider than six
+   near-identical rugs can measure rather than fit.
+
+`strength_entropy` is the transform-stable candidate to build it from *if* #34
+clears the caveat. None of this is wired into the reported score, deliberately:
+adopting a corpus-fitted constant now would trade a wrong answer for an overfitted
+one, and adopting a repetition detector mislabelled as a wholeness measure would be
+worse. What *is* wired in is the measurement — the `discrimination` stage prints the
+rank separation of the score and of both candidates on every run, so #29 is no
+longer a paragraph in a document but a number the harness reports.
 
 
 ## Recommended order of work
