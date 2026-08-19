@@ -894,14 +894,17 @@ Shannon entropy of the centre population (`audit/redundancy.py`):
 | **strength entropy** | 1.99 – 2.38 | 2.53 – 2.74 | 1.09 | **1.000** |
 | scale entropy | 1.41 – 1.60 | 1.74 – 1.91 | 1.01 | 1.000 |
 
-Both separate **every** carpet from **every** noise field — a clean rank
-separation of 1.000, where the reported degree of life scores 0.000 (fully
-inverted, noise above every carpet). Measured over a wider panel — the six carpets,
-about twenty structured synthetic images, and fifteen noise fields (five seeds each
-of white, smooth and blob noise) — the separation is 90/90 pairs for both. And it
-is **not a centre-count artefact**: the Varamin (798 centres) and a white-noise
-field (780 centres) have almost identical counts but sit 0.44 apart in scale
-entropy (1.43 against 1.88) and 0.4 apart in strength entropy (2.24 against 2.63).
+On the original six carpets both separate **every** carpet from **every** noise
+field — a clean rank separation of 1.000, where the reported degree of life scores
+0.000 (fully inverted, noise above every carpet). Over a wider *synthetic* panel —
+the six carpets, about twenty structured synthetic images, and fifteen noise fields
+— the separation is 90/90 pairs for both. And it is **not a centre-count artefact**:
+the Varamin (798 centres) and a white-noise field (780 centres) have almost
+identical counts but sit 0.44 apart in scale entropy (1.43 against 1.88) and 0.4
+apart in strength entropy (2.24 against 2.63).
+
+**But 1.000 was measured on six near-identical rugs, and it does not survive the
+wider real corpus** — see the next two subsections, which are the point.
 
 ### The load-bearing caveat: is it measuring wholeness, or repetitiveness?
 
@@ -928,12 +931,42 @@ redundancy falls, its strength entropy climbs toward the noise floor.
 The least-redundant compositions land within ~0.2 of the noise floor — *smaller
 than the measure's own transform spread* (§ invariance below), so under a resize
 they would cross it. The clean 90/90 separation held **because the corpus is six
-highly-repetitive carpets.** So the honest scope of the result is narrower than
-"separates art from noise": it separates *dense redundant ornament* from noise,
-with a margin that erodes as compositional variety rises, and its generalisation
-to non-repetitive art is untested and at genuine risk. That test needs a corpus of
-varied real artworks — #34 — and until it is run, the redundancy direction is a
-lead, not a solution.
+highly-repetitive carpets.**
+
+### The wider corpus (#34) confirms the caveat, on real art
+
+The corpus was then widened to **32 real artworks** — 17 carpets and 15 tile panels
+from Iran, Turkey, Syria, the Caucasus, Egypt (a reconstruction of decoration from
+c. 1350 BCE), Mughal India, 19th-century Mexico and Delft, all CC-licensed (see
+`images/README.md`). Re-run against the three noise controls:
+
+| discriminator | rank separation, 32 artworks vs noise | at rest |
+|---|---:|---|
+| **degree of life** (the reported score) | **0.000** | every one of the 32 artworks scores *below* noise |
+| strength entropy | **0.997** | `tile_geometric_egypt` (2.546) crosses the noise floor (2.542) |
+| scale entropy | 1.000 | clean, but by a margin of only **0.047** — and it is transform-fragile (#9) |
+
+Two things follow, and both were predicted by the caveat. **First, #29 is not a
+six-carpet artefact:** on a fivefold larger, multi-cultural corpus the reported
+degree of life *still* ranks every single artwork below noise (0.000). The problem
+is real and robust. **Second, the strength-entropy separation degrades exactly
+where predicted:** a bold, less-repetitive geometric piece (the ancient-Egyptian
+reconstruction) crosses the noise floor *at rest*, before any transform. Combining
+the two entropies recovers a clean 1.000 at rest, but only by margins of 0.01–0.03
+— far inside the transform spread and inside measurement noise — and scale entropy
+is still transform-fragile. **So on the wider corpus there is no robust, clean
+single-statistic separator.**
+
+The honest scope of the result is therefore narrower than "separates art from
+noise": the redundancy statistics separate *dense redundant ornament* from noise
+with a margin that erodes as compositional variety rises, and one real artwork
+already crosses it. The corpus is still **ornament only** — carpets and tiles,
+which are repetitive by construction — so the deepest form of the caveat (does it
+separate a *painting* or a *portrait* from noise?) remains untested and at genuine
+risk. What the wider corpus settled is that the redundancy direction is real
+(0/32 for the score against ~31/32 for the discriminators is a large, consistent
+signal) but is **a lead, not a solution**: no threshold on these entropies
+survives both the variety already in the corpus and the transforms.
 
 ### Why this is an interior optimum, and why that blocks the fix
 
@@ -963,30 +996,35 @@ highest transformed carpet (2.39) below the noise floor (2.54).
 
 ### Where this leaves #29
 
-The problem is now specific rather than open-ended, and so are its blockers.
-**The direction is a global-redundancy term of the organised-complexity kind — an
-interior optimum in the entropy of the centre population — but three things stand
-between it and the score, in order:**
+The problem is now specific rather than open-ended, and the wider corpus has moved
+it forward without solving it. **The direction is a global-redundancy term of the
+organised-complexity kind — an interior optimum in the entropy of the centre
+population.** Where it stands:
 
-1. **#34, and it is now the *decisive* precondition, not merely a calibration
-   one.** The caveat above means the corpus must settle whether the measure reads
-   wholeness or only repetition *before* the term is worth building. That needs
-   varied real artworks — and in this execution environment they cannot be
-   fetched: the egress policy denies image hosts (`upload.wikimedia.org` returns a
-   403), so #34 needs the repository owner to add images out of band, or an
-   allowlisted source.
+1. **#34 is partly done, and it tempered the result rather than confirming it.**
+   The corpus is now 32 CC-licensed real artworks (the repository owner added them
+   out of band; this environment's egress policy denies image hosts, so they could
+   not be fetched from here). On that corpus the reported score still fails #29 for
+   *every* artwork — the problem is robust — but the strength-entropy separation
+   drops from a clean 1.000 to 0.997, one real artwork crossing the noise floor at
+   rest. The redundancy signal is real and large but is **not a clean separator on
+   varied art**, and the corpus is still ornament only: **the decisive test — a
+   non-repetitive painting or portrait against noise — is still not in it.**
 2. **#9**, so the crisper `scale_entropy` version survives a resize instead of
-   riding the absolute-pixel ladder.
-3. **The interior optimum's location**, which only a corpus wider than six
-   near-identical rugs can measure rather than fit.
+   riding the absolute-pixel ladder; on the 32-artwork corpus it separates cleanly
+   *at rest* but by only 0.047, which a transform erases.
+3. **The interior optimum's location and width**, which the wider corpus can now
+   begin to constrain — but the razor-thin margins (0.01–0.05) say a single entropy
+   threshold is not enough, and a genuinely different or composite formulation is
+   likely needed.
 
-`strength_entropy` is the transform-stable candidate to build it from *if* #34
-clears the caveat. None of this is wired into the reported score, deliberately:
-adopting a corpus-fitted constant now would trade a wrong answer for an overfitted
-one, and adopting a repetition detector mislabelled as a wholeness measure would be
-worse. What *is* wired in is the measurement — the `discrimination` stage prints the
-rank separation of the score and of both candidates on every run, so #29 is no
-longer a paragraph in a document but a number the harness reports.
+None of this is wired into the reported score, deliberately: no threshold on these
+entropies survives both the variety already in the 32-image corpus and the benign
+transforms, so adopting one now would ship a separator that a resize or one bold
+geometric tile already breaks. What *is* wired in is the measurement — the
+`discrimination` stage prints the rank separation of the score and of both
+candidates on every run, so #29 is no longer a paragraph in a document but a number
+the harness reports, now over the full corpus.
 
 
 ## Recommended order of work

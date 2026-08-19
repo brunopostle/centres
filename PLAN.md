@@ -98,20 +98,21 @@ for a new session to start:
    centre population's strength distribution. The missing ingredient is an
    organised-complexity term (an *interior optimum* in that entropy — a mechanical
    grid sits at the low extreme, noise at the high, life between). See
-   `audit/redundancy.py`. **The load-bearing caveat (AUDIT §17):** carpets are
-   hyper-redundant, so on this corpus "few recurring strengths" and "alive" are
-   confounded — the measure may be reading *repetition*, not wholeness, and the
-   separation erodes on the least-redundant synthetics (they reach 2.38–2.42 against
-   a noise floor of ~2.59). Whether it survives on non-repetitive art is untested
-   and is the whole question. Nothing is wired into the score.
-2. **#34 — now the decisive precondition for #29, not just an SNR limit.** The
-   corpus must settle the caveat above (wholeness vs repetition) before the
-   redundancy term is worth building, and must be wide enough to *locate* the
-   interior optimum rather than fit it. That needs varied real artworks —
-   **which cannot be fetched in this execution environment: the egress policy
-   denies image hosts (`upload.wikimedia.org` → 403).** #34 therefore needs the
-   repository owner to add images out of band, or an allowlisted source. #9 is the
-   second blocker (so the crisper scale-entropy version survives a resize).
+   `audit/redundancy.py`. **The load-bearing caveat, now tested on the wider corpus
+   (AUDIT §17):** carpets are hyper-redundant, so the measure may be reading
+   *repetition*, not wholeness. On the widened 32-artwork corpus the reported score
+   still fails #29 for *every* artwork (robust), but the strength-entropy separation
+   drops from 1.000 to 0.997 — a bold Egyptian geometric tile crosses the noise
+   floor at rest — and scale entropy separates cleanly only by 0.047 (and is
+   transform-fragile). No robust clean separator survives the variety now in the
+   corpus. Nothing is wired into the score.
+2. **#34 — partly done: corpus widened to 32 CC-licensed real artworks** (17
+   carpets, 15 tile panels; the owner added them out of band, since this
+   environment's egress policy denies image hosts). It tempered the finding rather
+   than confirming it (point 1), and the corpus is still **ornament only** — the
+   decisive test, a non-repetitive painting/portrait against noise, is still not in
+   it. #9 remains the second blocker (so the crisper scale-entropy version survives
+   a resize).
 
 Then: the tone-robustness bug #31 (a clean, well-specified fix), the visualisation
 #32 and harness label #33 (both small), one measure that still fails (`alternating

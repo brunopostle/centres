@@ -171,7 +171,13 @@ def discrimination():
 
     art = {f: _analyze_scaled(cv2.imread(os.path.join(IMAGES, f)))
            for f in sorted(os.listdir(IMAGES)) if f.endswith((".jpg", ".png"))}
-    noise = {name: _analyze_scaled(getattr(stimuli, name)()) for name in NOISE_CONTROLS}
+    # Several seeds per noise generator, not one. The noise floor is itself a
+    # sampled quantity — a smooth-noise strength entropy ranges 2.54–2.59 across
+    # seeds — and a single realisation gives an optimistic separation: the
+    # Egyptian geometric tile (2.55) sits below seed 0's floor and above seed 1's,
+    # so one seed reports a clean 1.000 and three seeds report the honest 0.99x.
+    noise = {f"{name}{seed}": _analyze_scaled(getattr(stimuli, name)(seed=seed))
+             for name in NOISE_CONTROLS for seed in range(3)}
     grid = _analyze_scaled(stimuli.regular_grid())  # a mechanical reference point
 
     def col(d, i):

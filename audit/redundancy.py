@@ -51,15 +51,17 @@ invariant forbids. So the resolution of #29 is: a redundancy term of this kind,
 once #9 makes the scale version stable and #34 supplies a corpus wide enough to
 locate the optimum without fitting it to six near-identical rugs.
 
-**The caveat that decides whether any of this generalises.** A carpet is
-hyper-redundant, so on this corpus "few recurring strengths" and "alive" cannot be
-told apart. Measured on the synthetic generators, the separation *erodes* as a
-composition's redundancy falls: the least-redundant compositions
-(``element_vocabulary(12)``, a non-periodic medallion) reach strength entropy 2.38
-–2.42 against a noise floor of ~2.59 — a margin smaller than the measure's own
-transform spread. So this may be reading *repetitiveness* rather than *wholeness*,
-and would then fail on non-repetitive art (a painting, a portrait). Deciding it
-needs varied real artworks, i.e. #34; until then this is a lead, not a solution.
+**The caveat that decides whether any of this generalises — now partly tested.**
+A carpet is hyper-redundant, so on the original six-carpet corpus "few recurring
+strengths" and "alive" cannot be told apart. The corpus was widened to 32 real
+CC-licensed artworks (17 carpets, 15 tile panels across many cultures; #34), and
+the caveat bit: the reported score still fails #29 for every one of the 32, but
+the strength-entropy separation drops from a clean 1.000 to 0.997 — a bold
+ancient-Egyptian geometric tile crosses the noise floor *at rest*. Combining
+strength and scale entropy recovers 1.000 at rest but by margins of 0.01–0.03,
+inside both the transform spread and measurement noise. So on varied art there is
+no robust clean separator, and the corpus is still ornament only: whether any of
+this separates a *painting* from noise is still untested. A lead, not a solution.
 See AUDIT.md §17.
 """
 
