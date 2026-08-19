@@ -52,7 +52,7 @@ acceptance check passes.
 
 ## Dependency graph
 
-Tracked as GitHub issues [#8–#30](https://github.com/brunopostle/centres/issues). Task IDs below link to them; statuses live on the issues, and this file is the overview and the rationale.
+Tracked as GitHub issues [#8–#35](https://github.com/brunopostle/centres/issues). Task IDs below link to them; statuses live on the issues, and this file is the overview and the rationale.
 
 ```
 DONE   A3 #10  adaptive edge detection        B1 #14  intensive energy terms
@@ -74,15 +74,31 @@ OPEN   D3 #23  error bars / median over benign transforms
 OPEN   D4 #24  correct docs   (THEORY.md done; images/README.md stale)
 OPEN      #29  noise outscores every artwork   (the central open problem)
 DONE      #30  tone inversion: detector + measures fixed (Δ 0.18->0.043, accepted); merged into #13
-OPEN   D2 #22  echoes, alternating repetition, not-separateness still fail
+OPEN   D2 #22  alternating repetition still fails (needs periodicity, no region cue)
+OPEN      #31  image-domain boundaries/deep_interlock shift under gamma/JPEG (fixed 128 threshold -> Otsu)
+OPEN      #32  render the synthetic stimuli as images for inspection
+OPEN      #33  sweep harness mislabels negatively-tracking measures (echoes, local_symmetries)
+OPEN      #34  widen the corpus - field SNR, not tracking, is now the binding constraint
+OPEN      #35  remove the dead interface_complexity/boundary_ratio computation
 ```
 
 **The instrument is now precise and ten of fifteen measures track their ground
-truth** (was one). The central open problem is #29: the aggregate degree of life
-still ranks noise above every carpet. The remaining tasks are the three measures
-that still fail under #22 (echoes, alternating repetition, not-separateness — each
-needs information no region descriptor carries), the optional detector-exactness
-push in #13, and the housekeeping in #16/#17/#23/#24.
+truth** (was one). Two problems now bound progress, and they are the right place
+for a new session to start:
+
+1. **#29 — the aggregate still ranks noise above every carpet.** Individual
+   validity has not composed into a valid overall degree of life. This is the
+   central open problem.
+2. **#34 — field SNR, not tracking, is now the limit, and the corpus is six
+   Persian carpets.** Four measures that track their constructed ground truth
+   separate real carpets weakly, and n=6 cannot tell a weak measure from a corpus
+   too small to exercise it. Widening the corpus is a precondition for making real
+   headway on #29.
+
+Then: the tone-robustness bug #31 (a clean, well-specified fix), the visualisation
+#32 and harness label #33 (both small), one measure that still fails (`alternating
+repetition`, needs periodicity), the optional detector-exactness push #13, and the
+housekeeping in #16/#17/#23/#24/#35.
 
 ### Where the instrument stands
 
