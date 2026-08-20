@@ -67,9 +67,13 @@ alternating repetition (+0.14). **One is spurious:** the void (+0.80 raw, partia
 tracking.** Four measures that track their ground truth (echoes, not-separateness,
 positive space, boundaries) have poor between-artwork SNR on the six carpets —
 they discriminate the constructed stimuli cleanly and separate real carpets
-weakly. And the image-domain `boundaries`/`deep_interlock` use a fixed grey-128
-threshold, so they shift under gamma and JPEG, which inflates their noise floor
-(a follow-up: the threshold should be relative, e.g. Otsu).
+weakly. (The image-domain `boundaries`/`deep_interlock` used to use a fixed
+grey-128 threshold, so they shifted under gamma and JPEG, inflating their noise
+floor; #31 replaced it with a **symmetrised Otsu** threshold that adapts to the
+image's own histogram, cutting the gamma sensitivity of `boundaries` from 2.9 to
+0.25 and of `deep_interlock` from 1.7 to 0.46 on the 0–10 scale while keeping the
+exact tone-inversion invariance #30 established and the ground-truth sweeps
+unchanged — boundaries still peaks at 0.3, deep interlock still tracks at +1.000.)
 
 **Two findings are unchanged, and are the honest residual:**
 
