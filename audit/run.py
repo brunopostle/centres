@@ -22,13 +22,28 @@ KEYS = [
 IMAGES = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images")
 
 
+def _redundancy(centers):
+    """The three global-redundancy statistics of a centre set (see audit.redundancy).
+
+    Bundled here so the one ``analyze`` call ``score`` already makes yields them
+    too, and the ``discrimination`` stage can reuse the corpus scores instead of
+    re-analysing every corpus image a second time.
+    """
+    return {
+        "strength_entropy": rdcy.strength_entropy(centers),
+        "scale_entropy": rdcy.scale_entropy(centers),
+        "spatial_coherence": rdcy.spatial_coherence(centers),
+    }
+
+
 def score(img, max_size=1024):
-    """Run the full pipeline and return (n_centres, life, raw, normalised).
+    """Run the full pipeline and return (n_centres, life, raw, normalised, redundancy).
 
     ``analyze`` returns the energy E, which is what ``evolve()`` minimises. The
     reported quantity is the degree of life L = -E — zero for a configuration
     with no structure, higher for more (#28) — so the sign is flipped here, once,
-    at the point where the harness reads it.
+    at the point where the harness reads it. The fifth value is the redundancy
+    dict, computed from the same centre set so no caller has to analyse twice.
     """
     h, w = img.shape[:2]
     s = min(max_size / max(h, w), 1.0)
@@ -36,7 +51,7 @@ def score(img, max_size=1024):
         img = cv2.resize(img, (int(w * s), int(h * s)), interpolation=cv2.INTER_AREA)
     field, centers, G, energy = analyze(img)
     raw = compute_all(field, centers, G, cv2.cvtColor(img, cv2.COLOR_BGR2GRAY))
-    return len(centers), -energy, raw, normalize_all(raw)
+    return len(centers), -energy, raw, normalize_all(raw), _redundancy(centers)
 
 
 def _header(title):
@@ -74,7 +89,7 @@ def null_controls():
     _cols()
     out = {}
     for name, fn in stimuli.NULL_CONTROLS.items():
-        n, life, _, norm = score(fn())
+        n, life, _, norm, _ = score(fn())
         out[name] = (n, life, norm)
         _row(name, n, norm)
     print("\n  degree of life:  " + "  ".join(
@@ -106,8 +121,8 @@ def corpus(controls=None):
     for f in sorted(os.listdir(IMAGES)):
         if not f.endswith((".jpg", ".png")):
             continue
-        n, life, _, norm = score(cv2.imread(os.path.join(IMAGES, f)))
-        out[f] = (n, life, norm)
+        n, life, _, norm, red = score(cv2.imread(os.path.join(IMAGES, f)))
+        out[f] = (n, life, norm, red)
         _row(f, n, norm)
     print("\n  degree of life:  " + "  ".join(
         f"{k.split('.')[0]} {v[1]:+.4f}" for k, v in out.items()))
@@ -153,7 +168,7 @@ def _analyze_scaled(img, max_size=1024):
             rdcy.spatial_coherence(centers))
 
 
-def discrimination():
+def discrimination(corpus_scores):
     """Does the reported score rank artworks above dense noise?  (#29)
 
     The central open problem. Section 2b showed uniform noise scoring a higher
@@ -161,17 +176,25 @@ def discrimination():
     no *local* measure separates the two, because dense noise is not short of
     local structure — it has more edges, more parents and more neighbours than any
     carpet. This stage states that failure as a number the harness prints on every
-    run, and alongside it measures the two global-redundancy discriminators from
-    ``audit.redundancy`` that *do* separate the corpus from noise — neither yet in
-    the score, for the reasons that module and #29/#9/#34 record.
+    run, and alongside it measures the global-redundancy and spatial-coherence
+    discriminators from ``audit.redundancy`` — and the combination of them that
+    *does* separate the corpus from noise. None is yet in the score, for the
+    reasons that module and #29/#9/#34 record.
 
     The metric is rank separation: the fraction of (artwork, noise) pairs ordered
     the way life demands. 1.0 is complete separation, 0.5 none, 0.0 fully inverted.
+
+    The artwork side is read from ``corpus_scores`` — the scores ``corpus`` already
+    computed — rather than re-analysed here, so the corpus is analysed once per run,
+    not twice.
     """
     _header("Discrimination: does the score rank artworks above noise?  (#29)")
 
-    art = {f: _analyze_scaled(cv2.imread(os.path.join(IMAGES, f)))
-           for f in sorted(os.listdir(IMAGES)) if f.endswith((".jpg", ".png"))}
+    # (life, strength_entropy, scale_entropy, spatial_coherence) per artwork, taken
+    # from the corpus stage's results (index 1 is life, index 3 the redundancy dict).
+    art = {f: (v[1], v[3]["strength_entropy"], v[3]["scale_entropy"],
+               v[3]["spatial_coherence"])
+           for f, v in corpus_scores.items()}
     # Several seeds per noise generator, not one. The noise floor is itself a
     # sampled quantity — a smooth-noise strength entropy ranges 2.54–2.59 across
     # seeds — and a single realisation gives an optimistic separation: the
@@ -234,7 +257,7 @@ def invariance(images, group=transforms.BENIGN, label="benign"):
         img = cv2.imread(path)
         vals = {k: [] for k in KEYS}
         for tname, fn in group.items():
-            _, _, _, norm = score(fn(img))
+            _, _, _, norm, _ = score(fn(img))
             for k in KEYS:
                 vals[k].append(norm[k])
         for k in KEYS:
@@ -307,7 +330,7 @@ def measure_generators():
     for name, (fn, values, target, test) in stimuli.SWEEPS.items():
         rows = []
         for v in values:
-            n, _, raw, norm = score(fn(v))
+            n, _, raw, norm, _ = score(fn(v))
             rows.append((v, n, raw, norm))
         out[name] = (target, test, rows)
     return out
@@ -577,7 +600,7 @@ def main():
 
     nulls = null_controls()
     cs = corpus(nulls)
-    discrimination()
+    discrimination(cs)
     measured = measure_generators()
     generators(measured)
     if not args.quick:

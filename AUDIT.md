@@ -1070,7 +1070,11 @@ corpus we have — two axes, not one. Where it stands:
 What *is* wired in is the measurement — the `discrimination` stage prints the score's
 separation, each candidate's, and the combined OR rule with its margin on every run,
 so #29 is no longer a paragraph in a document but a number
-the harness reports, now over the full corpus.
+the harness reports, now over the full corpus. (The stage reuses the corpus scores
+rather than re-analysing every corpus image a second time, and
+`tests/test_discrimination.py` guards the OR rule's complementarity and its survival
+of a resize on the two artworks that stress the two axes, so a pipeline change that
+broke the separation would fail a test rather than wait for an audit.)
 
 
 ## Recommended order of work
