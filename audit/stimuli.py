@@ -917,18 +917,28 @@ def _geom(mid, factor, half, digits=3):
             for k in range(-half, half + 1)]
 
 
-#: How a sweep is to be judged. ``MONOTONE`` means the measure should rise or
-#: fall with the parameter throughout, and Spearman's rho is the whole story.
+#: How a sweep is to be judged, and — for monotone measures — which way it should
+#: move. ``MONOTONE`` means the measure should *rise* with the parameter and
+#: ``MONOTONE_DOWN`` that it should *fall*: some properties are the inverse of the
+#: quantity swept (more distinct shapes means *less* echo, more shear means *less*
+#: symmetry), and a measure that correctly runs the other way is tracking its
+#: ground truth, not failing it. The second field is the expected sign, so the
+#: verdict can tell "runs backwards" from "tracks in the right direction" instead
+#: of assuming every measure should increase.
+#:
 #: ``optimum(x)`` means the measure claims an *interior* ideal at parameter value
-#: ``x`` and should be extremal there, so a high rho over the whole sweep would
-#: be evidence *against* it; the right statistic is where the extremum actually
-#: falls, plus monotonicity on each side of it. ``audit.run.sweeps`` prints
-#: whichever applies and says which it used.
-MONOTONE = ("monotone", None)
+#: ``x`` and should be extremal there, so a high rho over the whole sweep would be
+#: evidence *against* it. ``peak`` says which extremum: True when the raw measure
+#: is *maximal* at the ideal — which every current optimum measure is, since the
+#: #22 redefinitions made them ``exp(-deviation)``, one at the ideal — and False
+#: for a raw squared deviation that is *minimal* there. ``audit.run.sweeps`` looks
+#: for the right extremum accordingly.
+MONOTONE = ("monotone", +1)
+MONOTONE_DOWN = ("monotone", -1)
 
 
-def optimum(at):
-    return ("optimum", at)
+def optimum(at, peak=True):
+    return ("optimum", (at, peak))
 
 
 #: Twelve sample points per sweep, which is a deliberate change from the five or
@@ -973,7 +983,7 @@ SWEEPS = {
     # phase), so that sweep holds this property almost constant while varying
     # something else. Kept below, unregistered, as the record of a stimulus that
     # could not test what it was built for.
-    "bilateral_asymmetry": (bilateral_asymmetry, _span(0.0, 0.6), "local_symmetries", MONOTONE),
+    "bilateral_asymmetry": (bilateral_asymmetry, _span(0.0, 0.6), "local_symmetries", MONOTONE_DOWN),
     "interlock_depth": (interdigitated_bands, _span(0.0, 0.8), "deep_interlock", MONOTONE),
     # 0.1 is below the pipeline's absolute edge floor and detects nothing; it is
     # kept as the one sub-floor probe, and the rest of the sweep starts above it.
@@ -985,7 +995,7 @@ SWEEPS = {
     # space, not in this parameter, so the raw sweep is a monotonicity test.
     # ``audit.run.sweeps`` prints where the normalised score peaks regardless.
     "jitter": (jittered_lattice, _span(0.0, 0.45), "roughness", MONOTONE),
-    "shape_vocabulary": (shape_vocabulary, list(range(1, 13)), "echoes", MONOTONE),
+    "shape_vocabulary": (shape_vocabulary, list(range(1, 13)), "echoes", MONOTONE_DOWN),
     "void_size": (void_field, _span(0.0, 0.6), "the_void", MONOTONE),
     "element_kinds": (element_vocabulary, list(range(1, 13)), "simplicity", MONOTONE),
     "bleed": (bleeding_motifs, _span(0.0, 0.6), "not_separateness", MONOTONE),

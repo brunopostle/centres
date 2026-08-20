@@ -77,7 +77,7 @@ DONE      #30  tone inversion: detector + measures fixed (Δ 0.18->0.043, accept
 OPEN   D2 #22  alternating repetition still fails (needs periodicity, no region cue)
 DONE      #31  boundaries/deep_interlock tone-robust: fixed 128 -> symmetrised Otsu (gamma spread 2.9->0.25, 1.7->0.46)
 OPEN      #32  render the synthetic stimuli as images for inspection
-OPEN      #33  sweep harness mislabels negatively-tracking measures (echoes, local_symmetries)
+DONE      #33  sweep verdicts direction-aware (↓ measures track, not fail) + peak-vs-valley optimum
 OPEN      #34  widen the corpus - field SNR + locate the #29 organised-complexity optimum
 OPEN      #35  remove the dead interface_complexity/boundary_ratio computation
 ```

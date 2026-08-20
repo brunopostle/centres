@@ -367,30 +367,63 @@ def generators(measured):
     return collapsed
 
 
-def _monotone_verdict(name, target, pairs, dropped):
+#: A measure tracks its ground truth if its rank correlation with the parameter is
+#: at least this strong, in the *expected direction*. 0.5 is a genuine relationship
+#: at n = 12 (p < 0.1), and it is the honest bar: the old code flagged anything
+#: below 0.9 as "does not track its own ground truth", but 0.9 is a test for
+#: perfection — one rank swap costs 0.03 at n = 12 — and it mislabelled measures
+#: that clearly move the right way. echoes runs at -0.85 and local symmetries at
+#: -0.72 *by design* (more distinct shapes, less echo; more shear, less symmetry),
+#: and calling those "does not track" was simply wrong. The rho is still printed in
+#: full, so the difference between a perfect tracker (0.99) and a moderate one
+#: (0.66) is visible; the flag is reserved for real failures.
+TRACKS = 0.5
+
+
+def _monotone_verdict(name, target, pairs, dropped, expect):
+    """Does the measure move with the ground truth, in the direction it should?
+
+    ``expect`` is +1 if the measure should rise with the parameter, -1 if it should
+    fall. Three outcomes: it tracks (correct direction, |rho| >= TRACKS), it runs
+    backwards (wrong direction, not negligibly), or it does not track (|rho| below
+    TRACKS, no monotone relationship either way).
+    """
     from scipy.stats import spearmanr
     rho = spearmanr([p[0] for p in pairs], [p[1] for p in pairs]).statistic
-    flag = "" if abs(rho) > 0.9 else "   <-- does not track its own ground truth"
+    arrow = "↑" if expect >= 0 else "↓"   # the direction it should move
+    if abs(rho) < TRACKS:
+        flag = "   <-- does not track its own ground truth"
+    elif expect * rho < 0:
+        flag = f"   <-- runs BACKWARDS (should move {arrow})"
+    else:
+        flag = ""
     note = f"  ({dropped} undefined)" if dropped else ""
-    print(f"  {name:<18} -> {target:<24} monotone  rho = {rho:+.3f}{flag}{note}")
+    print(f"  {name:<18} -> {target:<24} monotone {arrow}  rho = {rho:+.3f}{flag}{note}")
     return rho
 
 
-def _optimum_verdict(name, target, pairs, claimed, dropped):
+def _optimum_verdict(name, target, pairs, claimed, peak, dropped):
     """For a measure with an interior ideal, report where the ideal actually is.
 
-    These measures are deviations from a target — ``levels_of_scale`` is
-    ``(log(r_parent/r_child) - log 3)**2`` — so they should be *minimal* at the
-    parameter value the theory names and rise on both sides of it. A high
-    Spearman rho over the whole sweep would mean the measure is not centred where
-    it claims to be, so rho is the wrong statistic and is not printed. What is
-    printed is the location of the minimum against the claimed one, and the
-    one-sided rank correlations, which is what a V shape actually asserts.
+    The measure should be *extremal* at the parameter value the theory names and
+    fall away on both sides, so a high rho over the whole sweep would be evidence
+    *against* it — rho is the wrong statistic and is not printed. What is printed is
+    the location of the extremum against the claimed one, and the one-sided rank
+    correlations, which is what the shape actually asserts.
+
+    ``peak`` says which extremum. The #22 redefinitions made these measures
+    ``exp(-deviation)``, *maximal* at the ideal (``boundaries`` peaks where the
+    band is 1/3 of what it bounds; ``levels_of_scale`` where the ratio is in band),
+    so ``peak`` is True and the extremum is the *maximum*. A raw squared deviation
+    would be *minimal* there instead. The previous code always took the minimum,
+    which put a peak measure's extremum at a sweep end and mislabelled it as "not
+    where the measure claims" — a harness bug, not a measure failure.
     """
     from scipy.stats import spearmanr
     xs = [p[0] for p in pairs]
     ys = [p[1] for p in pairs]
-    at = xs[int(np.argmin(ys))]
+    at = xs[int(np.argmax(ys) if peak else np.argmin(ys))]
+    kind = "maximum" if peak else "minimum"
     left = [(x, y) for x, y in pairs if x <= claimed]
     right = [(x, y) for x, y in pairs if x >= claimed]
     lo = (spearmanr([p[0] for p in left], [p[1] for p in left]).statistic
@@ -398,13 +431,15 @@ def _optimum_verdict(name, target, pairs, claimed, dropped):
     hi = (spearmanr([p[0] for p in right], [p[1] for p in right]).statistic
           if len(right) > 2 else None)
     ok = abs(at - claimed) <= 0.5 * (max(xs) - min(xs)) / (len(xs) - 1)
-    flag = "" if ok else "   <-- minimum is not where the measure claims it is"
+    flag = "" if ok else f"   <-- {kind} is not where the measure claims it is"
     note = f"  ({dropped} undefined)" if dropped else ""
-    print(f"  {name:<18} -> {target:<24} optimum   min at {at:g}, "
+    print(f"  {name:<18} -> {target:<24} optimum   {kind} at {at:g}, "
           f"claimed {claimed:g}{flag}{note}")
-    print(f"  {'':<18}    {'':<24} falling below rho = "
-          f"{'  n/a' if lo is None else f'{lo:+.3f}'}, rising above rho = "
-          f"{'  n/a' if hi is None else f'{hi:+.3f}'}   (a V wants - then +)")
+    # A peak rises then falls (+ then -); a valley falls then rises (- then +).
+    want = "+ then -" if peak else "- then +"
+    print(f"  {'':<18}    {'':<24} rising below rho = "
+          f"{'  n/a' if lo is None else f'{lo:+.3f}'}, falling above rho = "
+          f"{'  n/a' if hi is None else f'{hi:+.3f}'}   (this shape wants {want})")
     return at
 
 
@@ -437,9 +472,10 @@ def sweeps(measured):
                   f"{dropped}/{len(rows)} sweep points; no statistic")
             continue
         if kind == "optimum":
-            _optimum_verdict(name, target, pairs, arg, dropped)
+            claimed, peak = arg
+            _optimum_verdict(name, target, pairs, claimed, peak, dropped)
         else:
-            _monotone_verdict(name, target, pairs, dropped)
+            _monotone_verdict(name, target, pairs, dropped, expect=arg)
         peak = max(scored, key=lambda p: p[1])[0]
         print(f"  {'':<18}    {'':<24} normalised score peaks at {peak:g}"
               f"  (sweep spans {min(v for v, _ in pairs):g} to "

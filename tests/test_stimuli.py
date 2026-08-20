@@ -101,17 +101,25 @@ def test_sweeps_have_enough_points_for_a_rank_test(name):
 
 @pytest.mark.parametrize("name", sorted(stimuli.SWEEPS))
 def test_every_sweep_declares_how_it_is_to_be_judged(name):
-    """Monotonicity is the wrong test for a measure with an interior ideal."""
+    """Monotonicity is the wrong test for a measure with an interior ideal, and a
+    measure that runs the opposite way is not a failure. Each sweep therefore
+    declares its kind and, for a monotone sweep, the direction it should move; for
+    an optimum sweep, the ideal parameter and which extremum marks it."""
     _, _, _, (kind, arg) = stimuli.SWEEPS[name]
     assert kind in ("monotone", "optimum")
-    assert (arg is None) == (kind == "monotone")
+    if kind == "monotone":
+        assert arg in (+1, -1)                 # the direction it should move
+    else:
+        at, peak = arg                         # interior ideal, and peak vs valley
+        assert isinstance(at, float) and isinstance(peak, bool)
 
 
 def test_levels_of_scale_is_judged_on_where_its_optimum_falls():
-    """``levels_of_scale`` is a squared deviation from a ratio of 3, so a high
-    Spearman rho over a sweep spanning 3 would be evidence against it."""
-    _, values, target, (kind, at) = stimuli.SWEEPS["scale_ratio"]
-    assert (target, kind, at) == ("levels_of_scale", "optimum", 3.0)
+    """``levels_of_scale`` peaks (after #22, ``exp(-deviation)``) at a scale ratio
+    in the 2–5 band, so a high Spearman rho over a sweep spanning 3 would be
+    evidence against it — the right test is where its maximum falls."""
+    _, values, target, (kind, (at, peak)) = stimuli.SWEEPS["scale_ratio"]
+    assert (target, kind, at, peak) == ("levels_of_scale", "optimum", 3.0, True)
     assert min(values) < at < max(values)
 
 

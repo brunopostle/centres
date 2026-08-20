@@ -55,7 +55,8 @@ energy's global minimum.
 detector fix*: local contrast normalisation made the faint shape-vocabulary and
 bleed stimuli detectable, taking echoes from |0.17| to |0.89| and not-separateness
 from +0.24 to +0.83. (echoes correctly runs *negative* — more distinct shapes
-means less echo — which the harness's positive-monotone flag mislabels.)
+means less echo — which the harness now reports as tracking-downward rather than
+mislabelling as a failure; #33.)
 
 **Three track moderately:** roughness (+0.51), local symmetries (−0.46), good
 shape (+0.39). `good_shape` weakened under count control this run — its raw +0.91
@@ -482,8 +483,9 @@ their ideal is in the middle of the sweep, so the right check is where the score
 | void_size → the void | monotone | +0.80 / **−0.07** *(spurious, §16)* |
 
 The two "(↓)" rows correctly run *negative*: more distinct shapes means less echo,
-more shear means less symmetry. The harness's positive-monotone flag mislabels
-them, but the count-controlled magnitude (0.89, 0.46) is what counts.
+more shear means less symmetry. Each sweep now declares the direction it should
+move, so the harness reports these as tracking-downward rather than failing (#33);
+the count-controlled magnitude (0.89, 0.46) is what counts.
 
 **Ten measures track in the right direction, eight of them at |ρ| ≥ 0.7 or as a
 clean interior optimum.** At the start of the audit exactly one did. `echoes` and
@@ -575,8 +577,8 @@ Alexander's sense, and the failures are formulas or representations, not concept
   not-separateness from +0.24 to +0.83. Both track their ground truth well;
   their limitation is now field SNR (0.68, 1.08), not tracking.
 - **echoes correctly runs negative** — more distinct shapes, less echo. The
-  harness's positive-monotone flag mislabels it as failing; the count-controlled
-  magnitude, 0.89, is the number that matters.
+  harness now knows the sweep should fall and reports it as tracking rather than
+  failing (#33); the count-controlled magnitude, 0.89, is the number that matters.
 - **good shape weakened under count control this run:** raw +0.91, partial +0.39.
   Its region-compactness redefinition tracks the clean stimulus, but on the mixed
   ensemble much of that is centre-count covariation, so it drops to PROVISIONAL.
