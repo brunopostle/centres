@@ -96,16 +96,17 @@ for a new session to start:
    them — cleanly (every carpet below every noise field) and stably (under every
    practical transform) — is a **global** redundancy statistic: the entropy of the
    centre population's strength distribution. The missing ingredient is an
-   organised-complexity term (an *interior optimum* in that entropy — a mechanical
-   grid sits at the low extreme, noise at the high, life between). See
-   `audit/redundancy.py`. **The load-bearing caveat, now tested on the wider corpus
-   (AUDIT §17):** carpets are hyper-redundant, so the measure may be reading
-   *repetition*, not wholeness. On the widened 32-artwork corpus the reported score
-   still fails #29 for *every* artwork (robust), but the strength-entropy separation
-   drops from 1.000 to 0.997 — a bold Egyptian geometric tile crosses the noise
-   floor at rest — and scale entropy separates cleanly only by 0.047 (and is
-   transform-fragile). No robust clean separator survives the variety now in the
-   corpus. Nothing is wired into the score.
+   organised-complexity term. See `audit/redundancy.py`. **A robust discriminator
+   now exists on the 32-image corpus (AUDIT §17): redundancy OR spatial coherence.**
+   Strength-entropy (redundancy) alone drops to 0.997 on the wider corpus — a bold
+   Egyptian tile crosses at rest. Adding `spatial_coherence` (Moran's I of strength:
+   do neighbouring centres resemble each other?) closes it: the two fail on
+   *disjoint* artworks, and the rule "alive = entropy below noise floor OR coherence
+   above noise ceiling" separates all 32 from noise at rest AND under every transform
+   (tightest margin +0.074). The coherence axis is the one a non-repetitive painting
+   would rely on, and the least-repetitive pieces already depend on it. Not yet in
+   the score (needs the interior-optimum/grid treatment and a non-corpus-specific
+   threshold; +0.074 is thin). A strong lead ready for the painting test.
 2. **#34 — partly done: corpus widened to 32 CC-licensed real artworks** (17
    carpets, 15 tile panels; the owner added them out of band, since this
    environment's egress policy denies image hosts). It tempered the finding rather

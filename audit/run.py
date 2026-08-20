@@ -149,7 +149,8 @@ def _analyze_scaled(img, max_size=1024):
     _, centers, _, energy = analyze(img)
     return (-energy,
             rdcy.strength_entropy(centers),
-            rdcy.scale_entropy(centers))
+            rdcy.scale_entropy(centers),
+            rdcy.spatial_coherence(centers))
 
 
 def discrimination():
@@ -183,29 +184,45 @@ def discrimination():
     def col(d, i):
         return [v[i] for v in d.values()]
 
-    def line(name, art_vals, noise_vals, higher_is_life, note=""):
+    def line(name, art_vals, noise_vals, higher_is_life, note="", is_score=False):
         a, z = _defined(art_vals), _defined(noise_vals)
         sep = rdcy.pairwise_order(a, z, higher_is_life)
         arrow = "higher" if higher_is_life else "lower"
+        # The pass/fail-of-#29 verdict belongs only to the reported score; a
+        # candidate's separation being below 1.0 is information about the candidate,
+        # not a statement that the tool fails #29.
+        tag = ("(complete)" if sep == 1.0 else "(FAILS #29)") if is_score else ""
         print(f"  {name:<22} art [{min(a):+.3f},{max(a):+.3f}]  "
               f"noise [{min(z):+.3f},{max(z):+.3f}]  ({arrow}=life)")
-        print(f"  {'':<22} rank separation art-over-noise = {sep:.3f}"
-              f"   {'(complete)' if sep == 1.0 else '(FAILS #29)' if sep < 1.0 and higher_is_life else ''}"
-              f"{note}")
+        print(f"  {'':<22} rank separation art-over-noise = {sep:.3f}   {tag}{note}")
         return sep
 
     print("  reported degree of life:")
-    line("  degree of life", col(art, 0), col(noise, 0), True)
-    print("\n  candidate global-redundancy discriminators (NOT in the score; see audit/redundancy.py):")
+    line("  degree of life", col(art, 0), col(noise, 0), True, is_score=True)
+    print("\n  candidate discriminators (NOT in the score; see audit/redundancy.py):")
     se = line("  strength_entropy", col(art, 1), col(noise, 1), False,
-              note="   transform-stable")
+              note="   redundancy, transform-stable")
     line("  scale_entropy", col(art, 2), col(noise, 2), False,
-         note="   transform-FRAGILE (#9)")
+         note="   redundancy, transform-FRAGILE (#9)")
+    line("  spatial_coherence", col(art, 3), col(noise, 3), True,
+         note="   Moran's I of strength; complements entropy")
+
+    # The combination that actually separates the wider corpus: alive if redundant
+    # OR spatially coherent. The two axes fail on disjoint artworks, so the OR
+    # clears every one where neither single axis does. See AUDIT.md §17.
+    frac, margin = rdcy.combined_separation(col(art, 1), col(art, 3),
+                                            col(noise, 1), col(noise, 3))
+    print(f"\n  COMBINED — alive if (strength_entropy < noise floor) OR "
+          f"(spatial_coherence > noise ceiling):")
+    print(f"  {'':<22} {frac * len(art):.0f}/{len(art)} artworks separated from noise"
+          f"   tightest margin {margin:+.3f}"
+          f"   {'(all separated)' if frac == 1.0 else '(some cross both axes)'}")
+
     print(f"\n  mechanical reference: regular_grid  "
-          f"strength_entropy {grid[1]:.3f}, scale_entropy {grid[2]:.3f}  "
-          f"(below the carpets — the target is an interior optimum, not least entropy; #34)")
+          f"strength_entropy {grid[1]:.3f}, scale_entropy {grid[2]:.3f}, "
+          f"spatial_coherence {grid[3]:.3f}")
     return {"life_sep": rdcy.pairwise_order(col(art, 0), col(noise, 0), True),
-            "strength_entropy_sep": se}
+            "strength_entropy_sep": se, "combined_sep": frac}
 
 
 def invariance(images, group=transforms.BENIGN, label="benign"):

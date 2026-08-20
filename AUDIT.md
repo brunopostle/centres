@@ -968,6 +968,51 @@ risk. What the wider corpus settled is that the redundancy direction is real
 signal) but is **a lead, not a solution**: no threshold on these entropies
 survives both the variety already in the corpus and the transforms.
 
+### A second axis closes it, on the corpus we have: spatial coherence
+
+The redundancy measures ask one question — *do a few strength values recur?* There
+is a second, independent question the centre set can answer: *are the strengths
+arranged coherently in space — do neighbouring centres resemble each other?* That
+is spatial autocorrelation, Moran's I of strength over each centre's nearest
+neighbours (`audit.redundancy.spatial_coherence`). It is the complement of
+redundancy: a repetitive ornament has both, dense noise has neither, and — the
+point — **a non-repetitive but composed image has coherence without redundancy.**
+It is exactly the axis on which a painting should differ from noise.
+
+The two are complementary in the strong sense that on the 32-artwork corpus they
+fail on **disjoint** artworks. Measured (noise: coherence 0.02–0.07, entropy
+2.54–2.74):
+
+| artwork | strength entropy | spatial coherence | separated by |
+|---|---:|---:|---|
+| `tile_geometric_egypt` (bold, low-redundancy) | 2.55 — *above* floor ✗ | **0.35** ✓ | coherence |
+| `varamin` (spatially-flat strengths) | **2.24** ✓ | −0.01 — *below* ceiling ✗ | redundancy |
+| every other artwork | ✓ | ✓ | both |
+
+So the rule **"alive = strength entropy below the noise floor OR spatial coherence
+above the noise ceiling"** separates **all 32 artworks from noise — at rest, and
+under every benign and practical transform** (mirror, rot90, gamma, JPEG, tone
+inversion, crop, vignette, resize-to-512): 32/32, tightest margin **+0.074** across
+288 artwork-transform cases. It is an OR by design, and that is why it is robust: a
+transform has to knock *both* an artwork's redundancy and its spatial coherence
+below the noise cloud at once to misclassify it, and none does — where either axis
+weakens (resize flattens `ghashghai`'s coherence, a bold tile has diffuse
+strengths) the other holds.
+
+This is the first **robust, clean** separator of the wider corpus, and it directly
+addresses the caveat: the two least-repetitive pieces present — the pictorial Delft
+tile and the Egyptian geometric — are carried by the *coherence* axis, which is the
+one a painting would rely on. It is real evidence that the direction generalises
+beyond ornament, short of the painting test itself (still #34).
+
+Two honest limits remain. The corpus is **still ornament only**, so a painting
+against noise is measured only by proxy. And the floor and ceiling are constants —
+taken from the noise cloud rather than fitted to art, which is defensible, but the
++0.074 tightest margin is thin, so a harsher transform or a genuinely borderline
+image could still cross. The `discrimination` stage prints this separation and its
+margin on every audit run; adopting it into the *score* still waits on the
+interior-optimum question below and on #34's painting test.
+
 ### Why this is an interior optimum, and why that blocks the fix
 
 The obvious move — "reward low entropy" — is wrong, and the mechanical lattice
@@ -996,34 +1041,35 @@ highest transformed carpet (2.39) below the noise floor (2.54).
 
 ### Where this leaves #29
 
-The problem is now specific rather than open-ended, and the wider corpus has moved
-it forward without solving it. **The direction is a global-redundancy term of the
-organised-complexity kind — an interior optimum in the entropy of the centre
-population.** Where it stands:
+The problem is now specific, and a **robust discriminator now exists** on the
+corpus we have — two axes, not one. Where it stands:
 
-1. **#34 is partly done, and it tempered the result rather than confirming it.**
-   The corpus is now 32 CC-licensed real artworks (the repository owner added them
-   out of band; this environment's egress policy denies image hosts, so they could
-   not be fetched from here). On that corpus the reported score still fails #29 for
-   *every* artwork — the problem is robust — but the strength-entropy separation
-   drops from a clean 1.000 to 0.997, one real artwork crossing the noise floor at
-   rest. The redundancy signal is real and large but is **not a clean separator on
-   varied art**, and the corpus is still ornament only: **the decisive test — a
-   non-repetitive painting or portrait against noise — is still not in it.**
-2. **#9**, so the crisper `scale_entropy` version survives a resize instead of
-   riding the absolute-pixel ladder; on the 32-artwork corpus it separates cleanly
-   *at rest* but by only 0.047, which a transform erases.
-3. **The interior optimum's location and width**, which the wider corpus can now
-   begin to constrain — but the razor-thin margins (0.01–0.05) say a single entropy
-   threshold is not enough, and a genuinely different or composite formulation is
-   likely needed.
+1. **A separator that survives the wider corpus and the transforms:** *redundancy
+   OR spatial coherence.* A single entropy threshold does not survive the variety
+   in the 32-artwork corpus (one bold tile crosses at rest, and the margins of any
+   entropy-only combination are inside the transform spread). Adding the
+   complementary axis — Moran's I of strength, "do neighbouring centres resemble
+   each other?" — closes it: the two fail on disjoint artworks, and the OR rule
+   separates all 32 from noise at rest and under every benign/practical transform,
+   tightest margin +0.074. Crucially the coherence axis is the one a *non-repetitive
+   painting* would rely on, and the least-repetitive pieces in the corpus already
+   depend on it — real evidence the direction generalises, short of the painting test.
+2. **#34 is partly done.** The corpus is now 32 CC-licensed real artworks (the owner
+   added them out of band; this environment's egress policy denies image hosts). It
+   is still **ornament only**, so a painting against noise is measured only by
+   proxy — the decisive generalisation test is still not in it.
+3. **#9** would let the crisper `scale_entropy` join the panel robustly (it
+   separates cleanly at rest, margin 0.047, but a resize erases it); the OR rule
+   above already works without it, on the transform-stable strength axis.
+4. **Adoption into the *score* still waits.** Turning the OR rule into a term of the
+   degree of life needs the interior-optimum treatment below (a mechanical grid must
+   not score as alive) and a way to set the noise floor/ceiling that is not a
+   corpus-specific constant. The margin is also thin (+0.074), so this is a strong
+   lead ready for the painting test, not yet a shipped fix.
 
-None of this is wired into the reported score, deliberately: no threshold on these
-entropies survives both the variety already in the 32-image corpus and the benign
-transforms, so adopting one now would ship a separator that a resize or one bold
-geometric tile already breaks. What *is* wired in is the measurement — the
-`discrimination` stage prints the rank separation of the score and of both
-candidates on every run, so #29 is no longer a paragraph in a document but a number
+What *is* wired in is the measurement — the `discrimination` stage prints the score's
+separation, each candidate's, and the combined OR rule with its margin on every run,
+so #29 is no longer a paragraph in a document but a number
 the harness reports, now over the full corpus.
 
 

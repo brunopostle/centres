@@ -55,17 +55,36 @@ locate the optimum without fitting it to six near-identical rugs.
 A carpet is hyper-redundant, so on the original six-carpet corpus "few recurring
 strengths" and "alive" cannot be told apart. The corpus was widened to 32 real
 CC-licensed artworks (17 carpets, 15 tile panels across many cultures; #34), and
-the caveat bit: the reported score still fails #29 for every one of the 32, but
-the strength-entropy separation drops from a clean 1.000 to 0.997 — a bold
-ancient-Egyptian geometric tile crosses the noise floor *at rest*. Combining
-strength and scale entropy recovers 1.000 at rest but by margins of 0.01–0.03,
-inside both the transform spread and measurement noise. So on varied art there is
-no robust clean separator, and the corpus is still ornament only: whether any of
-this separates a *painting* from noise is still untested. A lead, not a solution.
+the caveat bit: strength entropy alone dropped from a clean 1.000 to 0.997 — a bold
+ancient-Egyptian geometric tile crossed the noise floor.
+
+**The resolution is a second axis: spatial coherence.** ``strength_entropy`` asks
+whether a *few strength values recur* (redundancy); ``spatial_coherence`` asks
+whether the strengths are *arranged coherently in space* (Moran's I over nearest
+neighbours). The two are complementary — a repetitive ornament has both, a
+*non-repetitive* composed image has coherence without redundancy, and dense noise
+has neither — and on the 32-artwork corpus they fail on *disjoint* artworks: the
+Egyptian tile that entropy misses has strong spatial coherence, and the Varamin
+that has spatially-flat strengths is redundant. The rule "alive = strength entropy
+below the noise floor **OR** spatial coherence above the noise ceiling" separates
+**all 32 artworks from noise, at rest and under every benign and practical
+transform** (mirror, rot90, gamma, JPEG, invert, crop, vignette, resize-512),
+tightest margin +0.074. This is the first robust clean separator on the wider
+corpus, and it is an OR precisely so that a transform must break *both* an
+artwork's redundancy and its coherence at once to misclassify it.
+
+Two things are still open, and neither is wired into the reported score. The corpus
+is **ornament only**, so the decisive test — a *painting* against noise — is still
+not run; but the spatial-coherence axis is exactly what a painting (coherent, not
+repetitive) would be caught by, and the least-repetitive pieces here (a pictorial
+Delft tile, the Egyptian geometric) are already carried by it, which is real
+evidence for generalisation. And the floor/ceiling are still constants — derived
+from noise rather than fitted to art, which is more defensible, but constants.
 See AUDIT.md §17.
 """
 
 import numpy as np
+from scipy.spatial import cKDTree
 
 
 def _entropy(values, bins=16):
@@ -109,6 +128,60 @@ def scale_entropy(centers, bins=16):
     if len(centers) < 2:
         return None
     return _entropy(np.log(np.array([c.scale for c in centers]) + 1e-6), bins)
+
+
+def spatial_coherence(centers, k=6):
+    """Moran's I of centre strength over k-nearest-neighbour adjacency — the
+    complement of ``strength_entropy``, and the axis that should survive
+    non-repetitive art.
+
+    ``strength_entropy`` asks whether a *few strength values recur* (redundancy).
+    This asks whether the strengths are *arranged coherently in space*: do
+    neighbouring centres resemble each other? It is Moran's I, the standard index
+    of spatial autocorrelation — near +1 when nearby centres have similar
+    strengths, near 0 when they are placed at random, which is what dense noise is
+    (measured: noise 0.02–0.07, artworks 0.10–0.45, with one spatially-flat carpet
+    at ≈0 that redundancy catches instead).
+
+    ``k`` nearest neighbours *by position*, not the reinforcement graph: position
+    adjacency is dimensionless and scale-free, so the statistic does not inherit the
+    graph's edge-admission threshold and holds under a resize. ``None`` for fewer
+    than ``k + 2`` centres, where the neighbourhood is not defined.
+    """
+    if len(centers) < k + 2:
+        return None
+    pos = np.array([[c.x, c.y] for c in centers], dtype=float)
+    x = np.array([c.strength for c in centers], dtype=float)
+    if float(np.ptp(x)) <= 1e-12:   # every strength identical: nothing to correlate
+        return 0.0
+    z = x - x.mean()
+    zz = float(z @ z)
+    _, idx = cKDTree(pos).query(pos, k=k + 1)   # column 0 is the point itself
+    neighbours = z[idx[:, 1:]]                  # (n, k)
+    return float((z[:, None] * neighbours).sum() / (k * zz))
+
+
+def combined_separation(art_se, art_mo, noise_se, noise_mo):
+    """The 'redundancy OR spatial coherence' rule, evaluated against the noise cloud.
+
+    An artwork counts as separated from noise if its strength entropy is below the
+    noise floor (``min`` over the noise samples) *or* its spatial coherence is above
+    the noise ceiling (``max`` over them). Both bounds are taken from noise, not from
+    art, so the rule is not fitted to the corpus it judges.
+
+    Returns ``(fraction_separated, tightest_margin)``. The margin is
+    ``max(floor - entropy, coherence - ceiling)`` — positive when at least one axis
+    clears the noise cloud — and its minimum over the artworks is how close the rule
+    comes to failing. On the 32-artwork corpus this is 1.0 and +0.15 at rest, and
+    stays 1.0 with a tightest margin of +0.074 across all benign/practical transforms.
+    """
+    floor = min(v for v in noise_se if v is not None)
+    ceiling = max(v for v in noise_mo if v is not None)
+    margins = [max(floor - se, mo - ceiling)
+               for se, mo in zip(art_se, art_mo) if se is not None and mo is not None]
+    if not margins:
+        return None, None
+    return sum(m > 0 for m in margins) / len(margins), min(margins)
 
 
 def pairwise_order(art, noise, life_is_higher_for_art=True):

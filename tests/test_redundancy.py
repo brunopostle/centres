@@ -63,3 +63,54 @@ def test_pairwise_order_counts_pairs():
 def test_pairwise_order_none_when_a_side_empty():
     assert redundancy.pairwise_order([], [1, 2], True) is None
     assert redundancy.pairwise_order([1, 2], [None, None], True) is None
+
+
+def _placed(xy, strengths):
+    return [Center(id=i, x=float(x), y=float(y), scale=10.0, strength=float(s))
+            for i, ((x, y), s) in enumerate(zip(xy, strengths))]
+
+
+def test_spatial_coherence_none_below_k_plus_two():
+    rng = np.random.default_rng(0)
+    xy = rng.integers(0, 1000, (5, 2))
+    assert redundancy.spatial_coherence(_placed(xy, [0.5] * 5), k=6) is None
+
+
+def test_spatial_coherence_high_when_strength_tracks_position():
+    """Strength = x/1000: neighbours in space have near-equal strength -> Moran's I ~ 1."""
+    rng = np.random.default_rng(0)
+    xy = rng.integers(0, 1000, (200, 2))
+    ordered = _placed(xy, [x / 1000.0 for x, _ in xy])
+    assert redundancy.spatial_coherence(ordered) > 0.8
+
+
+def test_spatial_coherence_near_zero_for_random_strengths():
+    rng = np.random.default_rng(1)
+    xy = rng.integers(0, 1000, (200, 2))
+    rand = _placed(xy, rng.random(200))
+    assert abs(redundancy.spatial_coherence(rand)) < 0.15
+
+
+def test_spatial_coherence_zero_when_all_strengths_equal():
+    rng = np.random.default_rng(2)
+    xy = rng.integers(0, 1000, (50, 2))
+    assert redundancy.spatial_coherence(_placed(xy, [0.7] * 50)) == 0.0
+
+
+def test_combined_separation_or_rule():
+    # noise: high entropy, low coherence
+    noise_se = [2.6, 2.7, 2.55]
+    noise_mo = [0.05, 0.07, 0.03]
+    # art A separated by entropy only, art B by coherence only, art C by neither
+    art_se = [2.0, 2.65, 2.65]   # A low, B/C high
+    art_mo = [0.02, 0.30, 0.04]  # B high, A/C low
+    frac, margin = redundancy.combined_separation(art_se, art_mo, noise_se, noise_mo)
+    # A (entropy) and B (coherence) separate; C crosses both -> 2/3
+    assert frac == pytest.approx(2 / 3)
+    # C's margin is negative (fails both), so the tightest margin is < 0
+    assert margin < 0
+
+    # all separated -> fraction 1.0, positive margin
+    frac2, margin2 = redundancy.combined_separation([2.0, 2.6], [0.02, 0.30],
+                                                    noise_se, noise_mo)
+    assert frac2 == 1.0 and margin2 > 0
