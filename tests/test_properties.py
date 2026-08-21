@@ -90,7 +90,7 @@ def with_region(centre, **kw):
                     tone_spread=0.0, vertical_symmetry=0.5,
                     horizontal_symmetry=0.5, elongation=0.5, orientation=0.0,
                     shape_signature=(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0),
-                    thickness=3.0, interface_complexity=2.0, boundary_ratio=0.33)
+                    thickness=3.0)
     defaults.update(kw)
     centre.region = Region(**defaults)
     return centre
@@ -472,7 +472,7 @@ def test_compute_all_returns_all_fifteen():
 
 def test_compute_all_values_finite():
     centers = [
-        with_region(x, interface_complexity=2.0, boundary_ratio=0.33)
+        with_region(x)
         for x in well_formed_hierarchy()
     ]
     for x in centers:

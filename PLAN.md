@@ -79,7 +79,7 @@ DONE      #31  boundaries/deep_interlock tone-robust: fixed 128 -> symmetrised O
 OPEN      #32  render the synthetic stimuli as images for inspection
 DONE      #33  sweep verdicts direction-aware (↓ measures track, not fail) + peak-vs-valley optimum
 OPEN      #34  widen the corpus - field SNR + locate the #29 organised-complexity optimum
-OPEN      #35  remove the dead interface_complexity/boundary_ratio computation
+DONE      #35  removed dead interface_complexity/boundary_ratio + _describe_interfaces
 ```
 
 **The instrument is now precise and ten of fifteen measures track their ground

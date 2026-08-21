@@ -20,9 +20,11 @@ nothing else. But the source defines:
 - *contrast* as **tone** — "black-white and colour contrast"
 - *local symmetries* as **bilateral symmetry about the vertical axis**
 
-None of compactness, convexity, thickness, interface complexity, shape or tone is
-recoverable from a position and a radius. This module supplies them, by giving
-each centre the region it actually occupies.
+None of compactness, convexity, thickness, shape or tone is recoverable from a
+position and a radius. This module supplies them, by giving each centre the region
+it actually occupies. (Interface complexity, once attempted here from the
+watershed's shared boundaries, is not among them: thin interdigitating fingers get
+no basin, so *deep interlock* is read from the image instead — see below.)
 
 **One limit is worth knowing before relying on this.** The regions are seeded at
 detected centres, and a centre is a maximum of the distance transform — so a
@@ -104,16 +106,6 @@ class Region:
     #: Characteristic width, 2A/P — the width of the band if the region were one.
     #: In pixels, so use it only as a ratio against another length.
     thickness: float = 0.0
-
-    #: Superseded and currently unused. Was an attempt at *deep interlock* from
-    #: the watershed's shared interfaces; it failed because thin interdigitating
-    #: fingers get no basin, so ``deep_interlock`` reads the image instead. Left
-    #: on the dataclass as computed region geometry that a future measure might use.
-    interface_complexity: float = 0.0
-
-    #: Superseded and currently unused, for the same reason: ``boundaries`` reads
-    #: band thickness from the image, not from the centre regions.
-    boundary_ratio: float = 0.0
 
 
 def _mirror_overlap(mask, axis):
@@ -224,69 +216,4 @@ def segment_regions(field, centers, gray):
         mask = markers == (i + 1)
         c.region = _describe(mask, gray) if mask.any() else Region()
 
-    _describe_interfaces(markers, centers)
     return centers
-
-
-def _describe_interfaces(markers, centers):
-    """Measure what each region shares with its neighbours.
-
-    Two properties are about the *relation* between adjacent regions rather than
-    about either one alone, and neither can be computed from a region in
-    isolation: *deep interlock* is the complexity of the shared interface, and
-    *thick boundaries* is a ratio between a band and what it bounds.
-
-    Interface length is counted along the watershed line. ``cv2.watershed`` marks
-    it -1 and leaves it one pixel wide, so two basins never carry adjacent labels
-    -- there is always a line between them, and counting label-to-label adjacency
-    directly finds nothing at all. Each line pixel is instead attributed to the
-    pair of labels it separates, which is both correct and a direct measure of
-    interface length in pixels.
-    """
-    h, w = markers.shape
-    ys, xs = np.nonzero(markers == -1)
-    if ys.size == 0:
-        return
-
-    stack = []
-    for dy, dx in ((0, 1), (0, -1), (1, 0), (-1, 0)):
-        stack.append(markers[np.clip(ys + dy, 0, h - 1), np.clip(xs + dx, 0, w - 1)])
-    around = np.stack(stack)
-
-    sentinel = np.iinfo(np.int32).max
-    highest = np.where(around > 0, around, 0).max(axis=0)
-    lowest = np.where(around > 0, around, sentinel).min(axis=0)
-    separating = (highest > 0) & (lowest < sentinel) & (highest != lowest)
-    if not separating.any():
-        return
-
-    keys, counts = np.unique(
-        np.stack([lowest[separating], highest[separating]]), axis=1, return_counts=True
-    )
-    pairs = {(int(p), int(q)): int(n) for (p, q), n in zip(keys.T, counts)}
-
-    neighbours = {}
-    for (p, q), length in pairs.items():
-        neighbours.setdefault(p, []).append((q, length))
-        neighbours.setdefault(q, []).append((p, length))
-
-    for i, c in enumerate(centers):
-        adjacent = neighbours.get(i + 1, [])
-        if not adjacent or c.region is None or c.region.area <= 0:
-            continue
-        complexities, bounded = [], []
-        for j, length in adjacent:
-            other = centers[j - 1].region
-            if other is None or other.area <= 0:
-                continue
-            # A straight cut across the smaller region is about sqrt(area) long.
-            smaller = min(c.region.area, other.area)
-            complexities.append(length / np.sqrt(smaller))
-            bounded.append(other)
-        if complexities:
-            c.region.interface_complexity = float(np.mean(complexities))
-        if bounded:
-            largest = max(bounded, key=lambda r: r.area)
-            diameter = 2.0 * np.sqrt(largest.area / np.pi)
-            if diameter > 0:
-                c.region.boundary_ratio = float(c.region.thickness / diameter)

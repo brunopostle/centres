@@ -66,7 +66,7 @@ def _with_region(centre, **kw):
     d = dict(area=100.0, compactness=0.5, solidity=0.5, tone=0.5, tone_spread=0.0,
              vertical_symmetry=0.5, horizontal_symmetry=0.5, elongation=0.5,
              orientation=0.0, shape_signature=(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0),
-             thickness=3.0, interface_complexity=2.0, boundary_ratio=0.33)
+             thickness=3.0)
     d.update(kw)
     centre.region = Region(**d)
     return centre
