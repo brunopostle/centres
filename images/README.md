@@ -231,9 +231,133 @@ Stonepaste, painted and glazed. Gift of Mrs. Frederick F. Thompson, 1915.
 
 ---
 
+## Paintings and illustrations
+
+Line-drawn illustrations by Aubrey Beardsley (1872–1898), included as a structurally distinct corpus alongside the woven/tiled patterns above: figurative compositions built from dense stippling, cross-hatching, and flat black/white contrast rather than repeating motifs. All twelve are from Beardsley's late period (1896–97, the year before his death), sourced via [The Public Domain Review's Aubrey Beardsley collection](https://publicdomainreview.org/collection/aubrey-beardsley/), digitised by the National Digital Library of Poland ([Polona](https://polona.pl/)).
+
+### Lysistrata — 1896
+
+![Lysistrata](beardsley_lysistrata.jpg)
+
+Title illustration from Beardsley's edition of Aristophanes' *Lysistrata*.
+
+*Public Domain (PD Worldwide) · Aubrey Beardsley · [The Public Domain Review](https://publicdomainreview.org/collection/aubrey-beardsley/) · digitised by [Polona](https://polona.pl/)*
+
+---
+
+### The Herald — 1896
+
+![The Herald](beardsley_the_herald.jpg)
+
+From Beardsley's edition of Aristophanes' *Lysistrata*.
+
+*Public Domain (PD Worldwide) · Aubrey Beardsley · [The Public Domain Review](https://publicdomainreview.org/collection/aubrey-beardsley/) · digitised by [Polona](https://polona.pl/)*
+
+---
+
+### The Ascension of Saint Rose of Lima — 1896
+
+![The Ascension of Saint Rose of Lima](beardsley_ascension_saint_rose_of_lima.jpg)
+
+Illustration for Beardsley's story *Under the Hill*, published in *The Savoy* magazine.
+
+*Public Domain (PD Worldwide) · Aubrey Beardsley · [The Public Domain Review](https://publicdomainreview.org/collection/aubrey-beardsley/) · digitised by [Polona](https://polona.pl/)*
+
+---
+
+### The Fourth Tableau of 'Das Rheingold' — 1896
+
+![The Fourth Tableau of 'Das Rheingold'](beardsley_fourth_tableau_rheingold.jpg)
+
+From *The Savoy* magazine, illustrating Wagner's *Das Rheingold*.
+
+*Public Domain (PD Worldwide) · Aubrey Beardsley · [The Public Domain Review](https://publicdomainreview.org/collection/aubrey-beardsley/) · digitised by [Polona](https://polona.pl/)*
+
+---
+
+### Erda — 1896
+
+![Erda](beardsley_erda.jpg)
+
+Illustration for Wagner's *Das Rheingold*, published in *The Savoy* magazine.
+
+*Public Domain (PD Worldwide) · Aubrey Beardsley · [The Public Domain Review](https://publicdomainreview.org/collection/aubrey-beardsley/) · digitised by [Polona](https://polona.pl/)*
+
+---
+
+### Les Liaisons Dangereuses — 1896
+
+![Les Liaisons Dangereuses](beardsley_les_liaisons_dangereuses.jpg)
+
+Illustration for Pierre Choderlos de Laclos' novel, published in *The Savoy* magazine.
+
+*Public Domain (PD Worldwide) · Aubrey Beardsley · [The Public Domain Review](https://publicdomainreview.org/collection/aubrey-beardsley/) · digitised by [Polona](https://polona.pl/)*
+
+---
+
+### Et in Arcadia Ego — 1896
+
+![Et in Arcadia Ego](beardsley_et_in_arcadia_ego.jpg)
+
+From *The Savoy* magazine.
+
+*Public Domain (PD Worldwide) · Aubrey Beardsley · [The Public Domain Review](https://publicdomainreview.org/collection/aubrey-beardsley/) · digitised by [Polona](https://polona.pl/)*
+
+---
+
+### Atalanta — 1896
+
+![Atalanta](beardsley_atalanta.jpg)
+
+A late, comparatively spare figure study of the huntress Atalanta from Greek mythology.
+
+*Public Domain (PD Worldwide) · Aubrey Beardsley · [The Public Domain Review](https://publicdomainreview.org/collection/aubrey-beardsley/) · digitised by [Polona](https://polona.pl/)*
+
+---
+
+### The Return of Tannhäuser to Venusberg — 1897
+
+![The Return of Tannhäuser to Venusberg](beardsley_return_of_tannhauser.jpg)
+
+From Beardsley's *The Story of Venus and Tannhäuser*.
+
+*Public Domain (PD Worldwide) · Aubrey Beardsley · [The Public Domain Review](https://publicdomainreview.org/collection/aubrey-beardsley/) · digitised by [Polona](https://polona.pl/)*
+
+---
+
+### Frontispiece to The Pierrot of the Minute — 1897
+
+![Frontispiece to The Pierrot of the Minute](beardsley_pierrot_of_the_minute.jpg)
+
+Frontispiece from Beardsley's illustrated edition of Ernest Dowson's *The Pierrot of the Minute*.
+
+*Public Domain (PD Worldwide) · Aubrey Beardsley · [The Public Domain Review](https://publicdomainreview.org/collection/aubrey-beardsley/) · digitised by [Polona](https://polona.pl/)*
+
+---
+
+### The New Star — 1897
+
+![The New Star](beardsley_the_new_star.jpg)
+
+From Beardsley's illustrated edition of Alexander Pope's *The Rape of the Lock*.
+
+*Public Domain (PD Worldwide) · Aubrey Beardsley · [The Public Domain Review](https://publicdomainreview.org/collection/aubrey-beardsley/) · digitised by [Polona](https://polona.pl/)*
+
+---
+
+### The Baron's Prayer — 1897
+
+![The Baron's Prayer](beardsley_barons_prayer.jpg)
+
+From Beardsley's illustrated edition of Alexander Pope's *The Rape of the Lock* — one of his densest, most patterned late compositions.
+
+*Public Domain (PD Worldwide) · Aubrey Beardsley · [The Public Domain Review](https://publicdomainreview.org/collection/aubrey-beardsley/) · digitised by [Polona](https://polona.pl/)*
+
+---
+
 ## License notes
 
-Public Domain and CC0 images have no restrictions on use. Images under CC BY 2.0 or CC BY-SA 3.0 require attribution to the author listed above each entry; CC BY-SA 3.0 works must also be shared under the same licence if redistributed.
+Public Domain and CC0 images have no restrictions on use. Images under CC BY 2.0 or CC BY-SA 3.0 require attribution to the author listed above each entry; CC BY-SA 3.0 works must also be shared under the same licence if redistributed. "PD Worldwide" (used for the Beardsley illustrations) is [The Public Domain Review's label](https://publicdomainreview.org/rights-labelling-on-our-site/#pd-worldwide) for works it deems most likely to be in the public domain globally — Beardsley died in 1898, so his work is out of copyright in essentially every jurisdiction.
 
 ---
 
