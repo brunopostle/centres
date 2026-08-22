@@ -1145,15 +1145,54 @@ Both failures have one root — `nesting`'s non-intensivity — which is also ex
 the two *dense* artworks (`ghashghai` n=678, `tile_panel_delft` n=463) sit at the
 noise ceiling: more centres, more fragmentation, lower nesting.
 
-So the resolution of #29 is a wholeness term — the direction is settled and
-demonstrated — but the specific measure the score needs is a **count-invariant**
-measure of "one thing made of many," which `max_tree` is not. Getting there needs
-either detection-count stability upstream (#9), so `n` no longer varies the
-fragmentation, or an intrinsically intensive wholeness statistic (e.g. one built on
-relative extents or graph structure rather than a raw tree-size fraction) — an open
-design question, and the honest next step for #29. The `discrimination` stage keeps
-`nesting` as its strongest axis, where count-invariance is not required because the
-comparison is against a same-scale noise cloud.
+So the resolution of #29 is a wholeness term — the direction is settled — but the
+specific measure the score needs is a **count-invariant** measure of "one thing made
+of many," which raw `max_tree` is not.
+
+### The count-invariant wholeness statistic, and the score fix it delivers
+
+That statistic exists. The count confound in `max_tree` is precisely that a *random*
+field fragments more as `n` grows, so its largest-tree fraction decays with count.
+Subtract that null: define the **wholeness excess** as `max_tree` minus the expected
+largest-tree fraction of a random field of the same `n`,
+
+    excess(centres) = max_tree(centres) − C · n^B,   C ≈ 1.957, B ≈ −0.737
+
+with `C, B` fit once over synthetic random fields at constant density, `n = 16..1024`
+— fit to the **null**, not to any artwork, so it is not the frame-versus-artwork error
+the invariant forbids. It is the exact correction that removes the count dependence:
+
+- **Intensive.** On random fields the correlation with `n` falls from **−0.83
+  (raw `max_tree`) to −0.04** (excess); its mean is ~0 at every `n`.
+- **Still a perfect discriminator.** Corpus rank separation stays **1.000**, and —
+  because a random field of `n = 678` fragments far more than `ghashghai` does — it
+  **rescues the two dense works** the raw measure left at the noise floor: *no*
+  artwork sits at or below the noise ceiling.
+
+Mapped through `1 − exp(−max(0, excess)/S)` (S ≈ 0.15) to a [0, 1) quality and used
+as the score's wholeness gate, `L = (Σ participationₖ·qualityₖ) · wholeness − barrier`,
+it **fixes #29 in the reported score**: measured over the corpus, the score's own
+art-over-noise rank separation goes from 0.131 to **1.000** (complete), and — the
+test that killed the raw gate — `test_degree_of_life_does_not_track_centre_count`
+**passes** (r ≈ −0.38, inside the |r| < 0.5 bound; the raw gate was −0.87). Empty and
+structureless configurations still score exactly 0 (their excess is ≤ 0, so the gate
+is 0). This is the first form that closes #29 in the score without reintroducing the
+count confound.
+
+**What it costs, and why it is the owner's call to ship.** The gate multiplies a
+flat lattice's wholeness toward 0, so a bare grid of equal-scale centres — reinforced
+but not nested — scores ~0 rather than "alive." That is aligned with #29 and the
+interior-optimum complaint (the grid should *not* score high), but it is a genuine
+theory decision: it changes #28's stance from "any relationships beat none" to
+"relationships that form one whole beat those that do not," and it changes the
+acceptance test `test_structure_scores_above_structurelessness`, which asserts the
+former. It also introduces three constants (`C`, `B`, `S`) and shrinks the score's
+scale, so the worked numbers in `energy.degree_of_life` and THEORY §8 need re-deriving
+(#16). None of these is a measurement doubt — the fix is validated — they are the
+theory sign-off and recalibration that flipping the headline metric requires. Until
+then the `discrimination` stage keeps `nesting` as its strongest axis (where
+count-invariance is not required, because the comparison is against a same-scale
+noise cloud), and the gate is documented here as the demonstrated resolution of #29.
 
 ### Why this is an interior optimum, and why that blocks the fix (for the entropy route)
 
@@ -1216,18 +1255,17 @@ it stands:
    simply resolves fewer centres at lower resolution — so the relative ladder did
    not deliver invariance and degraded sparse images. The OR rule does not need it:
    it runs on the transform-stable strength axis.
-4. **A score fix is demonstrated in direction, but the obvious form fails an
-   invariant.** A **wholeness gate** on `nesting` — `L = (Σ participationₖ·qualityₖ)·
-   nesting − barrier` — lifts the reported score's own #29 separation from 0.131 to
-   0.99 and drops the mechanical grid from +0.229 (above 12 artworks) to +0.024,
-   fixing the interior-optimum too. But when actually wired into
-   `energy.degree_of_life` and run, it **reintroduces the #14 centre-count confound**
-   (r +0.14 → −0.87), because `nesting = (largest tree)/n` is not intensive — it
-   decays with count as the hierarchy fragments. It was reverted. So a wholeness term
-   is the settled resolution of #29, but the score needs a **count-invariant** one,
-   which `max_tree` is not; that needs detection-count stability upstream (#9) or an
-   intrinsically intensive wholeness statistic (open design question). See the
-   score-integration section above.
+4. **A score fix that closes #29 is now demonstrated, pending an owner decision.** A
+   raw-`nesting` gate reintroduces the #14 count confound (r → −0.87), because
+   `(largest tree)/n` is not intensive. The fix is to subtract the random-field null:
+   the **wholeness excess** `max_tree − C·n^B` is intensive (r → −0.04) and still a
+   perfect discriminator (rank separation 1.000, rescuing the dense works). Gating the
+   score by it takes the reported score's own #29 separation to **1.000 (complete)**
+   *and* passes the count-confound test (r ≈ −0.38). What remains before it is the
+   reported metric is not a measurement doubt but a theory sign-off — a flat lattice
+   scores ~0 under it, changing #28's "any relationships beat none" and its acceptance
+   test — plus fixing three constants and recalibrating (#16). See the
+   count-invariant-wholeness section above.
 
 What *is* wired in is the measurement — the `discrimination` stage prints the score's
 separation, each of the three candidates' (entropy, coherence, nesting), and the

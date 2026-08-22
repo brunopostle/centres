@@ -72,7 +72,7 @@ OPEN   B3 #16  re-derive the remaining reference constants (clamping done)
 OPEN   B4 #17  wire audit thresholds into CI
 OPEN   D3 #23  error bars / median over benign transforms
 OPEN   D4 #24  correct docs   (THEORY.md done; images/README.md stale)
-OPEN      #29  noise outscores every artwork   (nesting axis: single-axis sep 1.000; wholeness gate lifts score sep 0.131->0.99 + fixes grid BUT reintroduces #14 count confound r->-0.87, reverted; needs count-invariant wholeness)
+OPEN      #29  noise outscores every artwork   (SOLVED in principle: count-invariant wholeness gate excess=max_tree-C*n^B gives score sep 1.000 AND passes count-confound r=-0.38; needs owner theory sign-off (flat lattice->0) + constants + #16 recalibration to ship)
 DONE      #30  tone inversion: detector + measures fixed (Δ 0.18->0.043, accepted); merged into #13
 OPEN   D2 #22  alternating repetition still fails (needs periodicity, no region cue)
 DONE      #31  boundaries/deep_interlock tone-robust: fixed 128 -> symmetrised Otsu (gamma spread 2.9->0.25, 1.7->0.46)
@@ -111,10 +111,15 @@ for a new session to start:
    (above 12 artworks) to +0.024, fixing the interior-optimum too. But wired into
    `energy.degree_of_life` and run, it **reintroduces the #14 centre-count confound**
    (r +0.14 → −0.87) because `nesting = (largest tree)/n` is not intensive (fragments
-   with count); reverted. So a wholeness term is the settled resolution of #29, but
-   the score needs a **count-invariant** wholeness measure — `max_tree` is a strong
-   rank discriminator, not a valid score multiplier. Needs detection-count stability
-   upstream (#9) or an intensive wholeness statistic (open design question).
+   with count); reverted. **The count-invariant statistic now exists:** the wholeness *excess*
+   `max_tree − C·n^B` (subtract the random-field null; C≈1.957, B≈−0.737, fit to
+   random fields not art) is intensive (r vs n: −0.83 → −0.04) and still separates
+   perfectly (rank sep 1.000, rescues the dense works). Gating the score by
+   `1−exp(−excess/S)` takes the score's own #29 separation to **1.000 (complete)** and
+   **passes** the count-confound test (r≈−0.38). Not yet shipped: it makes a flat
+   lattice score ~0 (a theory decision changing #28's "any relationships beat none"
+   and its acceptance test), adds three constants, and shrinks the scale (#16
+   recalibration). These are owner sign-offs, not measurement doubts. See AUDIT §17.
 2. **#34 — done: corpus widened to 44 CC-licensed real works** (32 ornament — 17
    carpets, 15 tile panels — plus **12 non-repetitive Beardsley illustrations**; the
    owner added them out of band, since this environment's egress policy denies image
