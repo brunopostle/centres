@@ -1110,45 +1110,50 @@ the two artworks in the whole corpus that sit near the noise ceiling. That is th
 detection-count/hierarchy-fragmentation limit (#9 re-scoped), and it is what keeps
 even nesting — and the score fix built on it — from *fully* closing #29.
 
-### Score integration: a wholeness gate closes ~99% of #29, and fixes the grid for free
+### Score integration: a wholeness gate closes ~99% of #29 — but reintroduces the count confound, and that is the real blocker
 
 `nesting` is good enough to try in the reported score, not just the discrimination
-stage. Measured across the full corpus by recomputing the degree of life from cached
-terms, the cleanest integration is a **wholeness gate**: multiply the descriptive
-sum by nesting, `L = (Σ participationₖ · qualityₖ) · nesting − barrier`. It preserves
-every invariant the functional was built on (#28) — empty still scores exactly 0,
-the result is still bounded in [0, 1], cramming still does not pay — and it says the
-thing the theory always meant: local structure counts toward life *only insofar as
-it forms one whole.*
+stage. The cleanest integration is a **wholeness gate**: multiply the descriptive
+sum by nesting, `L = (Σ participationₖ · qualityₖ) · nesting − barrier`. On paper it
+preserves the #28 invariants — empty still scores 0, the result is still bounded in
+[0, 1], cramming still does not pay — and it says the thing the theory always meant:
+local structure counts toward life *only insofar as it forms one whole.*
 
-Its effect is large. The reported score's own #29 rank separation goes from **0.131
-to 0.99**, and the mechanical grid — which the current score ranks *above* twelve
-artworks (+0.229) — drops to +0.024, **below almost every artwork**, so the same
-change that addresses noise also addresses the interior-optimum problem §3 and the
-next section describe. A framework-faithful *additive* nesting term (a sixth
-participation×quality term, priorities renormalised) reaches only 0.79–0.91 and does
-not fix the grid; the gate is decisively better because it is multiplicative.
+Its effect on discrimination is large. Recomputed across the full corpus, the
+reported score's own #29 rank separation goes from **0.131 to 0.99**, and the
+mechanical grid — which the current score ranks *above* twelve artworks (+0.229) —
+drops to +0.024, **below almost every artwork**, addressing the interior-optimum
+problem §3 describes at the same time. A framework-faithful *additive* nesting term
+reaches only 0.79–0.91 and does not fix the grid; the gate is decisively better on
+these axes.
 
-But it is **not a complete fix, and it is not yet wired in**, for three honest
-reasons:
+**But it was wired into `energy.degree_of_life` and run against the test suite, and
+it fails a load-bearing invariant.** `test_degree_of_life_does_not_track_centre_count`
+went from r = +0.14 to **r = −0.87**: the gate *reintroduces the centre-count
+confound that #14 and #28 removed.* The reason is exact and not fixable by
+recalibration — `nesting` is `(largest tree) / n`, and it is **not intensive**: on a
+random field at fixed density the hierarchy fragments as `n` grows, so the ratio
+decays with the centre count, and gating the score by it drags the whole score back
+into tracking `n`. (`test_structure_scores_above_structurelessness` also fails, on
+the shrunk absolute margin — the calibration issue — but the count confound is the
+disqualifying one.) The change was reverted.
 
-1. **It does not fully separate.** The same two dense works — `ghashghai` and
-   `tile_panel_delft` — remain at the noise ceiling, because their hierarchy
-   fragments (above). So the gated score reaches 0.99, not 1.0, and the audit's
-   #29 verdict would still read "FAILS". Closing the last 1% needs the
-   detection-count/hierarchy-fragmentation fix (#9), which is upstream.
-2. **It redefines the score's calibrated semantics.** Gating shrinks every score
-   (carpets from ~0.35 to ~0.13); the SCALE constants (median-anchored, #16) and the
-   worked numbers in `energy.degree_of_life` and THEORY §8 would all need
-   re-deriving on the wider corpus before the gated score is the reported one.
-3. **The floor/ceiling the gate's discrimination is judged against are still noise
-   constants**, the same caveat as the OR rule.
+This sharpens the earlier reading. `nesting` is an excellent **rank discriminator**
+(art nests more than noise at comparable counts, single-axis separation 1.000) but a
+poor **score multiplier** (it is count-dependent, so it re-confounds the score).
+Both failures have one root — `nesting`'s non-intensivity — which is also exactly why
+the two *dense* artworks (`ghashghai` n=678, `tile_panel_delft` n=463) sit at the
+noise ceiling: more centres, more fragmentation, lower nesting.
 
-So the resolution of #29 is now concrete and mostly demonstrated: **a wholeness gate
-on `nesting`.** What stands between it and adoption is #9 (so it separates the dense
-works too) and #16 (so the gated score is recalibrated), not any doubt about the
-direction. The `discrimination` stage ORs `nesting` in as the third axis and prints
-it every run.
+So the resolution of #29 is a wholeness term — the direction is settled and
+demonstrated — but the specific measure the score needs is a **count-invariant**
+measure of "one thing made of many," which `max_tree` is not. Getting there needs
+either detection-count stability upstream (#9), so `n` no longer varies the
+fragmentation, or an intrinsically intensive wholeness statistic (e.g. one built on
+relative extents or graph structure rather than a raw tree-size fraction) — an open
+design question, and the honest next step for #29. The `discrimination` stage keeps
+`nesting` as its strongest axis, where count-invariance is not required because the
+comparison is against a same-scale noise cloud.
 
 ### Why this is an interior optimum, and why that blocks the fix (for the entropy route)
 
@@ -1211,17 +1216,18 @@ it stands:
    simply resolves fewer centres at lower resolution — so the relative ladder did
    not deliver invariance and degraded sparse images. The OR rule does not need it:
    it runs on the transform-stable strength axis.
-4. **A score fix is now demonstrated, and partial.** A **wholeness gate** on
-   `nesting` — `L = (Σ participationₖ·qualityₖ)·nesting − barrier` — lifts the
-   reported score's own #29 separation from 0.131 to 0.99 and drops the mechanical
-   grid from +0.229 (above 12 artworks) to +0.024 (below almost all), fixing the
-   interior-optimum problem at the same time, all while preserving the #28 invariants
-   (empty = 0, bounded, cramming-proof). It is not yet wired in for two reasons: it
-   leaves the two dense hierarchy-fragmented works (`ghashghai`, `tile_panel_delft`)
-   at the noise ceiling — closing that needs **detection-count stability** (#9) — and
-   it shrinks every score, so the SCALE constants and the worked numbers in
-   `energy.degree_of_life` and THEORY §8 need re-deriving (#16) before the gated score
-   is the reported one. The direction is settled; #9 and #16 are what remain.
+4. **A score fix is demonstrated in direction, but the obvious form fails an
+   invariant.** A **wholeness gate** on `nesting` — `L = (Σ participationₖ·qualityₖ)·
+   nesting − barrier` — lifts the reported score's own #29 separation from 0.131 to
+   0.99 and drops the mechanical grid from +0.229 (above 12 artworks) to +0.024,
+   fixing the interior-optimum too. But when actually wired into
+   `energy.degree_of_life` and run, it **reintroduces the #14 centre-count confound**
+   (r +0.14 → −0.87), because `nesting = (largest tree)/n` is not intensive — it
+   decays with count as the hierarchy fragments. It was reverted. So a wholeness term
+   is the settled resolution of #29, but the score needs a **count-invariant** one,
+   which `max_tree` is not; that needs detection-count stability upstream (#9) or an
+   intrinsically intensive wholeness statistic (open design question). See the
+   score-integration section above.
 
 What *is* wired in is the measurement — the `discrimination` stage prints the score's
 separation, each of the three candidates' (entropy, coherence, nesting), and the

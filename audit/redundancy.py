@@ -25,10 +25,13 @@ space) and ``nesting`` (do the parts form a single whole). On the 44-artwork cor
 their single-axis rank separations against noise are 0.949, 0.977 and **1.000**.
 
 **None is wired into the reported score.** A wholeness gate built on ``nesting`` was
-measured to lift the score's own #29 separation from 0.131 to ~0.99 and to fix the
-mechanical-grid interior-optimum at the same time, but it does not fully close #29
-(two dense, hierarchy-fragmented artworks remain) and it redefines the score's
-calibrated semantics; see AUDIT.md §17. So these stay candidates, ORed together in
+wired into ``energy.degree_of_life`` and measured: it lifts the score's own #29
+separation from 0.131 to ~0.99 and fixes the mechanical-grid interior-optimum, but it
+**reintroduces the #14 centre-count confound** (r +0.14 → −0.87) because ``nesting``
+is not intensive — ``(largest tree)/n`` decays as the hierarchy fragments with count
+— so it was reverted. ``nesting`` is a strong rank *discriminator* but not a valid
+score *multiplier*; the score needs a count-invariant wholeness measure (#9 upstream,
+or an intensive statistic). See AUDIT.md §17. So these stay candidates, ORed together in
 the ``discrimination`` stage, recorded here with the evidence for and against each.
 
 The three measures, and why each earns its place:

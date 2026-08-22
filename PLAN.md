@@ -72,7 +72,7 @@ OPEN   B3 #16  re-derive the remaining reference constants (clamping done)
 OPEN   B4 #17  wire audit thresholds into CI
 OPEN   D3 #23  error bars / median over benign transforms
 OPEN   D4 #24  correct docs   (THEORY.md done; images/README.md stale)
-OPEN      #29  noise outscores every artwork   (nesting axis: single-axis sep 1.000; wholeness gate lifts score sep 0.131->0.99 + fixes grid; blocked on #9,#16)
+OPEN      #29  noise outscores every artwork   (nesting axis: single-axis sep 1.000; wholeness gate lifts score sep 0.131->0.99 + fixes grid BUT reintroduces #14 count confound r->-0.87, reverted; needs count-invariant wholeness)
 DONE      #30  tone inversion: detector + measures fixed (Δ 0.18->0.043, accepted); merged into #13
 OPEN   D2 #22  alternating repetition still fails (needs periodicity, no region cue)
 DONE      #31  boundaries/deep_interlock tone-robust: fixed 128 -> symmetrised Otsu (gamma spread 2.9->0.25, 1.7->0.46)
@@ -105,15 +105,16 @@ for a new session to start:
    1.000**. Nesting alone rank-separates every artwork from noise, survives
    downscaling where coherence collapses, catches `varamin` that both others miss,
    and — unlike entropy — is NOT an interior optimum (a mechanical grid is flat, so
-   it nests low). **Score integration is now demonstrated and partial:** a wholeness
+   it nests low). **Score integration: direction settled, obvious form fails.** A wholeness
    gate `L = (Σ participationₖ·qualityₖ)·nesting − barrier` lifts the reported
    score's own #29 separation from 0.131 to 0.99 AND drops the grid from +0.229
-   (above 12 artworks) to +0.024, fixing the interior-optimum too, all while keeping
-   the #28 invariants. Not yet wired into the score: it leaves two dense
-   hierarchy-fragmented works (`ghashghai`, `tile_panel_delft`) at the noise ceiling
-   (needs #9 detection-count stability) and shrinks every score (needs #16 to
-   re-derive SCALE/THEORY reference values). The direction is settled; #9 and #16 are
-   what remain.
+   (above 12 artworks) to +0.024, fixing the interior-optimum too. But wired into
+   `energy.degree_of_life` and run, it **reintroduces the #14 centre-count confound**
+   (r +0.14 → −0.87) because `nesting = (largest tree)/n` is not intensive (fragments
+   with count); reverted. So a wholeness term is the settled resolution of #29, but
+   the score needs a **count-invariant** wholeness measure — `max_tree` is a strong
+   rank discriminator, not a valid score multiplier. Needs detection-count stability
+   upstream (#9) or an intensive wholeness statistic (open design question).
 2. **#34 — done: corpus widened to 44 CC-licensed real works** (32 ornament — 17
    carpets, 15 tile panels — plus **12 non-repetitive Beardsley illustrations**; the
    owner added them out of band, since this environment's egress policy denies image
