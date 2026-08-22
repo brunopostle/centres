@@ -74,7 +74,7 @@ OPEN   D3 #23  error bars / median over benign transforms
 OPEN   D4 #24  correct docs   (THEORY.md done; images/README.md stale)
 DONE      #29  noise outscores every artwork   (FIXED: reported score gated by count-invariant wholeness excess=max_tree-C*n^B; audit rank sep 1.000 "complete", count-confound r=-0.41 w/controls; flat lattice now ~0 (deliberate theory change). #16 SCALE re-fit still open/orthogonal)
 DONE      #30  tone inversion: detector + measures fixed (Δ 0.18->0.043, accepted); merged into #13
-OPEN   D2 #22  alternating repetition still fails (needs periodicity, no region cue)
+OPEN   D2 #22  alternating repetition still fails (rho +0.049); 7 measures tried, none tracks — detector doesn't encode size alternation, graph filters it, image domain swamped. Needs a purpose-built periodicity detector robust on aperiodic art. See D2 note
 DONE      #31  boundaries/deep_interlock tone-robust: fixed 128 -> symmetrised Otsu (gamma spread 2.9->0.25, 1.7->0.46)
 DONE      #32  render stimuli as contact sheets (python -m audit.render -> docs/stimuli/)
 DONE      #33  sweep verdicts direction-aware (↓ measures track, not fail) + peak-vs-valley optimum
@@ -565,6 +565,40 @@ needs periodicity (autocorrelation or spectral); contrast is tonal.
 
 Add region segmentation with shape descriptors alongside the centre set, rather
 than replacing it.
+
+**Alternating repetition — seven measures tried, all fail (2026-08-22).** This is
+the one measure of the eleven that region segmentation did not rescue, and a
+focused attempt confirmed why. The ground truth (`alternating_tiles`) is a
+checkerboard of two motif *sizes*; the measure must rise with the size contrast.
+Tested against the sweep (Spearman rho vs amplitude):
+
+  - current — strength std over the reinforcement graph — **+0.049** (no tracking);
+    strength is not what alternates.
+  - scale Moran's I over the reinforcement graph — the graph's `scale_term` *drops*
+    big–small edges, so it connects only same-size centres and cannot see
+    alternation at all; `mean |Δlog scale|` over the same graph gives a strong but
+    **inverted** −0.95, an artifact of that filtering.
+  - negative scale / area Moran's I over **position-kNN** (the right adjacency) —
+    **+0.53 / +0.02**, noisy and non-monotone: blob detection does not encode the
+    motif-size checkerboard in centre scale or region area (the detected count even
+    regime-changes, 341→537, across the sweep).
+  - FFT subharmonic of the structural field — **−0.35**, controls higher than the
+    sweep: the distance-transform field is dominated by lattice *geometry*, not
+    motif size.
+  - raw-image radial autocorrelation — **+0.87** with a fragile first-local-max
+    period pick, but **0 everywhere** once the period detection is made robust,
+    because autocorrelation decays monotonically and the alternation modulation is
+    swamped.
+
+So alternation resists both the centre domain (the detector doesn't preserve it and
+the reinforcement graph filters it out) and the simple image domain (swamped or
+geometry-dominated). A real fix needs a purpose-built periodicity / bipartite-pattern
+detector that is robust on *aperiodic* real art — a standalone measure, not a
+redefinition in the mould of the other eight — and none of the reasonable candidates
+clears the tracking bar. Left as-is (honestly failing at rho +0.049) rather than
+shipping a measure that also does not track. The least-wrong principled direction is
+negative spatial autocorrelation of scale over position-kNN (+0.53), if a future
+front end encodes motif size faithfully (see #9).
 
 ### [D2b](https://github.com/brunopostle/centres/issues/26) · Give centres figure/ground polarity
 **Blocked by:** #21 · groups with #22

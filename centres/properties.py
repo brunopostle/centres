@@ -216,9 +216,16 @@ def boundaries(field, centers, G, gray=None):
 def alternating_repetition(G):
     """↑  Mean standard deviation of strengths across each centre's neighbours.
 
-    Approximation. Alternating repetition produces systematic strength
-    alternation between adjacent centres. High neighbour-strength variance
-    indicates this pattern.
+    Approximation, and the one measure of the fifteen that still does **not** track
+    its ground truth (rho +0.049 against a checkerboard-of-two-sizes sweep). Strength
+    is not what alternates, and — measured (#22, PLAN D2 note) — no reachable measure
+    fixes it: the detection pipeline does not encode motif-size alternation in centre
+    attributes, the reinforcement graph's scale term actively drops the alternating
+    (dissimilar-scale) adjacencies, and image-domain periodicity is either swamped
+    (autocorrelation decays) or dominated by the base lattice (FFT). Seven candidates
+    were tried; none clears the tracking bar. A real fix needs a purpose-built
+    periodicity detector robust on aperiodic real art, so this is left honest-and-
+    failing rather than swapped for another measure that also does not track.
 
     Undefined (``None``) when no centre has at least two neighbours: the
     quantity averaged is a standard deviation *across a centre's neighbours*,
