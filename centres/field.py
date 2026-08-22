@@ -46,6 +46,18 @@ CAP_SPACINGS = 8.0
 # absolute threshold then rejects almost every detection. The field's scale and
 # the detection threshold have to be fixed together, in the same units, or not at
 # all. Tracked on #27.
+#
+# A SUBTLER VIOLATION, measured on #9: edge_spacing itself is not as
+# resolution-invariant as this note assumes. It is pinned near ~4 px at every
+# resolution (varamin 4.12 / 4.09 / 5.17 at 1024 / 512 / 256), because the
+# percentile edge threshold in _detect_edges holds edge density roughly constant
+# (~8-11% of pixels) whatever the resolution, and the medial-axis half-widths of a
+# fixed-density edge map are a fixed number of pixels. So edge_spacing partly tracks
+# edge density rather than the artwork's scale, and the detection count tracks pixel
+# area. This does not reach the reported score (the #29 wholeness gate is
+# count-invariant by construction), but it does move the raw discrimination axes
+# under a resize. Fixing it needs resolution-adaptive edge density, a front-end
+# redesign; see PLAN.md A2 (#9).
 # -----------------------------------------------------------------------------
 
 

@@ -64,7 +64,7 @@ DONE  D2b #26  figure/ground polarity         -- #28  degree of life
 DONE   D2 #22  region layer + 8 of 11 measures redefined against the source
 
 OPEN   A1  #8  suppress plateau/structureless detections   (not started)
-OPEN   A2  #9  scale ladder from edge_spacing   (attempted+reverted: ladder is NOT the cause, see A2 note)
+OPEN   A2  #9  detection-count stability across resolution   (root cause found: edge_spacing pinned ~4px by fixed edge density, not artwork; ladder+blur fixes both fail; score now count-robust via wholeness, so reprioritised. See A2 note)
 OPEN   A6 #13  detection exactly equivariant under isometry AND inversion (merges #30)
               (isometry Δ 5.9->0.21, inversion Δ 0.18->0.043; both accepted, exactness optional)
 OPEN   A7 #27  field scale + detection threshold together  (attempt reverted)
@@ -286,9 +286,39 @@ principled — but it does **not** deliver the invariance #9 was for, and it deg
 sparse/near-empty images. Reverted rather than ship complexity for no measured gain
 (owner decision). **Re-scope:** the real target behind #9 is *detection-count
 stability across resolution and framing* — why the detector finds 798 centres at
-1024 and 469 at 512 — which is upstream of the sigma ladder, in the edge detector
-and the absolute 0.08 threshold on the max-normalised field (#27). The rung-ratio
-observation (1.42 vs the target 3) stands and could be fixed cheaply on its own.
+1024 and 469 at 512 — which is upstream of the sigma ladder.
+
+**Root cause found (2026-08-22).** The count varies with resolution because
+`edge_spacing` does not track the artwork: it is pinned near ~4 px at *every*
+resolution (varamin 4.12 / 4.09 / 5.17 px at 1024 / 512 / 256; every corpus image
+measured lands in 3.5–5.7 px at all three). It is pinned not by the pre-blur —
+varying the pre-blur σ over 1 → 4 barely moves it (3.37 / 4.12 / 3.18) and σ ≥ 8
+collapses it to 0 — but by **edge density**: the percentile edge threshold (#10,
+`_EDGE_PERCENTILE = 92`) holds the edge map at ~8–11 % of pixels whatever the image
+or resolution, and the medial-axis half-widths of a fixed-density edge map are a
+fixed number of *pixels*. So `edge_spacing` is essentially a function of edge
+density — a pixel constant in disguise, not "a property of the thing photographed"
+as the `field.py` invariant claims. With peak spacing pinned in pixels, the centre
+count tracks pixel area rather than the artwork, and every population statistic on
+the centre set inherits the resolution dependence.
+
+This is why neither repair works: the sigma ladder is downstream of the pinned
+`edge_spacing`, and an iterative `edge_spacing`-relative pre-blur (tested: blur =
+0.5 · spacing, iterated to a fixed point) re-pins to the same ~4 px scale and leaves
+the count as resolution-dependent as before (varamin n·spacing²/area 0.017 / 0.041 /
+0.087 at 1024 / 512 / 256, a 5× spread). A real fix would have to make the edge
+*density* resolution-adaptive — detect a resolution-invariant set of structural
+edges rather than a fixed fraction of pixels — which is a front-end redesign, and it
+runs into a fundamental limit: downscaling destroys fine detail, so a 512 image
+genuinely has less structure than its 1024 original.
+
+**Reprioritised.** After the #29 wholeness gate, the *reported score* is
+count-invariant by construction (`wholeness` subtracts the random-field baseline as a
+function of n), so #9's resolution dependence no longer touches the degree of life —
+only the raw discrimination-stage candidate axes at low resolution, which are
+diagnostics, not the score. #9 therefore drops from a blocker to a characterised
+front-end limitation. The separable rung-ratio observation (1.42 vs the target 3)
+remains the one cheap, self-contained improvement in this area.
 
 ### [A3](https://github.com/brunopostle/centres/issues/10) · ✅ Replace fixed Canny thresholds with locally adaptive edge detection
 **Blocks:** #18
