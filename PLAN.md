@@ -64,7 +64,7 @@ DONE  D2b #26  figure/ground polarity         -- #28  degree of life
 DONE   D2 #22  region layer + 8 of 11 measures redefined against the source
 
 OPEN   A1  #8  suppress plateau/structureless detections   (not started)
-OPEN   A2  #9  scale ladder from edge_spacing              (agent MemoryError, unmerged)
+OPEN   A2  #9  scale ladder from edge_spacing   (attempted+reverted: ladder is NOT the cause, see A2 note)
 OPEN   A6 #13  detection exactly equivariant under isometry AND inversion (merges #30)
               (isometry Δ 5.9->0.21, inversion Δ 0.18->0.043; both accepted, exactness optional)
 OPEN   A7 #27  field scale + detection threshold together  (attempt reverted)
@@ -72,7 +72,7 @@ OPEN   B3 #16  re-derive the remaining reference constants (clamping done)
 OPEN   B4 #17  wire audit thresholds into CI
 OPEN   D3 #23  error bars / median over benign transforms
 OPEN   D4 #24  correct docs   (THEORY.md done; images/README.md stale)
-OPEN      #29  noise outscores every artwork   (central problem; diagnosed, blocked on #9+#34)
+OPEN      #29  noise outscores every artwork   (central problem; diagnosed, OR-rule lead blocked on #34)
 DONE      #30  tone inversion: detector + measures fixed (Δ 0.18->0.043, accepted); merged into #13
 OPEN   D2 #22  alternating repetition still fails (needs periodicity, no region cue)
 DONE      #31  boundaries/deep_interlock tone-robust: fixed 128 -> symmetrised Otsu (gamma spread 2.9->0.25, 1.7->0.46)
@@ -112,8 +112,9 @@ for a new session to start:
    environment's egress policy denies image hosts). It tempered the finding rather
    than confirming it (point 1), and the corpus is still **ornament only** — the
    decisive test, a non-repetitive painting/portrait against noise, is still not in
-   it. #9 remains the second blocker (so the crisper scale-entropy version survives
-   a resize).
+   it. (The transform-stable OR-rule discriminator uses `strength_entropy`, which
+   needs no #9; the crisper but resize-fragile `scale_entropy` would have — but #9's
+   ladder approach was attempted and reverted, see A2, so that path is not open.)
 
 Then: the tone-robustness bug #31 (a clean, well-specified fix), the visualisation
 #32 and harness label #33 (both small), one measure that still fails (`alternating
@@ -236,6 +237,34 @@ r ∈ {30, 60, 120, 200} px; scores for a corpus image at `--max-size` 512 vs 10
 agree within 1.0 on the 0–10 scale for every property; and — new — scores for an
 image and the same image padded with a 10% border agree within 1.0, which the
 original spec would have failed.
+
+**Attempted and reverted — the premise is wrong.** The `edge_spacing`-relative
+ladder was implemented (min from `0.15 × spacing` floored at 2 px, max from the
+field's own deepest capped distance, rung `3^(1/3)`) and measured against the
+acceptance. It **failed all three criteria, because the scale ladder is not what
+makes scores framing-dependent:**
+
+- **512-vs-1024 barely moved** (Ardabil worst-property Δ 2.99 → 2.64; Varamin
+  2.73 → 2.33; the Egyptian tile got *worse*, 5.45 → 6.08) — all far from the ≤1.0
+  target. The reason is decisive: at 512 the old *and* the new ladder detect the
+  *same* count (Varamin 469 either way) — the resolution dependence is the detector
+  resolving **fewer centres** at lower resolution (798 → 469), which the ladder does
+  not touch. Centre count, not the sigma range, is the driver.
+- **Pad-10% is bad and unhelped** (Δ 5.31 / 8.82): a white border shifts
+  `edge_spacing` and the cap, moving everything.
+- **The circle test is unachievable this way:** a lone circle on a blank canvas is
+  a near-empty image, where `edge_spacing` is dominated by the background — it reads
+  142 px for an r=30 circle — so a spacing-relative ladder is meaningless there.
+
+So the ladder change is near-neutral at the operating resolution (1024 counts move
+<1%), removes the fixed 68 px ceiling and the wasted high-sigma rungs, and is more
+principled — but it does **not** deliver the invariance #9 was for, and it degrades
+sparse/near-empty images. Reverted rather than ship complexity for no measured gain
+(owner decision). **Re-scope:** the real target behind #9 is *detection-count
+stability across resolution and framing* — why the detector finds 798 centres at
+1024 and 469 at 512 — which is upstream of the sigma ladder, in the edge detector
+and the absolute 0.08 threshold on the max-normalised field (#27). The rung-ratio
+observation (1.42 vs the target 3) stands and could be fixed cheaply on its own.
 
 ### [A3](https://github.com/brunopostle/centres/issues/10) · ✅ Replace fixed Canny thresholds with locally adaptive edge detection
 **Blocks:** #18

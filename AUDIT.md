@@ -1064,9 +1064,13 @@ corpus we have — two axes, not one. Where it stands:
    added them out of band; this environment's egress policy denies image hosts). It
    is still **ornament only**, so a painting against noise is measured only by
    proxy — the decisive generalisation test is still not in it.
-3. **#9** would let the crisper `scale_entropy` join the panel robustly (it
-   separates cleanly at rest, margin 0.047, but a resize erases it); the OR rule
-   above already works without it, on the transform-stable strength axis.
+3. **`scale_entropy` stays sidelined.** It separates cleanly at rest (margin 0.047)
+   but a resize erases it, because it rides the absolute-pixel scale ladder. Making
+   that ladder `edge_spacing`-relative (#9) was attempted to fix this and **reverted**
+   (PLAN A2): the ladder is not the driver of resolution dependence — the detector
+   simply resolves fewer centres at lower resolution — so the relative ladder did
+   not deliver invariance and degraded sparse images. The OR rule does not need it:
+   it runs on the transform-stable strength axis.
 4. **Adoption into the *score* still waits.** Turning the OR rule into a term of the
    degree of life needs the interior-optimum treatment below (a mechanical grid must
    not score as alive) and a way to set the noise floor/ceiling that is not a

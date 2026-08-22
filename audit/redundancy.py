@@ -33,11 +33,14 @@ The two measures, and why one is usable and one is not *yet*:
 ``scale_entropy`` — Shannon entropy of the log-blob-scale distribution.
   Separates the same six carpets even more cleanly at rest (carpet 1.41–1.60,
   noise 1.74–1.91), but it rides the detector's **absolute-pixel** scale ladder
-  (``min_sigma=2, max_sigma=48``; issue #9 is open precisely because that ladder
-  is in pixels, not in units of the artwork). Under a resize the detections shift
-  along the ladder and clip at its ends, and the separation **breaks**: the worst
-  transformed carpet reaches 1.743 against a noise floor of 1.741. It is kept here
-  as a diagnostic and as the reason #9 blocks the clean version of the fix.
+  (``min_sigma=2, max_sigma=48``, in pixels not artwork units). Under a resize the
+  detections shift along the ladder and clip at its ends, and the separation
+  **breaks**: the worst transformed carpet reaches 1.743 against a noise floor of
+  1.741. Making the ladder ``edge_spacing``-relative (#9) was tried to fix this and
+  reverted — it does not deliver resolution invariance, because the driver is the
+  detector resolving fewer centres at lower resolution, not the sigma range (see
+  PLAN A2). So ``scale_entropy`` is kept only as a diagnostic; the usable axis is
+  ``strength_entropy``, which needs no ladder change.
 
 **Why neither is adopted yet.** Both separate carpets from noise monotonically,
 but a mechanical lattice (``regular_grid``) sits at the *low*-entropy extreme,
@@ -47,9 +50,11 @@ living order between the rigid lattice and the random field. The location of tha
 optimum is an empirical quantity, and with a corpus of six Persian carpets it can
 only be fitted, not measured — which is issue #34. Shipping a corpus-fitted
 constant into the score is exactly the frame-versus-artwork error the project
-invariant forbids. So the resolution of #29 is: a redundancy term of this kind,
-once #9 makes the scale version stable and #34 supplies a corpus wide enough to
-locate the optimum without fitting it to six near-identical rugs.
+invariant forbids. So the resolution of #29 is a redundancy term of this kind, once
+#34 supplies a corpus wide enough (and varied enough — not six near-identical rugs)
+to locate the optimum without fitting it. It builds on ``strength_entropy``, which
+is transform-stable already; the crisper ``scale_entropy`` would have needed the
+#9 ladder change, but that was attempted and reverted (above), so it is not the path.
 
 **The caveat that decides whether any of this generalises — now partly tested.**
 A carpet is hyper-redundant, so on the original six-carpet corpus "few recurring
@@ -122,8 +127,9 @@ def scale_entropy(centers, bins=16):
     """Entropy of the log-blob-scale distribution — separates, but is transform-fragile.
 
     Cleaner than ``strength_entropy`` at rest, but built on the absolute-pixel
-    scale ladder (#9), so a resize moves it enough to erase the carpet/noise gap.
-    Kept as a diagnostic, not a candidate for adoption until #9 lands.
+    scale ladder, so a resize moves it enough to erase the carpet/noise gap. Making
+    the ladder relative (#9) was tried and reverted (PLAN A2 — the ladder is not the
+    cause), so this stays a diagnostic only; ``strength_entropy`` is the usable axis.
     """
     if len(centers) < 2:
         return None
