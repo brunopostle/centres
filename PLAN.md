@@ -256,6 +256,18 @@ falls *between* rungs — so `levels_of_scale` and `echoes` partly report the
 sampling lattice. Make the lattice a function of the target ratio rather than
 hard-coding either; whether 3 is right at all is a #21 question.
 
+**Measured, and not worth shipping (2026-08-22).** The two measures this would
+target already track their ground truth on the current ladder: `scale_ratio →
+levels_of_scale` peaks correctly at 3 ("maximum at 3, claimed 3") and
+`shape_vocabulary → echoes` runs at rho −0.85 (tracks, with the expected sign).
+Snapping the ladder to 3^(1/3) = 1.442 (from the current 24^(1/9) = 1.415, a ~6 %
+mismatch over three rungs) would not move the levels-of-scale peak off 3, and it
+changes the sigma ladder for **every** detection — so it perturbs all fifteen
+measures for a refinement of two that are already passing. Per the same
+"don't ship complexity for no measured gain" reasoning that reverted the ladder
+change, left as-is. The rung ratio would matter only if a front-end redesign
+(#9) changed the detector's scale behaviour.
+
 **Acceptance:** a circle of radius r is detected at scale ≈ r (within 25%) for
 r ∈ {30, 60, 120, 200} px; scores for a corpus image at `--max-size` 512 vs 1024
 agree within 1.0 on the 0–10 scale for every property; and — new — scores for an
@@ -318,7 +330,9 @@ function of n), so #9's resolution dependence no longer touches the degree of li
 only the raw discrimination-stage candidate axes at low resolution, which are
 diagnostics, not the score. #9 therefore drops from a blocker to a characterised
 front-end limitation. The separable rung-ratio observation (1.42 vs the target 3)
-remains the one cheap, self-contained improvement in this area.
+was measured and left as-is: the two measures it would target (`levels_of_scale`,
+`echoes`) already track on the current ladder, so a global detection change is not
+justified (see the rung-ratio note under A2 above).
 
 ### [A3](https://github.com/brunopostle/centres/issues/10) · ✅ Replace fixed Canny thresholds with locally adaptive edge detection
 **Blocks:** #18

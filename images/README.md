@@ -1,6 +1,6 @@
 # Test images
 
-Photographs of Persian carpets and tile patterns used for testing the `centres` analysis pipeline. Sourced from Wikimedia Commons, Flickr, and The Metropolitan Museum of Art's Open Access collection, and resized to a maximum of 1024 px on the longest side.
+Reference images used for testing the `centres` analysis pipeline — 44 in all: 32 ornamental patterns (17 Persian carpets and 15 tile panels) and 12 non-repetitive figurative line illustrations by Aubrey Beardsley, the latter included as a structurally distinct corpus so the measures are exercised on composed pictorial art as well as repeating ornament. Sourced from Wikimedia Commons, Flickr, The Metropolitan Museum of Art's Open Access collection, and The Public Domain Review, and resized to a maximum of 1024 px on the longest side.
 
 ---
 
