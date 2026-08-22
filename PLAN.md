@@ -72,13 +72,13 @@ OPEN   B3 #16  re-derive the remaining reference constants (clamping done)
 OPEN   B4 #17  wire audit thresholds into CI
 OPEN   D3 #23  error bars / median over benign transforms
 OPEN   D4 #24  correct docs   (THEORY.md done; images/README.md stale)
-OPEN      #29  noise outscores every artwork   (central problem; diagnosed, OR-rule lead blocked on #34)
+OPEN      #29  noise outscores every artwork   (diagnosed; OR-rule passes painting test at native res, resolution-gated -> #9)
 DONE      #30  tone inversion: detector + measures fixed (Δ 0.18->0.043, accepted); merged into #13
 OPEN   D2 #22  alternating repetition still fails (needs periodicity, no region cue)
 DONE      #31  boundaries/deep_interlock tone-robust: fixed 128 -> symmetrised Otsu (gamma spread 2.9->0.25, 1.7->0.46)
 DONE      #32  render stimuli as contact sheets (python -m audit.render -> docs/stimuli/)
 DONE      #33  sweep verdicts direction-aware (↓ measures track, not fail) + peak-vs-valley optimum
-OPEN      #34  widen the corpus - field SNR + locate the #29 organised-complexity optimum
+DONE      #34  corpus widened to 44 (32 ornament + 12 Beardsley paintings); painting test run, passes at native res (still: locate the organised-complexity optimum)
 DONE      #35  removed dead interface_complexity/boundary_ratio + _describe_interfaces
 ```
 
@@ -97,24 +97,34 @@ for a new session to start:
    practical transform) — is a **global** redundancy statistic: the entropy of the
    centre population's strength distribution. The missing ingredient is an
    organised-complexity term. See `audit/redundancy.py`. **A robust discriminator
-   now exists on the 32-image corpus (AUDIT §17): redundancy OR spatial coherence.**
-   Strength-entropy (redundancy) alone drops to 0.997 on the wider corpus — a bold
-   Egyptian tile crosses at rest. Adding `spatial_coherence` (Moran's I of strength:
-   do neighbouring centres resemble each other?) closes it: the two fail on
-   *disjoint* artworks, and the rule "alive = entropy below noise floor OR coherence
-   above noise ceiling" separates all 32 from noise at rest AND under every transform
-   (tightest margin +0.074). The coherence axis is the one a non-repetitive painting
-   would rely on, and the least-repetitive pieces already depend on it. Not yet in
-   the score (needs the interior-optimum/grid treatment and a non-corpus-specific
-   threshold; +0.074 is thin). A strong lead ready for the painting test.
-2. **#34 — partly done: corpus widened to 32 CC-licensed real artworks** (17
-   carpets, 15 tile panels; the owner added them out of band, since this
-   environment's egress policy denies image hosts). It tempered the finding rather
-   than confirming it (point 1), and the corpus is still **ornament only** — the
-   decisive test, a non-repetitive painting/portrait against noise, is still not in
-   it. (The transform-stable OR-rule discriminator uses `strength_entropy`, which
-   needs no #9; the crisper but resize-fragile `scale_entropy` would have — but #9's
-   ladder approach was attempted and reverted, see A2, so that path is not open.)
+   now exists (AUDIT §17): redundancy OR spatial coherence.**
+   Strength-entropy (redundancy) alone drops to 0.949 on the wider corpus — a bold
+   Egyptian tile and non-repetitive works cross at rest. Adding `spatial_coherence`
+   (Moran's I of strength: do neighbouring centres resemble each other?) closes it:
+   the two fail on *disjoint* artworks, and the rule "alive = entropy below noise
+   floor OR coherence above noise ceiling" separates all 44 from noise at native
+   resolution (tightest margin +0.154). **The painting test is now run and passes at
+   native resolution** (point 2): coherence is the axis a non-repetitive painting
+   relies on, and with the paintings added it is the single strongest axis (0.977 vs
+   0.949). Not yet in the score (needs the interior-optimum/grid treatment, a
+   non-corpus-specific threshold, and — new from the painting test — detection-count
+   stability across resolution, since the coherence-only works are resolution-gated).
+2. **#34 — done: corpus widened to 44 CC-licensed real works** (32 ornament — 17
+   carpets, 15 tile panels — plus **12 non-repetitive Beardsley illustrations**; the
+   owner added them out of band, since this environment's egress policy denies image
+   hosts). This ran the decisive **painting test** that every earlier claim was short
+   of. At native resolution all 12 figurative works separate from noise, **6 of them
+   on spatial coherence alone** (strength entropy above the noise floor) — direct
+   evidence the coherence axis sees composition, not repetition. The honest limit: on
+   the coherence-only works the separation is **resolution-gated** — downscaled to
+   512 their coherence collapses below the noise ceiling (`the_herald`,
+   `et_in_arcadia_ego` fail even at identity@512), because a non-repetitive image has
+   no redundancy fallback when the detector resolves fewer centres. That is the #9
+   detection-count problem (re-scoped, see A2), not a flaw in the rule — and it is
+   now the thing standing between the painting-tested OR rule and the score. (The
+   OR-rule discriminator uses `strength_entropy` + `spatial_coherence`, neither of
+   which needs #9's reverted ladder change; what it needs is detection-count
+   stability, which is upstream of the ladder.)
 
 Then: the tone-robustness bug #31 (a clean, well-specified fix), the visualisation
 #32 and harness label #33 (both small), one measure that still fails (`alternating

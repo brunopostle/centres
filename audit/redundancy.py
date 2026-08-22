@@ -78,14 +78,24 @@ tightest margin +0.074. This is the first robust clean separator on the wider
 corpus, and it is an OR precisely so that a transform must break *both* an
 artwork's redundancy and its coherence at once to misclassify it.
 
-Two things are still open, and neither is wired into the reported score. The corpus
-is **ornament only**, so the decisive test — a *painting* against noise — is still
-not run; but the spatial-coherence axis is exactly what a painting (coherent, not
-repetitive) would be caught by, and the least-repetitive pieces here (a pictorial
-Delft tile, the Egyptian geometric) are already carried by it, which is real
-evidence for generalisation. And the floor/ceiling are still constants — derived
-from noise rather than fitted to art, which is more defensible, but constants.
-See AUDIT.md §17.
+**The painting test is now run, and it locates the remaining limit.** The corpus was
+widened again to 44 works with twelve non-repetitive Beardsley illustrations — the
+"painting against noise" case. At native resolution the direction holds decisively:
+all twelve separate from noise, six of them on spatial coherence *alone* (their
+strength entropy sits above the noise floor), and with the figurative works added
+``spatial_coherence`` becomes the single strongest axis (rank separation 0.977 vs
+``strength_entropy``'s 0.949). But the coherence-only works have no redundancy
+fallback, so they are **resolution-gated**: downscaled to 512 their coherence
+collapses below the noise ceiling (``the_herald`` and ``et_in_arcadia_ego`` fail even
+at identity@512), which is the #9 detection-count-versus-resolution dependence — not
+a flaw in the rule — biting the figurative works harder than ornament.
+
+So two things are still open, and neither is wired into the reported score. The OR
+rule is robust on ornament at every resolution but on non-repetitive art only near
+native resolution, so adopting it needs the detector to resolve a resolution-stable
+set of centres first (#9, re-scoped to detection-count stability). And the
+floor/ceiling are still constants — derived from noise rather than fitted to art,
+which is more defensible, but constants. See AUDIT.md §17.
 """
 
 import numpy as np

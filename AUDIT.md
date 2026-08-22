@@ -1008,16 +1008,62 @@ strengths) the other holds.
 This is the first **robust, clean** separator of the wider corpus, and it directly
 addresses the caveat: the two least-repetitive pieces present — the pictorial Delft
 tile and the Egyptian geometric — are carried by the *coherence* axis, which is the
-one a painting would rely on. It is real evidence that the direction generalises
-beyond ornament, short of the painting test itself (still #34).
+one a painting would rely on. That was, until the corpus was widened again, only
+evidence by proxy; the section below runs the painting test itself.
 
-Two honest limits remain. The corpus is **still ornament only**, so a painting
-against noise is measured only by proxy. And the floor and ceiling are constants —
-taken from the noise cloud rather than fitted to art, which is defensible, but the
-+0.074 tightest margin is thin, so a harsher transform or a genuinely borderline
-image could still cross. The `discrimination` stage prints this separation and its
-margin on every audit run; adopting it into the *score* still waits on the
-interior-optimum question below and on #34's painting test.
+### The painting test, now run: coherence generalises at native resolution — but not yet under downscaling
+
+The corpus was widened a second time (#34) with **twelve late-period Aubrey
+Beardsley illustrations** — non-repetitive figurative line art, the "painting
+against noise" case that every claim above was still short of. The corpus is now 44
+CC-licensed real works (32 ornament, 12 figurative). Two things came out of it, one
+confirming the direction and one marking its limit.
+
+**At native resolution the direction holds, and coherence is what carries it.** All
+12 Beardsley works separate from noise, and — the point of the whole exercise — **6
+of the 12 have strength entropy *above* the noise floor**, so redundancy alone would
+file them as noise, and every one is rescued by spatial coherence (its Moran's I
+0.23–0.50 against a noise ceiling of 0.07, a 3–7× clearance). These are genuinely
+non-repetitive images being caught by the axis built for them, not by repetition.
+The whole-corpus effect is unambiguous: with the figurative works added,
+`spatial_coherence` overtakes `strength_entropy` as the **single strongest** axis
+(rank separation 0.977 vs 0.949), and the OR rule separates **44/44 at rest,
+tightest margin +0.154** — adding non-repetitive art did not weaken it. The caveat
+of the two sections above — "is it measuring wholeness, or repetitiveness?" — is
+answered here: on art with little repetition to measure, the *coherence* half of the
+rule does the work.
+
+**But the non-repetitive works are not yet robust to downscaling, and that is the
+honest limit.** The coherence-only works have no redundancy fallback, so they lean
+entirely on the softer axis — and coherence erodes when the detector resolves fewer
+centres. Re-run at 512 px, the four most marginal coherence-only Beardsleys behave
+much worse than any ornament: `the_herald` and `et_in_arcadia_ego` fail the OR rule
+**even at identity@512** (`the_herald`'s coherence collapses 0.269 → 0.048 on the
+downscale alone), `les_liaisons_dangereuses` fails under crop, pad and perspective,
+and only `erda` survives every practical transform (worst margin +0.038). This is
+**not a new defect** — it is the same detection-count-versus-resolution dependence
+recorded as the #9 negative finding (the detector resolves fewer centres at lower
+resolution; the sigma ladder is not the cause), now shown to bite the figurative
+works far harder than ornament precisely because they have only the one axis to
+stand on. Ornament survives 512 because its redundancy holds when its coherence
+flattens; a painting has no such second leg.
+
+So the painting test **passes at native resolution and fails under aggressive
+downscaling** — which locates the remaining work squarely on the resolution problem,
+not on the discriminator. The OR rule is the right shape; making it hold for
+non-repetitive art at all resolutions needs the detector to resolve a
+resolution-stable set of centres first (#9, re-scoped to detection-count stability),
+which is upstream of everything here.
+
+Two honest limits therefore remain. The OR rule is **resolution-gated on
+non-repetitive art**: robust on ornament at every resolution, robust on the
+figurative works only near native resolution. And the floor and ceiling are
+constants — taken from the noise cloud rather than fitted to art, which is
+defensible, but the +0.154 tightest margin is at native resolution; downscaling
+eats it for the coherence-only works. The `discrimination` stage prints this
+separation and its margin on every audit run; adopting it into the *score* still
+waits on the interior-optimum question below, on a non-constant floor/ceiling, and
+now on the detection-count stability that the painting test just showed it needs.
 
 ### Why this is an interior optimum, and why that blocks the fix
 
@@ -1052,18 +1098,25 @@ corpus we have — two axes, not one. Where it stands:
 
 1. **A separator that survives the wider corpus and the transforms:** *redundancy
    OR spatial coherence.* A single entropy threshold does not survive the variety
-   in the 32-artwork corpus (one bold tile crosses at rest, and the margins of any
+   in the corpus (one bold tile crosses at rest, and the margins of any
    entropy-only combination are inside the transform spread). Adding the
    complementary axis — Moran's I of strength, "do neighbouring centres resemble
-   each other?" — closes it: the two fail on disjoint artworks, and the OR rule
-   separates all 32 from noise at rest and under every benign/practical transform,
-   tightest margin +0.074. Crucially the coherence axis is the one a *non-repetitive
-   painting* would rely on, and the least-repetitive pieces in the corpus already
-   depend on it — real evidence the direction generalises, short of the painting test.
-2. **#34 is partly done.** The corpus is now 32 CC-licensed real artworks (the owner
-   added them out of band; this environment's egress policy denies image hosts). It
-   is still **ornament only**, so a painting against noise is measured only by
-   proxy — the decisive generalisation test is still not in it.
+   each other?" — closes it: the two fail on disjoint artworks, and at native
+   resolution the OR rule separates all 44 from noise, tightest margin +0.154. With
+   the figurative works added, the coherence axis is now the *single strongest*
+   discriminator (0.977), which is exactly the axis a non-repetitive painting relies
+   on — see the painting-test section above.
+2. **#34 is done, and the painting test with it — with one caveat.** The corpus is
+   now 44 CC-licensed real works (the owner added them out of band; this
+   environment's egress policy denies image hosts): 32 ornament plus **12
+   non-repetitive Beardsley illustrations**. At native resolution the figurative
+   works separate 12/12, 6 of them on coherence alone — the decisive generalisation
+   test passes. The caveat is that on those coherence-only works the separation is
+   **resolution-gated**: downscaling to 512 collapses their coherence below the
+   noise ceiling (`the_herald` and `et_in_arcadia_ego` fail even at identity@512),
+   because a non-repetitive image has no redundancy fallback when the detector
+   resolves fewer centres. That is the #9 detection-count problem, not a flaw in the
+   rule.
 3. **`scale_entropy` stays sidelined.** It separates cleanly at rest (margin 0.047)
    but a resize erases it, because it rides the absolute-pixel scale ladder. Making
    that ladder `edge_spacing`-relative (#9) was attempted to fix this and **reverted**
@@ -1073,9 +1126,12 @@ corpus we have — two axes, not one. Where it stands:
    it runs on the transform-stable strength axis.
 4. **Adoption into the *score* still waits.** Turning the OR rule into a term of the
    degree of life needs the interior-optimum treatment below (a mechanical grid must
-   not score as alive) and a way to set the noise floor/ceiling that is not a
-   corpus-specific constant. The margin is also thin (+0.074), so this is a strong
-   lead ready for the painting test, not yet a shipped fix.
+   not score as alive), a way to set the noise floor/ceiling that is not a
+   corpus-specific constant, and — new from the painting test — **detection-count
+   stability across resolution**, without which the coherence axis the figurative
+   works depend on is not robust. The native-resolution margin is +0.154, but it is
+   eaten by downscaling on exactly those works, so this is a strong, now
+   painting-tested lead, not yet a shipped fix.
 
 What *is* wired in is the measurement — the `discrimination` stage prints the score's
 separation, each candidate's, and the combined OR rule with its margin on every run,
