@@ -72,7 +72,7 @@ OPEN   B3 #16  re-derive the remaining reference constants (clamping done)
 OPEN   B4 #17  wire audit thresholds into CI
 OPEN   D3 #23  error bars / median over benign transforms
 OPEN   D4 #24  correct docs   (THEORY.md done; images/README.md stale)
-OPEN      #29  noise outscores every artwork   (SOLVED in principle: count-invariant wholeness gate excess=max_tree-C*n^B gives score sep 1.000 AND passes count-confound r=-0.38; needs owner theory sign-off (flat lattice->0) + constants + #16 recalibration to ship)
+DONE      #29  noise outscores every artwork   (FIXED: reported score gated by count-invariant wholeness excess=max_tree-C*n^B; audit rank sep 1.000 "complete", count-confound r=-0.41 w/controls; flat lattice now ~0 (deliberate theory change). #16 SCALE re-fit still open/orthogonal)
 DONE      #30  tone inversion: detector + measures fixed (Δ 0.18->0.043, accepted); merged into #13
 OPEN   D2 #22  alternating repetition still fails (needs periodicity, no region cue)
 DONE      #31  boundaries/deep_interlock tone-robust: fixed 128 -> symmetrised Otsu (gamma spread 2.9->0.25, 1.7->0.46)
@@ -82,14 +82,14 @@ DONE      #34  corpus widened to 44 (32 ornament + 12 Beardsley paintings); pain
 DONE      #35  removed dead interface_complexity/boundary_ratio + _describe_interfaces
 ```
 
-**The instrument is now precise and ten of fifteen measures track their ground
-truth** (was one). Two problems now bound progress, and they are the right place
-for a new session to start:
+**The instrument is now precise, ten of fifteen measures track their ground
+truth** (was one), **and #29 — the central problem — is fixed in the reported
+score.**
 
-1. **#29 — the aggregate still ranks noise above every carpet.** Individual
-   validity has not composed into a valid overall degree of life. This is the
-   central open problem, and it is now **diagnosed** (AUDIT.md §17, and a
-   `discrimination` stage now in `python -m audit`). The failure is *locality*:
+1. **#29 — FIXED: the reported score now ranks every artwork above noise.** It was
+   a *locality* failure (below), and it is now closed by a **global wholeness gate**.
+   The audit's `discrimination` stage reports the reported degree of life at rank
+   separation **1.000 ("complete")**, from 0.131. The failure was *locality*:
    noise wins eleven of the fifteen individual local properties, because dense
    noise is abundant in local structure, so neither re-weighting the energy terms
    nor any per-relation measure can separate art from noise. What *does* separate
@@ -115,11 +115,14 @@ for a new session to start:
    `max_tree − C·n^B` (subtract the random-field null; C≈1.957, B≈−0.737, fit to
    random fields not art) is intensive (r vs n: −0.83 → −0.04) and still separates
    perfectly (rank sep 1.000, rescues the dense works). Gating the score by
-   `1−exp(−excess/S)` takes the score's own #29 separation to **1.000 (complete)** and
-   **passes** the count-confound test (r≈−0.38). Not yet shipped: it makes a flat
-   lattice score ~0 (a theory decision changing #28's "any relationships beat none"
-   and its acceptance test), adds three constants, and shrinks the scale (#16
-   recalibration). These are owner sign-offs, not measurement doubts. See AUDIT §17.
+   `1−exp(−excess/S)`, `L = (Σ participationₖ·qualityₖ)·wholeness − barrier`, takes the
+   score's own #29 separation to **1.000 (complete)** and **passes** the count-confound
+   test (audit r=−0.41 with controls). **Shipped** in `energy.degree_of_life`. It
+   carries a deliberate theory change — a flat lattice (reinforced but not nested)
+   now scores ~0, so #28's acceptance test became `test_composed_whole_scores_above_
+   structurelessness` + `test_flat_lattice_is_not_alive_under_the_wholeness_gate`.
+   THEORY §8 and the energy docstring re-derived; a full per-term SCALE re-fit on the
+   wider corpus (#16) is orthogonal and still open. See AUDIT §17.
 2. **#34 — done: corpus widened to 44 CC-licensed real works** (32 ornament — 17
    carpets, 15 tile panels — plus **12 non-repetitive Beardsley illustrations**; the
    owner added them out of band, since this environment's egress policy denies image

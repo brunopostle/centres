@@ -20,7 +20,7 @@ This document sets out the mathematical theory implemented in this codebase. The
 > | § | Claim | Status |
 > |---|---|---|
 > | 8 | "Lower energy = greater wholeness" | **Was false, now corrected.** The functional's minimum was the *absence* of structure. Replaced by the degree of life L = −E, participation × quality, zero for nothing ([#28](https://github.com/brunopostle/centres/issues/28)) |
-> | 8 | The reported score orders artwork above noise | **False, and now diagnosed.** Noise outscores all six carpets, equally under the functional this replaced. AUDIT.md §17: this is a *locality* failure — noise wins eleven of the fifteen individual local properties, because dense noise is abundant in local structure, not short of it, so no per-relation measure and no re-weighting can separate the two. The reported score still fails #29 for all 32 artworks of the widened corpus, so the problem is robust. What separates art from noise is *global* structure the local aggregate discards: **redundancy OR spatial coherence.** Strength-entropy (redundancy) alone drops to 0.997 on the wider corpus, but adding Moran's I of strength (spatial coherence — "do neighbouring centres resemble each other?") closes it: the two fail on disjoint artworks, and the OR rule separates all 32 from noise at rest and under every transform (tightest margin +0.074). Not yet in the score (needs the interior-optimum treatment and a non-corpus-specific threshold; corpus still ornament-only, so the painting test is #34). A strong lead ready for that test ([#29](https://github.com/brunopostle/centres/issues/29)) |
+> | 8 | The reported score orders artwork above noise | **Was false, now fixed.** Noise once outscored every carpet, equally under the functional this replaced — a *locality* failure (AUDIT.md §17): dense noise is abundant in local structure, so no per-relation measure and no re-weighting could separate the two. The fix is a *global* gate the local aggregate was missing — **wholeness**, the count-invariant degree to which the centres nest under a single whole (`max_tree` minus its random-field baseline, `energy.wholeness`). Gating the descriptive sum by it, `L = (Σ participationₖ·qualityₖ)·wholeness − barrier`, makes the reported degree of life rank **all 44 artworks above every noise field** (`discrimination` stage: rank separation 1.000, "complete"; noise and a mechanical grid now score ≈ 0), and — because the gate is intensive — without reintroducing the #14 count confound (r(L, n) = −0.41 with controls). See [#29](https://github.com/brunopostle/centres/issues/29) and AUDIT.md §17 |
 > | 8 | The stated weights, incl. `50·E_L` | **Superseded twice.** Terms were not intensive; the total was centre count × 0.27 ([#14](https://github.com/brunopostle/centres/issues/14)). The weights they became belonged to the additive framing and are gone with it ([#28](https://github.com/brunopostle/centres/issues/28)) |
 > | 8.5 | Child coverage of 0.65 | **Unsourced.** Attributed to Alexander with no citation ([#24](https://github.com/brunopostle/centres/issues/24)) |
 > | 8.6 | Radial band of 0.3–0.7 | **Unsourced.** Attributed to Alexander with no citation ([#24](https://github.com/brunopostle/centres/issues/24)) |
@@ -249,32 +249,37 @@ map is steepest and discriminates best. The standard deviation would have put th
 corpus at q = 0.003–0.05 on three of the five terms — every real image
 indistinguishably bad.
 
-> **Measured ordering, and one part of it fails.**
+> **Measured ordering, after the wholeness gate closed #29 (2026-08-22, 44-image corpus).**
 >
 > ```
 > empty canvas, 0 centres      L = +0.0000
-> 36 equal scales, far apart   L = −0.0000
+> 36 equal scales, far apart   L = +0.0000
 > 40 centres collapsed         L = −1.0000
 > concentric 3:1 ladder        L = −0.8041
-> lattice of 36                L = +0.2994
-> six carpets                  L = +0.3237 .. +0.4047
-> white noise                  L = +0.4957
-> random blobs                 L = +0.4833
+> flat lattice of 36           L ≈ 0
+> white / smooth / random noise L = +0.007 / +0.000 / +0.039
+> regular grid                 L = +0.097
+> 44 artworks                  L = +0.059 .. +0.316
 > ```
 >
-> The first four lines are what #28 asked for: emptiness and collapse are the floor,
-> not the optimum, and collapse now loses to a lattice by 1.30 rather than by 0.004.
+> The first four lines are what #28 asked for: emptiness and collapse are the floor.
 >
-> **The last two are a failure. Noise outscores every carpet.** It is not a failure
-> this change introduced: read the functional it replaces as −E, and white noise
-> (−0.79) and random blobs (−0.83) also beat all six carpets (−1.71…−0.92). The cause
-> is in the measures, not in the framing. Term by term, the carpets beat white noise
-> on exactly one of the five — field smoothness — and lose on the other four, chiefly
-> because `assign_hierarchy` gives 91% of white-noise centres a parent against 67–83%
-> for a carpet, and because dense noise earns more reinforcement per edge. No
-> re-weighting of these five terms can order art above noise. That is
-> [#21](https://github.com/brunopostle/centres/issues/21)'s territory, not #28's, and
-> it is recorded here so the claim is not left standing.
+> **The last four lines are #29, now fixed.** The descriptive sum is gated by
+> *wholeness* — the count-invariant degree to which the centres nest under a single
+> whole (`energy.wholeness`; see AUDIT.md §17) — so local structure counts toward life
+> only insofar as it forms one thing. Noise and a flat lattice have local relations
+> but no single whole, so the gate takes them to ≈ 0; composed artwork nests into one
+> thing and scores above them. The reported degree of life now ranks **all 44 artworks
+> above every noise field** (the `discrimination` stage reports rank separation 1.000,
+> "complete"), where the ungated functional ranked noise *above* every carpet. The gate
+> is intensive, so it does this without reintroducing the centre-count confound #14
+> removed (r(L, n) = −0.41 with controls, inside the |r| < 0.5 bound).
+>
+> The earlier reading — that no re-weighting of the five *local* terms can order art
+> above noise — was correct, and is exactly why the fix is not a re-weighting but a
+> *global* gate: what noise lacks is not any local relation but the single whole the
+> local aggregate cannot see. See [#29](https://github.com/brunopostle/centres/issues/29)
+> and AUDIT.md §17.
 
 ### 8.2 Hierarchy Energy E_H
 
@@ -389,7 +394,7 @@ This is the awkward term in the participation × quality scheme, because it is a
 
 ## 9. Connection to Alexander's 15 Properties
 
-> **⚠ UNSUPPORTED.** The claim that all 15 properties arise as stable patterns when E is minimised has never been demonstrated, and nothing in the repository tests it. Against it, two ways. First, on synthetic stimuli where the answer is known by construction, the measures were rebuilt against the source (#22) until ten of fifteen now track their own ground truth (AUDIT.md §12/§13) — but that was done by defining each measure *directly*, not by minimising E, so it is evidence the properties can be *computed*, not that they *emerge* from the functional. Second, and directly against the claim: a configuration that minimises E (equivalently, maximises the degree of life) does **not** exhibit the fifteen properties more than dense noise does — noise scores a higher degree of life than every carpet and beats the carpets on eleven of the fifteen individual properties (AUDIT.md §17, [#29](https://github.com/brunopostle/centres/issues/29)). If the properties emerged from E-minimisation, the thing that minimises E would show them; it shows disorder instead.
+> **⚠ UNSUPPORTED.** The claim that all 15 properties arise as stable patterns when E is minimised has never been demonstrated, and nothing in the repository tests it. Against it, two ways. First, on synthetic stimuli where the answer is known by construction, the measures were rebuilt against the source (#22) until ten of fifteen now track their own ground truth (AUDIT.md §12/§13) — but that was done by defining each measure *directly*, not by minimising E, so it is evidence the properties can be *computed*, not that they *emerge* from the functional. Second, and directly against the claim: dense noise still beats the carpets on eleven of the fifteen individual properties (AUDIT.md §17), even though the **degree of life** now ranks every artwork above noise. Those are consistent because the fix to #29 was *not* in the fifteen properties — it was the global **wholeness** gate on the aggregate ([#29](https://github.com/brunopostle/centres/issues/29)), which noise fails and the individual local properties cannot see. So the degree of life orders art above noise, but the property *set* a minimiser would exhibit is still noise-like on eleven of fifteen: E-minimisation is not shown to produce the fifteen properties. The gate makes the *score* correct; it does not make the properties *emerge*.
 >
 > The **table below is also stale.** It maps each property to an "energy driver" and gives a score formula, but the #22 redefinitions rebuilt eleven of the measures on a region layer read from the image (compactness, solidity, tone, image-domain boundaries), so most of the "energy driver" and "score" cells no longer describe `centres/properties.py`. Read that module and AUDIT.md §15 for what each measure now computes.
 

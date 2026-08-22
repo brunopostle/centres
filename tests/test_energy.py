@@ -9,10 +9,12 @@ from centres.energy import (
     degree_of_life,
     field_energy,
     hierarchy_energy,
+    largest_containment_fraction,
     life_terms,
     locality_energy,
     reinforcement_energy,
     total_energy,
+    wholeness,
 )
 from centres.graph import build_graph, propagate_strength
 from centres.field import reconstruct_field
@@ -220,15 +222,82 @@ def test_structureless_configuration_scores_zero():
     )
 
 
-def test_structure_scores_above_structurelessness():
-    """A configuration with relationships beats one with none."""
+def _nested_hierarchy():
+    """A genuine whole: one root, four children at a 3:1 ratio and half-radius, each
+    with two grandchildren — all nesting into a single containment tree."""
+    centers = [c(0, 200, 200, 60.0)]
+    idx = 1
+    for dx, dy in ((30, 0), (-30, 0), (0, 30), (0, -30)):
+        cx, cy = 200 + dx, 200 + dy
+        centers.append(c(idx, cx, cy, 20.0))
+        idx += 1
+        for ddx in (10, -10):
+            centers.append(c(idx, cx + ddx, cy, 7.0))
+            idx += 1
+    return centers
+
+
+def test_composed_whole_scores_above_structurelessness():
+    """A configuration that forms one whole beats one with none — #28's third
+    constraint, under the #29 wholeness gate.
+
+    The gate multiplies the descriptive sum by wholeness, so what beats
+    structurelessness is not *any* relationships but relationships that nest into a
+    single thing. A three-level containment hierarchy (``_nested_hierarchy``) does,
+    and scores well above zero; a structureless scatter of equal, far-apart centres
+    has no relationships at all and scores zero.
+    """
     spacing, k = 220.0, 6
-    shape = (int(spacing * (k + 1)),) * 2
     structureless = [
         c(i, spacing * (1 + i % k), spacing * (1 + i // k), 10.0) for i in range(k * k)
     ]
-    lattice = [c(i, 50.0 * (1 + i % k), 50.0 * (1 + i // k), 12.0) for i in range(k * k)]
-    assert _life_of(lattice, (350, 350)) > _life_of(structureless, shape) + 0.1
+    assert _life_of(_nested_hierarchy(), (400, 400)) > _life_of(
+        structureless, (int(spacing * (k + 1)),) * 2
+    ) + 0.3
+
+
+def test_flat_lattice_is_not_alive_under_the_wholeness_gate():
+    """The theory change #29 brought: a flat lattice is reinforced but not a whole.
+
+    A grid of identical, equal-scale centres has adjacency and reinforcement but no
+    containment hierarchy — nothing nests under anything — so its wholeness is zero
+    and the gate takes its degree of life to ~0. Before the gate this lattice scored
+    +0.30, *above* several carpets: it was a face of the interior-optimum failure
+    (#29, §3 of AUDIT.md). Living order requires one whole, not merely local
+    relationships.
+    """
+    lattice = [c(i, 50.0 * (1 + i % 6), 50.0 * (1 + i // 6), 12.0) for i in range(36)]
+    assert _life_of(lattice, (350, 350)) == pytest.approx(0.0, abs=1e-3)
+
+
+def test_largest_containment_fraction_one_for_a_nested_whole():
+    """All centres in one containment tree -> fraction 1.0; a flat grid -> low."""
+    assert largest_containment_fraction(assign_hierarchy(_nested_hierarchy())) == pytest.approx(1.0)
+    lattice = [c(i, 50.0 * (1 + i % 6), 50.0 * (1 + i // 6), 12.0) for i in range(36)]
+    assert largest_containment_fraction(assign_hierarchy(lattice)) < 0.1
+    assert largest_containment_fraction([]) == 0.0
+
+
+def test_wholeness_zero_for_flat_and_empty_positive_for_nested():
+    """The gate: 0 for fewer than two centres and for anything no more nested than
+    its random-field null (a flat grid), positive for a genuine hierarchy."""
+    assert wholeness([]) == 0.0
+    assert wholeness([c(0, 0, 0, 10.0)]) == 0.0
+    lattice = [c(i, 50.0 * (1 + i % 6), 50.0 * (1 + i // 6), 12.0) for i in range(36)]
+    assert wholeness(assign_hierarchy(lattice)) == 0.0
+    assert wholeness(assign_hierarchy(_nested_hierarchy())) > 0.5
+
+
+def test_wholeness_is_count_invariant_on_random_fields():
+    """The property that lets it gate the score without reintroducing the #14 count
+    confound: subtracting the random-field baseline leaves wholeness flat in n."""
+    ns, ws = [], []
+    for n in (32, 64, 128, 256):
+        side = 24.5 * math.sqrt(n)
+        for seed in range(3):
+            ns.append(n)
+            ws.append(wholeness(_random_centers(n, side, seed)))
+    assert abs(float(np.corrcoef(ns, ws)[0, 1])) < 0.5
 
 
 def test_participation_is_a_fraction_and_is_zero_when_nothing_participates():

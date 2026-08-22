@@ -1179,20 +1179,24 @@ structureless configurations still score exactly 0 (their excess is ≤ 0, so th
 is 0). This is the first form that closes #29 in the score without reintroducing the
 count confound.
 
-**What it costs, and why it is the owner's call to ship.** The gate multiplies a
+**Shipped (2026-08-22), with the theory change it entails.** The gate multiplies a
 flat lattice's wholeness toward 0, so a bare grid of equal-scale centres — reinforced
 but not nested — scores ~0 rather than "alive." That is aligned with #29 and the
-interior-optimum complaint (the grid should *not* score high), but it is a genuine
-theory decision: it changes #28's stance from "any relationships beat none" to
-"relationships that form one whole beat those that do not," and it changes the
-acceptance test `test_structure_scores_above_structurelessness`, which asserts the
-former. It also introduces three constants (`C`, `B`, `S`) and shrinks the score's
-scale, so the worked numbers in `energy.degree_of_life` and THEORY §8 need re-deriving
-(#16). None of these is a measurement doubt — the fix is validated — they are the
-theory sign-off and recalibration that flipping the headline metric requires. Until
-then the `discrimination` stage keeps `nesting` as its strongest axis (where
-count-invariance is not required, because the comparison is against a same-scale
-noise cloud), and the gate is documented here as the demonstrated resolution of #29.
+interior-optimum complaint (the grid should *not* score high), and it is a genuine
+theory change, made deliberately: #28's stance moves from "any relationships beat
+none" to "relationships that form one whole beat those that do not." The acceptance
+test `test_structure_scores_above_structurelessness` is replaced by
+`test_composed_whole_scores_above_structurelessness` (a nested hierarchy beats a
+structureless scatter) and `test_flat_lattice_is_not_alive_under_the_wholeness_gate`
+(a flat lattice now scores ~0). The gate introduces three constants (`C`, `B`, `S`)
+and shrinks the score's scale, so the worked numbers in `energy.degree_of_life` and
+THEORY §8 were re-derived on the 44-image corpus; a full re-fit of the per-term SCALE
+constants on the wider corpus remains #16, orthogonal to the gate. Validated end to
+end with `python -m audit`: the reported degree of life's own #29 rank separation is
+**1.000 ("complete")**, and the count confound stays inside bounds (r(L, n) = −0.41
+with controls). The `discrimination` stage still reports `nesting` as its strongest
+raw axis (where count-invariance is not required, because the comparison is against a
+same-scale noise cloud); the reported score is now the `wholeness`-gated form.
 
 ### Why this is an interior optimum, and why that blocks the fix (for the entropy route)
 
@@ -1255,17 +1259,17 @@ it stands:
    simply resolves fewer centres at lower resolution — so the relative ladder did
    not deliver invariance and degraded sparse images. The OR rule does not need it:
    it runs on the transform-stable strength axis.
-4. **A score fix that closes #29 is now demonstrated, pending an owner decision.** A
-   raw-`nesting` gate reintroduces the #14 count confound (r → −0.87), because
-   `(largest tree)/n` is not intensive. The fix is to subtract the random-field null:
-   the **wholeness excess** `max_tree − C·n^B` is intensive (r → −0.04) and still a
-   perfect discriminator (rank separation 1.000, rescuing the dense works). Gating the
-   score by it takes the reported score's own #29 separation to **1.000 (complete)**
-   *and* passes the count-confound test (r ≈ −0.38). What remains before it is the
-   reported metric is not a measurement doubt but a theory sign-off — a flat lattice
-   scores ~0 under it, changing #28's "any relationships beat none" and its acceptance
-   test — plus fixing three constants and recalibrating (#16). See the
-   count-invariant-wholeness section above.
+4. **#29 is fixed in the reported score.** A raw-`nesting` gate reintroduced the #14
+   count confound (r → −0.87), because `(largest tree)/n` is not intensive. The fix is
+   to subtract the random-field null: the **wholeness excess** `max_tree − C·n^B` is
+   intensive (r → −0.04) and still a perfect discriminator (rank separation 1.000,
+   rescuing the dense works). The reported degree of life is now gated by it,
+   `L = (Σ participationₖ·qualityₖ)·wholeness − barrier`, and the audit confirms the
+   score's own #29 separation is **1.000 ("complete")** with the count confound inside
+   bounds (r = −0.41 with controls). It carries a deliberate theory change — a flat
+   lattice now scores ~0 — and its acceptance tests were updated accordingly. A full
+   re-fit of the per-term SCALE constants on the wider corpus (#16) is orthogonal and
+   still open. See the count-invariant-wholeness section above.
 
 What *is* wired in is the measurement — the `discrimination` stage prints the score's
 separation, each of the three candidates' (entropy, coherence, nesting), and the

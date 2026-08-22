@@ -112,10 +112,10 @@ floor/ceiling are still constants — derived from noise rather than fitted to a
 which is more defensible, but constants. See AUDIT.md §17.
 """
 
-from collections import Counter
-
 import numpy as np
 from scipy.spatial import cKDTree
+
+from centres.energy import largest_containment_fraction
 
 
 def _entropy(values, bins=16):
@@ -222,28 +222,15 @@ def nesting(centers):
     centres the hierarchy fragments into many small trees, so nesting reads low even
     for real art (``ghashghai`` 0.06 at n=678, ``tile_panel_delft`` 0.07 at n=463).
     That is the detection-count/hierarchy-fragmentation limit (#9), not a flaw in
-    the measure, and it is what keeps nesting — and the score-integration built on
-    it — from fully closing #29. See AUDIT.md §17. ``None`` for fewer than two
-    centres, where there is nothing to nest.
+    the measure. It is the discriminator form of the count-invariant ``wholeness``
+    the reported score is now gated by (``centres.energy``); here it is the raw
+    largest-tree fraction, because the discrimination stage compares against a
+    same-scale noise cloud and needs no random-field correction. See AUDIT.md §17.
+    ``None`` for fewer than two centres, where there is nothing to nest.
     """
-    n = len(centers)
-    if n < 2:
+    if len(centers) < 2:
         return None
-    parent = list(range(n))
-
-    def find(a):
-        while parent[a] != a:
-            parent[a] = parent[parent[a]]
-            a = parent[a]
-        return a
-
-    for i, c in enumerate(centers):
-        p = getattr(c, "parent", None)
-        if p is not None:
-            ra, rb = find(i), find(int(p))
-            if ra != rb:
-                parent[ra] = rb
-    return max(Counter(find(i) for i in range(n)).values()) / n
+    return largest_containment_fraction(centers)
 
 
 def or_rule(axes):

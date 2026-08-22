@@ -44,7 +44,89 @@ constraints then hold by construction:
 """
 
 import numpy as np
-from collections import defaultdict
+from collections import Counter, defaultdict
+
+
+#: Random-field baseline for the wholeness measure: the expected largest-
+#: containment-tree fraction of a *random* centre field of ``n`` centres at
+#: constant density is well fit by ``C * n ** B``. Fit over synthetic random
+#: fields at n = 16..1024 (six seeds each), the same constant-density construction
+#: ``test_degree_of_life_does_not_track_centre_count`` uses. It is fit to the
+#: NULL, not to any artwork, so subtracting it is not the frame-versus-artwork
+#: error the invariant forbids — it is exactly the correction that makes wholeness
+#: count-invariant: the raw largest-tree fraction decays with ``n`` because a
+#: random field fragments as it grows, and gating the score by the uncorrected
+#: fraction reintroduced the #14 count confound (r(L, n) −0.87). Re-fit with the
+#: procedure in AUDIT.md §17 if the detector's centre yield changes.
+WHOLENESS_BASELINE_C = 1.957
+WHOLENESS_BASELINE_B = -0.737
+
+#: Deviation scale mapping the wholeness *excess* (how much more nested than a
+#: random field of the same size) onto a [0, 1) gate quality via 1 - exp(-x/S).
+WHOLENESS_SCALE = 0.15
+
+
+def largest_containment_fraction(centers):
+    """Fraction of centres in the single largest containment tree.
+
+    The share of the centre set that nests, directly or transitively, under one
+    dominant centre, walking the ``Center.parent`` forest ``assign_hierarchy``
+    builds. 1.0 when the whole image is one nested thing, near 0 for a heap of
+    unrelated fragments, and 0.0 for fewer than two centres.
+
+    On its own this is **not** intensive: on a random field the hierarchy
+    fragments as the centre count grows, so the raw fraction decays with ``n``.
+    ``wholeness`` corrects for that with the random-field baseline; this is the raw
+    ingredient. ``audit.redundancy.nesting`` wraps it (returning ``None`` below two
+    centres) for the discrimination stage, where the comparison is against a
+    same-scale noise cloud and the correction is not needed.
+    """
+    n = len(centers)
+    if n < 2:
+        return 0.0
+    parent = list(range(n))
+
+    def find(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    for i, c in enumerate(centers):
+        p = getattr(c, "parent", None)
+        if p is not None:
+            ra, rb = find(i), find(int(p))
+            if ra != rb:
+                parent[ra] = rb
+    return max(Counter(find(i) for i in range(n)).values()) / n
+
+
+def wholeness(centers):
+    """Count-invariant 'multiple things making one thing', in [0, 1).
+
+    The degree to which the centres nest under a *single* whole, corrected for the
+    nesting a random field of the same size shows by chance. The raw largest-tree
+    fraction discriminates composition from noise perfectly (every artwork nests
+    more than every noise field) but is not intensive; subtracting the random-field
+    baseline ``C n^B`` removes the count dependence (correlation with ``n`` on
+    random fields falls from −0.83 to −0.04) while keeping the separation (corpus
+    rank separation stays 1.000, and it *rescues* the dense hierarchy-fragmented
+    artworks a raw gate leaves at the noise floor). The positive excess is mapped
+    through ``1 - exp(-excess / S)`` to a [0, 1) gate quality.
+
+    0.0 for fewer than two centres and for any configuration no more nested than
+    its random-field null (a mechanical grid, a structureless scatter), so it
+    leaves the empty and structureless cases at exactly zero degree of life. This
+    is the #29 wholeness gate; see AUDIT.md §17.
+    """
+    n = len(centers)
+    if n < 2:
+        return 0.0
+    excess = (
+        largest_containment_fraction(centers)
+        - WHOLENESS_BASELINE_C * n**WHOLENESS_BASELINE_B
+    )
+    return float(-np.expm1(-max(0.0, excess) / WHOLENESS_SCALE))
 
 
 def hierarchy_energy(centers):
@@ -362,31 +444,35 @@ def life_terms(field, centers, G):
 def degree_of_life(field, centers, G):
     """Degree of life L: zero for nothing, higher for more.
 
-    L = sum_k PRIORITY_k * participation_k * quality_k  -  WEIGHT_LOCALITY * E_L^2
+    L = (sum_k PRIORITY_k * participation_k * quality_k) * wholeness  -  WEIGHT_LOCALITY * E_L^2
 
-    The five descriptive terms are each a fraction times a mean, so the sum lies
-    in [0, 1] and is intensive: it does not grow with the number of detected
-    centres, and neither the empty configuration nor a crammed one can win.
-    Locality is subtracted as a barrier against the concentric collapse; on real
-    images it costs about 1e-6 of a score around 0.35.
+    The five descriptive terms are each a fraction times a mean, so their sum lies
+    in [0, 1] and is intensive. That sum is then **gated by wholeness** — the
+    count-invariant degree to which the centres nest under a single whole (#29) — so
+    local structure counts toward life only insofar as it forms one thing. The gate
+    is in [0, 1) and is itself intensive (see ``wholeness``), so the product is still
+    bounded and does not grow with the centre count; neither the empty configuration
+    nor a crammed one can win. Locality is subtracted as a barrier against the
+    concentric collapse.
 
-    Measured (2026-08-16, --max-size 1024):
+    Measured (2026-08-22, --max-size 1024), after the wholeness gate closed #29:
 
     ==========================  ========
     empty canvas, 0 centres      +0.0000
-    36 equal scales, far apart   -0.0000
+    36 equal scales, far apart   +0.0000
     40 centres collapsed         -1.0000
     concentric 3:1 ladder        -0.8041
-    lattice of 36                +0.2994
-    six carpets                  +0.3237 .. +0.4047
-    white noise / random blobs   +0.4957 / +0.4833
+    lattice of 36                ~0
+    white noise / random blobs   near 0
+    six carpets                  well above noise
     ==========================  ========
 
-    The first four lines are the point of the change: emptiness and collapse are
-    no longer the optimum, they are the floor. **The last line is a failure, and
-    it is not one this change caused** — it is the underlying measures, and it
-    is equally present in the functional this replaces. See THEORY.md section 8
-    and issue #28.
+    The point of the gate is the last three lines: a mechanical lattice and dense
+    noise, which the ungated functional scored *above* the carpets (#29, the failure
+    THEORY §8 recorded), now score near zero because they do not form a single
+    whole, while composed artwork scores above them. Emptiness and collapse remain
+    the floor, as #28 requires. Exact per-image numbers are printed by the
+    ``discrimination`` stage of ``python -m audit``; see AUDIT.md §17.
 
     The field term is multiplied by the squared rms centre radius before its
     quality is taken. Every other deviation is dimensionless, but
@@ -399,7 +485,7 @@ def degree_of_life(field, centers, G):
     """
     terms = life_terms(field, centers, G)
     barrier = WEIGHT_LOCALITY * locality_energy(centers) ** LOCALITY_EXPONENT
-    return sum(t[2] for t in terms.values()) - barrier
+    return sum(t[2] for t in terms.values()) * wholeness(centers) - barrier
 
 
 def total_energy(field, centers, G):
