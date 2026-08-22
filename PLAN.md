@@ -68,7 +68,7 @@ OPEN   A2  #9  scale ladder from edge_spacing   (attempted+reverted: ladder is N
 OPEN   A6 #13  detection exactly equivariant under isometry AND inversion (merges #30)
               (isometry Δ 5.9->0.21, inversion Δ 0.18->0.043; both accepted, exactness optional)
 OPEN   A7 #27  field scale + detection threshold together  (attempt reverted)
-OPEN   B3 #16  re-derive the remaining reference constants (clamping done)
+DONE   B3 #16  reference constants re-derived: rise() -> soft-sat 10*(1-e^-x/S), S=corpus_median/ln2 (no pinning, no flooring); clamping done earlier
 OPEN   B4 #17  wire audit thresholds into CI
 OPEN   D3 #23  error bars / median over benign transforms
 OPEN   D4 #24  correct docs   (THEORY.md done; images/README.md stale)

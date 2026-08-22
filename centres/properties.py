@@ -636,13 +636,34 @@ def compute_all(field, centers, G, gray=None):
     }
 
 
+#: Soft-saturation scale S for each ↑ property that has a reference level:
+#: ``normalize_all`` maps its raw value through ``10·(1 − e^(−x/S))``. Each S is the
+#: corpus **median / ln 2**, so the median artwork maps to exactly 5.0 and the range
+#: stays open at both ends (nothing pins at 10). Measured over the 44-image corpus at
+#: --max-size 1024 (2026-08-22); re-measure with the same corpus if the front end
+#: changes. These are display-normalisation constants only — the reported degree of
+#: life is computed from the energy terms, not from these 0–10 property scores — so
+#: anchoring them to the corpus is the documented intent ("typical values span 3–8"),
+#: not the frame-versus-artwork error the score invariant forbids. Raw corpus medians:
+#: strong_centres 0.685, alternating_repetition 0.118, simplicity 0.228,
+#: not_separateness 0.0039. See #16 and AUDIT.md §8.
+SATURATION = {
+    "strong_centres": 0.989,          # 0.6853 / ln 2
+    "alternating_repetition": 0.170,  # 0.1181 / ln 2
+    "simplicity": 0.328,              # 0.2275 / ln 2
+    "not_separateness": 0.00563,      # 0.0039 / ln 2
+}
+
+
 def normalize_all(raw):
     """Map raw property scores to 0–10 wholeness scores (10 = most present).
 
     All 15 scores use the same direction: higher = more of Alexander's property.
     The transformation for each property is either:
       - exp(-k·x) for ↓ properties (penalise positive raw values, ideal = 0)
-      - min(x / ref, 1) · 10 for ↑ properties with a reference saturation level
+      - 10·(1 − e^(−x/S)) for ↑ properties with a soft-saturation scale (see
+        ``SATURATION`` and ``rise``); this replaced the old linear clip, which
+        pinned real artworks at 10.0 (#16)
       - exp(-(x-opt)² / σ²) · 10 for the ~ roughness property (ideal at 0.5)
 
     Scale parameters are set so that typical real-image values span roughly 3–8,
@@ -658,8 +679,23 @@ def normalize_all(raw):
     def decay(x, k):
         return 10.0 * float(np.exp(-k * max(x, 0)))
 
-    def rise(x, ref):
-        return 10.0 * min(float(x) / ref, 1.0)
+    def rise(x, s):
+        """Soft-saturating rise, 10·(1 − e^(−x/s)): 0 at x=0, → 10 as x grows.
+
+        Replaces the old linear clip ``10·min(x/ref, 1)``. The clip pinned real
+        artworks at exactly 10.0 — ``not_separateness`` did so for 4 of the 44 corpus
+        images (and for half of the old six-carpet corpus), and the ceiling ties
+        were being read as agreement between artworks when they were only evidence
+        that the constant was too low (#16, AUDIT.md §8). It also *floored* the
+        opposite cases: ``strong_centres`` and ``simplicity`` spanned only 0.5–1.1
+        and 1.6–3.1 of the 0–10 range. A soft exponential — the same shape
+        ``decay`` and the energy reward already use — never pins, and anchoring its
+        scale at the corpus median (below) puts the typical artwork at 5 with the
+        range open at both ends, whatever the shape of the raw distribution (which
+        for ``not_separateness`` is strongly right-skewed, so no linear constant
+        could span 3–8 without pinning the tail).
+        """
+        return 10.0 * float(-np.expm1(-max(float(x), 0.0) / s))
 
     def roughness_peak(x):
         return 10.0 * float(np.exp(-((x - 0.5) ** 2) / 0.04))
@@ -677,11 +713,8 @@ def normalize_all(raw):
     transforms = {
         # ↑ properties already on a natural 0-1 scale
         **{k: (lambda x: 10.0 * min(max(float(x), 0.0), 1.0)) for k in direct},
-        # ↑ properties with a reference saturation level
-        "strong_centres": lambda x: rise(x, 10.0),
-        "alternating_repetition": lambda x: rise(x, 0.2),
-        "simplicity": lambda x: rise(x, 1.0),
-        "not_separateness": lambda x: rise(x, 0.02),
+        # ↑ properties with a soft-saturation scale (see SATURATION and rise)
+        **{k: (lambda x, s=s: rise(x, s)) for k, s in SATURATION.items()},
         # ↓ property — lower raw = better
         "the_void": lambda x: decay(x, 40.0),
         # ~ roughness — ideal at moderate irregularity, peak at 0.5

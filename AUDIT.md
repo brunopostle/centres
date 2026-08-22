@@ -385,13 +385,27 @@ edges fall in the inner third of the edge-admission radius, which is fixed by th
 graph constants; simplicity is the Gini coefficient of strengths, which after ten
 diffusion steps is largely set by graph topology.
 
-## 8. Normalisation constants saturate
+## 8. Normalisation constants saturate — fixed (#16)
 
-`rise(x, ref)` clips at `ref`. With `ref = 0.02` for not-separateness, three of
-six carpets pin at exactly 10.0; with `ref = 0.2` for alternating repetition,
-four of six pin at 10.0. `boundaries` uses `10 * (1 - raw)` with no clamp and can
-go negative. Ceiling ties are being read as agreement between artworks when they
-are only evidence that the reference constant is too low.
+The original `rise(x, ref)` clipped at `ref`. With `ref = 0.02` for not-separateness,
+three of six carpets pinned at exactly 10.0; with `ref = 0.2` for alternating
+repetition, four of six pinned; and the opposite mis-scaling floored `strong_centres`
+and `simplicity` into the bottom tenth of the range. Ceiling ties were being read as
+agreement between artworks when they were only evidence that the constant was wrong.
+
+**Fixed.** The nine measures redefined against the source (#22) lost their reference
+constants entirely (they return a [0, 1] value scaled directly). The four that keep a
+reference level — `strong_centres`, `alternating_repetition`, `simplicity`,
+`not_separateness` — now use a **soft-saturating** map `10·(1 − e^(−x/S))` instead of
+the linear clip, with `S = corpus_median / ln 2` so the median artwork maps to 5.0 and
+nothing pins at 10 (`properties.SATURATION`, measured over the 44-image corpus). This
+matters especially for `not_separateness`, whose raw distribution is strongly
+right-skewed (0.0003–0.0399): no *linear* constant could span 3–8 without either
+pinning the tail or flooring the median, but the exponential does. These are
+display-normalisation constants only — the reported degree of life is computed from
+the energy terms, not these 0–10 scores — so anchoring them to the corpus is the
+documented intent, not the frame-versus-artwork error the *score* invariant forbids.
+`boundaries` no longer goes negative (its clamp was added earlier under #16).
 
 ## 9. There are not fifteen independent measures
 
