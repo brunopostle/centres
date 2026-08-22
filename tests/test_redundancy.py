@@ -114,3 +114,61 @@ def test_combined_separation_or_rule():
     frac2, margin2 = redundancy.combined_separation([2.0, 2.6], [0.02, 0.30],
                                                     noise_se, noise_mo)
     assert frac2 == 1.0 and margin2 > 0
+
+
+def _nested(parents):
+    """Centres whose ``parent`` pointers are given (None for a root)."""
+    cs = [Center(id=i, x=0.0, y=0.0, scale=10.0, strength=0.5) for i in range(len(parents))]
+    for c, p in zip(cs, parents):
+        c.parent = p
+    return cs
+
+
+def test_nesting_none_below_two():
+    assert redundancy.nesting([]) is None
+    assert redundancy.nesting(_nested([None])) is None
+
+
+def test_nesting_low_when_no_hierarchy():
+    """No parent pointers -> every centre is its own tree -> 1/n, near zero for many."""
+    assert redundancy.nesting(_nested([None] * 50)) == pytest.approx(1 / 50)
+
+
+def test_nesting_one_when_all_nest_under_one_whole():
+    """A star: every lesser centre nests under a single root -> the whole is one thing."""
+    assert redundancy.nesting(_nested([None] + [0] * 49)) == pytest.approx(1.0)
+
+
+def test_nesting_is_fraction_of_largest_tree():
+    """Two disjoint trees (sizes 5 and 2) -> the larger share, 5/7."""
+    parents = [None, 0, 0, 0, 0, None, 5]  # {0,1,2,3,4} and {5,6}
+    assert redundancy.nesting(_nested(parents)) == pytest.approx(5 / 7)
+
+
+def test_nesting_follows_deep_chains():
+    """A chain 0<-1<-2<-3 is still one tree via union-find, not just direct children."""
+    assert redundancy.nesting(_nested([None, 0, 1, 2])) == pytest.approx(1.0)
+
+
+def test_or_rule_third_axis_rescues():
+    """An artwork failing entropy and coherence is separated if nesting clears its ceiling."""
+    noise_se = [2.6, 2.55]         # entropy floor 2.55 (low=life)
+    noise_mo = [0.05, 0.07]        # coherence ceiling 0.07 (high=life)
+    noise_ne = [0.05, 0.06]        # nesting ceiling 0.06 (high=life)
+    # one artwork: high entropy, low coherence, but strongly nested
+    art_se, art_mo, art_ne = [2.65], [0.04], [0.40]
+    frac, margin = redundancy.or_rule([
+        (art_se, noise_se, False),
+        (art_mo, noise_mo, True),
+        (art_ne, noise_ne, True),
+    ])
+    assert frac == 1.0 and margin == pytest.approx(0.40 - 0.06)
+
+
+def test_or_rule_matches_two_axis_combined():
+    """or_rule with the two entropy/coherence axes reproduces combined_separation."""
+    noise_se, noise_mo = [2.6, 2.7, 2.55], [0.05, 0.07, 0.03]
+    art_se, art_mo = [2.0, 2.65, 2.65], [0.02, 0.30, 0.04]
+    a = redundancy.combined_separation(art_se, art_mo, noise_se, noise_mo)
+    b = redundancy.or_rule([(art_se, noise_se, False), (art_mo, noise_mo, True)])
+    assert a == b

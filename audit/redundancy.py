@@ -15,12 +15,23 @@ of scales and strengths; noise spreads across every scale and strength there is.
 That is a *global* property of the centre population's distribution, not of any
 local relation, so no per-edge measure sees it and the aggregate is blind to it.
 
-This module measures that redundancy two ways and is used by the ``discrimination``
-stage of the audit. **Neither is wired into the reported score.** They are
-candidates, recorded here with the evidence for and against each, because
-adopting one into the degree of life is blocked on two open issues (see below).
+Redundancy is one answer, but not the deepest one. The deepest is that a
+composition is **one thing made of many**: the lesser centres nest under a
+dominant whole. That is a *global* structural fact too, and it turns out to be the
+strongest discriminator of all — see ``nesting`` below. This module measures three
+global statistics, used by the ``discrimination`` stage of the audit: ``strength_entropy``
+(redundancy), ``spatial_coherence`` (are the strengths arranged coherently in
+space) and ``nesting`` (do the parts form a single whole). On the 44-artwork corpus
+their single-axis rank separations against noise are 0.949, 0.977 and **1.000**.
 
-The two measures, and why one is usable and one is not *yet*:
+**None is wired into the reported score.** A wholeness gate built on ``nesting`` was
+measured to lift the score's own #29 separation from 0.131 to ~0.99 and to fix the
+mechanical-grid interior-optimum at the same time, but it does not fully close #29
+(two dense, hierarchy-fragmented artworks remain) and it redefines the score's
+calibrated semantics; see AUDIT.md §17. So these stay candidates, ORed together in
+the ``discrimination`` stage, recorded here with the evidence for and against each.
+
+The three measures, and why each earns its place:
 
 ``strength_entropy`` — Shannon entropy of the centre-strength distribution.
   Separates all six carpets from noise (carpet 1.99–2.38, noise 2.53–2.74) with a
@@ -97,6 +108,8 @@ set of centres first (#9, re-scoped to detection-count stability). And the
 floor/ceiling are still constants — derived from noise rather than fitted to art,
 which is more defensible, but constants. See AUDIT.md §17.
 """
+
+from collections import Counter
 
 import numpy as np
 from scipy.spatial import cKDTree
@@ -177,27 +190,107 @@ def spatial_coherence(centers, k=6):
     return float((z[:, None] * neighbours).sum() / (k * zz))
 
 
+def nesting(centers):
+    """Fraction of centres in the single largest containment tree — 'multiple
+    things making one thing', and the strongest discriminator of the three.
+
+    A composition is *one* thing built from many: the lesser centres nest under a
+    dominant containing centre, which nests under a larger one, up to the whole.
+    This walks ``Center.parent`` (assigned by ``assign_hierarchy`` — the smallest
+    centre whose extent contains each) as an undirected forest and returns the
+    share of centres in its biggest tree. It is Alexander's actual claim, that a
+    whole is a single centre all lesser centres support, made countable.
+
+    Why it beats both entropy and coherence. Noise has almost no nesting — its
+    centres are all one size, so none contains a meaningful share of the rest
+    (measured 0.01–0.06); a *mechanical grid* is flat for the same reason (≈0.10),
+    which is why nesting does **not** fall into the interior-optimum trap that
+    ``strength_entropy`` does — a grid is middling here, not maximal. Every one of
+    the 44 artworks nests more than every noise field (single-axis rank separation
+    1.000 at native resolution, against 0.977 for coherence and 0.949 for entropy),
+    and — because containment is measured in relative *extent*, not pixel
+    neighbourhoods — it survives downscaling where local coherence collapses: the
+    two paintings whose coherence the local axis loses at 512 (``the_herald``,
+    ``et_in_arcadia_ego``) keep a wide nesting margin under every practical
+    transform, and ``varamin``, which *both* coherence and entropy miss, is caught
+    by nesting because it is still one deeply-nested carpet.
+
+    Its one weakness is *dense* images: when the detector resolves many hundreds of
+    centres the hierarchy fragments into many small trees, so nesting reads low even
+    for real art (``ghashghai`` 0.06 at n=678, ``tile_panel_delft`` 0.07 at n=463).
+    That is the detection-count/hierarchy-fragmentation limit (#9), not a flaw in
+    the measure, and it is what keeps nesting — and the score-integration built on
+    it — from fully closing #29. See AUDIT.md §17. ``None`` for fewer than two
+    centres, where there is nothing to nest.
+    """
+    n = len(centers)
+    if n < 2:
+        return None
+    parent = list(range(n))
+
+    def find(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    for i, c in enumerate(centers):
+        p = getattr(c, "parent", None)
+        if p is not None:
+            ra, rb = find(i), find(int(p))
+            if ra != rb:
+                parent[ra] = rb
+    return max(Counter(find(i) for i in range(n)).values()) / n
+
+
+def or_rule(axes):
+    """Generalised 'A OR B OR …' separation of art from noise over several axes.
+
+    ``axes`` is a list of ``(art_values, noise_values, higher_is_life)``. Each axis
+    contributes a bound taken from the noise cloud — its ``max`` when higher is life
+    (a ceiling to clear), its ``min`` when lower is life (a floor to stay under) —
+    so no bound is fitted to the art it judges. An artwork is separated if it clears
+    *any* axis; its margin is the best (``max``) of the per-axis margins.
+
+    Returns ``(fraction_separated, tightest_margin)``: the fraction of artworks that
+    clear at least one axis, and the smallest margin over the artworks — how close
+    the whole rule comes to failing. An OR because a transform must break *every*
+    axis at once to misclassify an artwork, and the axes fail on disjoint artworks.
+    """
+    bounds = []
+    for art_v, noise_v, higher in axes:
+        nz = [v for v in noise_v if v is not None]
+        bounds.append(max(nz) if higher else min(nz))
+    n_art = len(axes[0][0])
+    margins = []
+    for i in range(n_art):
+        per_axis = []
+        for (art_v, _, higher), bound in zip(axes, bounds):
+            v = art_v[i]
+            if v is None:
+                continue
+            per_axis.append((v - bound) if higher else (bound - v))
+        if per_axis:
+            margins.append(max(per_axis))
+    if not margins:
+        return None, None
+    return sum(m > 0 for m in margins) / len(margins), min(margins)
+
+
 def combined_separation(art_se, art_mo, noise_se, noise_mo):
-    """The 'redundancy OR spatial coherence' rule, evaluated against the noise cloud.
+    """The 'redundancy OR spatial coherence' rule — the two-axis case of ``or_rule``.
 
     An artwork counts as separated from noise if its strength entropy is below the
     noise floor (``min`` over the noise samples) *or* its spatial coherence is above
     the noise ceiling (``max`` over them). Both bounds are taken from noise, not from
-    art, so the rule is not fitted to the corpus it judges.
+    art, so the rule is not fitted to the corpus it judges. Kept as a named
+    two-axis entry point; the ``discrimination`` stage now ORs in ``nesting`` as a
+    third axis via ``or_rule`` directly.
 
-    Returns ``(fraction_separated, tightest_margin)``. The margin is
-    ``max(floor - entropy, coherence - ceiling)`` — positive when at least one axis
-    clears the noise cloud — and its minimum over the artworks is how close the rule
-    comes to failing. On the 32-artwork corpus this is 1.0 and +0.15 at rest, and
-    stays 1.0 with a tightest margin of +0.074 across all benign/practical transforms.
+    Returns ``(fraction_separated, tightest_margin)``. On the 44-artwork corpus this
+    is 1.0 and +0.154 at rest.
     """
-    floor = min(v for v in noise_se if v is not None)
-    ceiling = max(v for v in noise_mo if v is not None)
-    margins = [max(floor - se, mo - ceiling)
-               for se, mo in zip(art_se, art_mo) if se is not None and mo is not None]
-    if not margins:
-        return None, None
-    return sum(m > 0 for m in margins) / len(margins), min(margins)
+    return or_rule([(art_se, noise_se, False), (art_mo, noise_mo, True)])
 
 
 def pairwise_order(art, noise, life_is_higher_for_art=True):

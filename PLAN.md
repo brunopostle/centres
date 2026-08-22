@@ -72,7 +72,7 @@ OPEN   B3 #16  re-derive the remaining reference constants (clamping done)
 OPEN   B4 #17  wire audit thresholds into CI
 OPEN   D3 #23  error bars / median over benign transforms
 OPEN   D4 #24  correct docs   (THEORY.md done; images/README.md stale)
-OPEN      #29  noise outscores every artwork   (diagnosed; OR-rule passes painting test at native res, resolution-gated -> #9)
+OPEN      #29  noise outscores every artwork   (nesting axis: single-axis sep 1.000; wholeness gate lifts score sep 0.131->0.99 + fixes grid; blocked on #9,#16)
 DONE      #30  tone inversion: detector + measures fixed (Δ 0.18->0.043, accepted); merged into #13
 OPEN   D2 #22  alternating repetition still fails (needs periodicity, no region cue)
 DONE      #31  boundaries/deep_interlock tone-robust: fixed 128 -> symmetrised Otsu (gamma spread 2.9->0.25, 1.7->0.46)
@@ -97,18 +97,23 @@ for a new session to start:
    practical transform) — is a **global** redundancy statistic: the entropy of the
    centre population's strength distribution. The missing ingredient is an
    organised-complexity term. See `audit/redundancy.py`. **A robust discriminator
-   now exists (AUDIT §17): redundancy OR spatial coherence.**
-   Strength-entropy (redundancy) alone drops to 0.949 on the wider corpus — a bold
-   Egyptian tile and non-repetitive works cross at rest. Adding `spatial_coherence`
-   (Moran's I of strength: do neighbouring centres resemble each other?) closes it:
-   the two fail on *disjoint* artworks, and the rule "alive = entropy below noise
-   floor OR coherence above noise ceiling" separates all 44 from noise at native
-   resolution (tightest margin +0.154). **The painting test is now run and passes at
-   native resolution** (point 2): coherence is the axis a non-repetitive painting
-   relies on, and with the paintings added it is the single strongest axis (0.977 vs
-   0.949). Not yet in the score (needs the interior-optimum/grid treatment, a
-   non-corpus-specific threshold, and — new from the painting test — detection-count
-   stability across resolution, since the coherence-only works are resolution-gated).
+   now exists (AUDIT §17): redundancy OR spatial coherence OR nesting** — three axes
+   that fail on disjoint artworks, separating all 44 from noise at native resolution
+   (tightest margin +0.155). The strongest by far is **`nesting`** — the fraction of
+   centres in the single largest containment tree, i.e. "multiple things making one
+   thing." Single-axis rank separations: entropy 0.949, coherence 0.977, **nesting
+   1.000**. Nesting alone rank-separates every artwork from noise, survives
+   downscaling where coherence collapses, catches `varamin` that both others miss,
+   and — unlike entropy — is NOT an interior optimum (a mechanical grid is flat, so
+   it nests low). **Score integration is now demonstrated and partial:** a wholeness
+   gate `L = (Σ participationₖ·qualityₖ)·nesting − barrier` lifts the reported
+   score's own #29 separation from 0.131 to 0.99 AND drops the grid from +0.229
+   (above 12 artworks) to +0.024, fixing the interior-optimum too, all while keeping
+   the #28 invariants. Not yet wired into the score: it leaves two dense
+   hierarchy-fragmented works (`ghashghai`, `tile_panel_delft`) at the noise ceiling
+   (needs #9 detection-count stability) and shrinks every score (needs #16 to
+   re-derive SCALE/THEORY reference values). The direction is settled; #9 and #16 are
+   what remain.
 2. **#34 — done: corpus widened to 44 CC-licensed real works** (32 ornament — 17
    carpets, 15 tile panels — plus **12 non-repetitive Beardsley illustrations**; the
    owner added them out of band, since this environment's egress policy denies image

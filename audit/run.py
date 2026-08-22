@@ -33,6 +33,7 @@ def _redundancy(centers):
         "strength_entropy": rdcy.strength_entropy(centers),
         "scale_entropy": rdcy.scale_entropy(centers),
         "spatial_coherence": rdcy.spatial_coherence(centers),
+        "nesting": rdcy.nesting(centers),
     }
 
 
@@ -165,7 +166,8 @@ def _analyze_scaled(img, max_size=1024):
     return (-energy,
             rdcy.strength_entropy(centers),
             rdcy.scale_entropy(centers),
-            rdcy.spatial_coherence(centers))
+            rdcy.spatial_coherence(centers),
+            rdcy.nesting(centers))
 
 
 def discrimination(corpus_scores):
@@ -190,10 +192,11 @@ def discrimination(corpus_scores):
     """
     _header("Discrimination: does the score rank artworks above noise?  (#29)")
 
-    # (life, strength_entropy, scale_entropy, spatial_coherence) per artwork, taken
-    # from the corpus stage's results (index 1 is life, index 3 the redundancy dict).
+    # (life, strength_entropy, scale_entropy, spatial_coherence, nesting) per
+    # artwork, taken from the corpus stage's results (index 1 is life, index 3 the
+    # redundancy dict).
     art = {f: (v[1], v[3]["strength_entropy"], v[3]["scale_entropy"],
-               v[3]["spatial_coherence"])
+               v[3]["spatial_coherence"], v[3]["nesting"])
            for f, v in corpus_scores.items()}
     # Several seeds per noise generator, not one. The noise floor is itself a
     # sampled quantity — a smooth-noise strength entropy ranges 2.54–2.59 across
@@ -229,21 +232,24 @@ def discrimination(corpus_scores):
          note="   redundancy, transform-FRAGILE (#9)")
     line("  spatial_coherence", col(art, 3), col(noise, 3), True,
          note="   Moran's I of strength; complements entropy")
+    line("  nesting", col(art, 4), col(noise, 4), True,
+         note="   largest containment tree; strongest, resolution-robust")
 
-    # The combination that actually separates the wider corpus: alive if redundant
-    # OR spatially coherent. The two axes fail on disjoint artworks, so the OR
-    # clears every one where neither single axis does. See AUDIT.md §17.
-    frac, margin = rdcy.combined_separation(col(art, 1), col(art, 3),
-                                            col(noise, 1), col(noise, 3))
-    print(f"\n  COMBINED — alive if (strength_entropy < noise floor) OR "
-          f"(spatial_coherence > noise ceiling):")
+    # The combination that separates the wider corpus: alive if redundant OR
+    # spatially coherent OR nested into one whole. The three axes fail on disjoint
+    # artworks, so the OR clears every one where no single axis does. See §17.
+    frac, margin = rdcy.or_rule([(col(art, 1), col(noise, 1), False),
+                                 (col(art, 3), col(noise, 3), True),
+                                 (col(art, 4), col(noise, 4), True)])
+    print(f"\n  COMBINED — alive if (strength_entropy < floor) OR "
+          f"(spatial_coherence > ceiling) OR (nesting > ceiling):")
     print(f"  {'':<22} {frac * len(art):.0f}/{len(art)} artworks separated from noise"
           f"   tightest margin {margin:+.3f}"
-          f"   {'(all separated)' if frac == 1.0 else '(some cross both axes)'}")
+          f"   {'(all separated)' if frac == 1.0 else '(some cross every axis)'}")
 
     print(f"\n  mechanical reference: regular_grid  "
-          f"strength_entropy {grid[1]:.3f}, scale_entropy {grid[2]:.3f}, "
-          f"spatial_coherence {grid[3]:.3f}")
+          f"strength_entropy {grid[1]:.3f}, spatial_coherence {grid[3]:.3f}, "
+          f"nesting {grid[4]:.3f}")
     return {"life_sep": rdcy.pairwise_order(col(art, 0), col(noise, 0), True),
             "strength_entropy_sep": se, "combined_sep": frac}
 
