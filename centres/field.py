@@ -271,29 +271,27 @@ def build_structural_field(image):
        edge spacing leaves the field on the retained region essentially
        unchanged (see AUDIT.md and the A4 notes in PLAN.md).
 
-    3. Normalisation — the field is divided by its own maximum, which is a known
-       weakness rather than a design choice.
+    3. Normalisation — the field is divided by its own maximum, which means a
+       single pixel, whichever happens to be furthest from an edge, sets the
+       amplitude of the whole image. That used to matter because detect_centers
+       compared the result to an absolute LoG threshold; it no longer does, so
+       rescaling the field can no longer change what gets detected. See the
+       project invariant note above and #27.
+    """
+    field, _ = _field_and_distance(image)
+    return field
 
-       It means a single pixel, whichever happens to be furthest from an edge,
-       sets the amplitude of the whole image, while detect_centers applies an
-       absolute LoG threshold to the result. That coupling is how vignetting used
-       to do its damage: corners lost edges, the distance transform there ran to
-       the cap, field.max() jumped (varamin 32 to 69), and every centre count
-       moved. Correction 2 defuses most of it — where the cap bites, field.max()
-       *is* the cap, which is a property of the artwork.
 
-       Dividing by the cap directly was tried and reverted (#27). It is
-       near-identical on the corpus, where the cap always bites, but it breaks
-       wherever the cap does not: on a sparse lattice CAP_SPACINGS * spacing is
-       270 px against a largest actual distance of 74, so the field peaks at 0.27
-       and the absolute 0.08 threshold rejects nearly every detection. Centre
-       counts on the synthetic generators collapsed from hundreds to single
-       figures.
+def _field_and_distance(image):
+    """Shared implementation behind build_structural_field.
 
-       The lesson is that the field's scale and the detection threshold cannot be
-       fixed independently: whatever sets the amplitude has to be the same
-       quantity the threshold is expressed in. Left coupled and honest until both
-       are addressed together.
+    Returns ``(field, dist)`` where ``dist`` is the *raw*, uncapped Euclidean
+    distance-to-edge transform the field is built from. ``build_structural_field``
+    exposes only ``field``; ``detect_centers`` additionally needs ``dist`` itself
+    to tell a real bounded centre from a local maximum on a structureless plateau
+    (#8) -- the distinction the capped, normalised field has already discarded.
+    Split out so both can share one (8x-orientation) edge detection pass rather
+    than paying for it twice.
     """
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     edges = _detect_edges(gray)
@@ -304,11 +302,11 @@ def build_structural_field(image):
         # No usable medial axis: no edges at all, or every pixel an edge. There
         # is no structure to measure and no scale to express it in, so the field
         # is empty rather than an arbitrary constant.
-        return np.zeros(gray.shape, dtype=float)
-    dist = np.minimum(dist, CAP_SPACINGS * spacing)
+        return np.zeros(gray.shape, dtype=float), dist
+    capped = np.minimum(dist, CAP_SPACINGS * spacing)
     blur = gaussian_filter(gray.astype(float) / 255.0, sigma=3)
-    field = dist + 0.1 * blur
-    return field / (field.max() + 1e-8)
+    field = capped + 0.1 * blur
+    return field / (field.max() + 1e-8), dist
 
 
 def reconstruct_field(shape, centers):

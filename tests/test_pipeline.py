@@ -1,6 +1,8 @@
+import cv2
 import numpy as np
 import pytest
 from centres.centers import Center
+from centres.field import _field_and_distance
 from centres.pipeline import detect_centers, assign_hierarchy, analyze
 
 
@@ -65,6 +67,76 @@ def test_detect_centers_invariant_to_field_amplitude():
         assert c1.x == pytest.approx(c2.x)
         assert c1.y == pytest.approx(c2.y)
         assert c1.scale == pytest.approx(c2.scale)
+
+
+def _circle_canvas(size=400, r=40, bg=230, fg=40):
+    img = np.full((size, size, 3), bg, np.uint8)
+    cv2.circle(img, (size // 2, size // 2), r, (fg, fg, fg), -1)
+    return img
+
+
+def _lattice_canvas(size=400, n=3, r=25, bg=230, fg=40, margin=60):
+    img = np.full((size, size, 3), bg, np.uint8)
+    positions = np.linspace(margin, size - margin, n)
+    centres = []
+    for y in positions:
+        for x in positions:
+            cv2.circle(img, (int(x), int(y)), r, (fg, fg, fg), -1)
+            centres.append((y, x))
+    return img, centres
+
+
+def test_single_circle_on_blank_canvas_yields_one_centre():
+    """A single circle on an otherwise empty canvas must detect exactly the
+    circle, not the canvas corners (#8).
+
+    Before the enclosure filter, the distance transform is *largest* at
+    whichever point is farthest from the circle's edge -- typically a canvas
+    corner -- so the corners and edge-midpoints outscored the circle itself
+    and the circle wasn't detected at all (its LoG response never cleared the
+    detection threshold once four corners and four edge-midpoints did first).
+    """
+    field, dist = _field_and_distance(_circle_canvas())
+    centers = detect_centers(field, dist)
+    assert len(centers) == 1
+    c = centers[0]
+    assert np.hypot(c.x - 200, c.y - 200) < 15
+
+
+def test_circle_lattice_has_no_corner_or_margin_detections():
+    """Every circle in a 3x3 lattice is detected, and nothing is detected in
+    the blank margin around them -- in particular not at the four canvas
+    corners, the plateau this issue is about (#8).
+
+    Total count is not asserted at exactly 9: real, closely-spaced circles
+    also produce genuine local maxima in the gaps between them (interstitial
+    "background" centres, a real and separately-handled population -- see
+    Center.polarity and #26 -- not a plateau artifact). Those are legitimately
+    enclosed by nearby structure on every side, which is exactly what this
+    filter is checking for, so it correctly leaves them alone.
+    """
+    img, true_centres = _lattice_canvas()
+    field, dist = _field_and_distance(img)
+    centers = detect_centers(field, dist)
+
+    for (ty, tx) in true_centres:
+        nearest = min(np.hypot(c.x - tx, c.y - ty) for c in centers)
+        assert nearest < 15, f"no detection near true circle at ({tx}, {ty})"
+
+    h, w = img.shape[:2]
+    margin = 30
+    for c in centers:
+        in_margin = (
+            c.x < margin or c.x > w - margin or c.y < margin or c.y > h - margin
+        )
+        assert not in_margin, f"spurious margin/corner detection at ({c.x}, {c.y})"
+
+
+def test_detect_centers_without_dist_skips_enclosure_filter():
+    """dist is optional (most unit tests detect on a hand-built field with no
+    distance transform to give); omitting it must not change behaviour."""
+    field = gaussian_field(yx=(50, 60), sigma=10)
+    assert detect_centers(field) == detect_centers(field, None)
 
 
 # --- assign_hierarchy ---
