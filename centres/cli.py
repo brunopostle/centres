@@ -2,11 +2,13 @@ import argparse
 import json
 import sys
 import cv2
+import numpy as np
 
 from .pipeline import analyze, evolve
 from .graph import build_graph
 from .visualize import visualize
 from .properties import compute_all, normalize_all
+from .transforms import BENIGN
 
 
 _PROPERTY_LABELS = [
@@ -116,8 +118,99 @@ def _emit(args, n_centers, energy, raw_scores):
         print_properties(raw_scores)
 
 
+def _median_spread(values):
+    """(median, half-range) over the defined values; (None, None) if none defined.
+
+    The half-range ``(max - min) / 2`` is the error bar: it brackets the values the
+    measure actually took across the transforms, so ``median ± err`` says "this is
+    the score, and this is how far a structure-preserving change moved it". A
+    measure that is genuinely invariant reports ± ~0; one that is fragile reports a
+    wide bar, which is the honest signal #23 is after.
+    """
+    vals = [v for v in values if v is not None]
+    if not vals:
+        return None, None
+    a = np.asarray(vals, dtype=float)
+    return float(np.median(a)), float((a.max() - a.min()) / 2.0)
+
+
+def robust_analyse(img, transforms=BENIGN):
+    """Score an image as the median over structure-preserving transforms (#23).
+
+    Applies each transform in ``transforms`` — mirror, rot90, gamma, JPEG, tone
+    inversion and the identity, none of which can change the composition — analyses
+    each result, and returns the median and half-range of every 0–10 property score
+    and of the degree of life. The median stabilises the estimate against the
+    detector's per-orientation jitter; the half-range is the error bar.
+
+    Returns ``(median_centres, (life_median, life_err), {property: (median, err)})``.
+    """
+    per = []
+    for fn in transforms.values():
+        t = fn(img)
+        field, centers, G, energy = analyze(t)
+        raw = compute_all(field, centers, G, cv2.cvtColor(t, cv2.COLOR_BGR2GRAY))
+        per.append((len(centers), -energy, normalize_all(raw)))
+    n_med = int(np.median([p[0] for p in per]))
+    life = _median_spread([p[1] for p in per])
+    props = {key: _median_spread([p[2][key] for p in per])
+             for key, _ in _PROPERTY_LABELS}
+    return n_med, life, props
+
+
+def _fmt_pm(value, err, width=5, prec=1):
+    if value is None:
+        return f"{_UNDEFINED:>{width}}  {'':>7}"
+    return f"{value:>{width}.{prec}f}  ± {err:.{prec}f}"
+
+
+def print_properties_robust(life, props, n_transforms):
+    (life_med, life_err) = life
+    print()
+    print(f"  Degree of life: {life_med:+.4f} ± {life_err:.4f}"
+          f"   (median over {n_transforms} benign transforms)")
+    print()
+    print("  Alexander's 15 structural properties  (0–10, median ± half-range)")
+    print(f"  {'':>2}  {'property':<24}  {'score':>11}  {'':10}")
+    print("  " + "─" * 68)
+    n_undefined = 0
+    for n, (key, label) in enumerate(_PROPERTY_LABELS, 1):
+        med, err = props[key]
+        if med is None:
+            n_undefined += 1
+            print(f"  {n:>2}  {label:<24}  {_UNDEFINED:>11}  {_bar(None)}")
+        else:
+            print(f"  {n:>2}  {label:<24}  {med:>5.1f} ± {err:<3.1f}  {_bar(med)}")
+    if n_undefined:
+        print()
+        print(f"  {n_undefined} of 15 undefined on the median.")
+    print()
+
+
+def robust_json(n_med, life, props, n_transforms):
+    life_med, life_err = life
+    return {
+        "centres": n_med,
+        "transforms": n_transforms,
+        "degree_of_life": {"median": round(life_med, 4), "error": round(life_err, 4)},
+        "properties": {
+            key: ({"score": None, "error": None} if props[key][0] is None
+                  else {"score": round(props[key][0], 2), "error": round(props[key][1], 2)})
+            for key, _ in _PROPERTY_LABELS
+        },
+    }
+
+
 def cmd_analyse(args):
     img = load_and_rescale(args.image, args.max_size)
+    if getattr(args, "robust", False):
+        n_med, life, props = robust_analyse(img)
+        if args.json:
+            print(json.dumps(robust_json(n_med, life, props, len(BENIGN)), indent=2))
+        else:
+            print(f"Centers (median): {n_med}")
+            print_properties_robust(life, props, len(BENIGN))
+        return
     field, centers, G, energy = analyze(img)
     raw = compute_all(field, centers, G, cv2.cvtColor(img, cv2.COLOR_BGR2GRAY))
     _emit(args, len(centers), energy, raw)
@@ -208,6 +301,14 @@ def main():
         "--json",
         action="store_true",
         help="Emit results as JSON and suppress all other output.",
+    )
+    p_analyse.add_argument(
+        "--robust",
+        action="store_true",
+        help="Score as the median over structure-preserving transforms (mirror, "
+        "rot90, gamma, JPEG, invert), reporting each measure with an error bar. "
+        "Runs the analysis once per transform, so it is ~6x slower, and skips the "
+        "interactive visualisation.",
     )
     p_analyse.set_defaults(func=cmd_analyse)
 

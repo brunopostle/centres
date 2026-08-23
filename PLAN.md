@@ -70,7 +70,7 @@ OPEN   A6 #13  detection exactly equivariant under isometry AND inversion (merge
 OPEN   A7 #27  field scale + detection threshold together  (attempt reverted)
 DONE   B3 #16  reference constants re-derived: rise() -> soft-sat 10*(1-e^-x/S), S=corpus_median/ln2 (no pinning, no flooring); clamping done earlier
 OPEN   B4 #17  wire audit thresholds into CI
-OPEN   D3 #23  error bars / median over benign transforms
+DONE   D3 #23  error bars / median over benign transforms (analyse --robust: median ± half-range over BENIGN; transforms shared into centres/transforms.py)
 OPEN   D4 #24  correct docs   (THEORY.md done; images/README.md stale)
 DONE      #29  noise outscores every artwork   (FIXED: reported score gated by count-invariant wholeness excess=max_tree-C*n^B; audit rank sep 1.000 "complete", count-confound r=-0.41 w/controls; flat lattice now ~0 (deliberate theory change). #16 SCALE re-fit still open/orthogonal)
 DONE      #30  tone inversion: detector + measures fixed (Δ 0.18->0.043, accepted); merged into #13
@@ -640,6 +640,18 @@ can print `boundaries 5.1 ± 0.7`. Scoring each image as the median across a set
 structure-preserving transforms both stabilises the estimate and yields the error
 bar. This makes residual instability visible instead of hidden, and is worth doing
 even if it is the only thing that ever ships.
+
+**Done (2026-08-22).** `centres analyse --robust` scores over the BENIGN group
+(identity, mirror, rot90, gamma, JPEG, invert — none can change composition),
+reporting each 0–10 property and the degree of life as the **median ± half-range**
+over the six. The median stabilises against the detector's per-orientation jitter;
+the half-range is the error bar, so a genuinely invariant measure reports ± ~0 and a
+fragile one reports a wide bar (measured on a synthetic: strong_centres,
+not_separateness ± 0.0; local_symmetries ± 2.0, positive_space ± 1.2). Opt-in
+because it is ~6× slower; text and `--json` both supported. The transform
+definitions moved to `centres/transforms.py` as the single source of truth, with
+`audit/transforms.py` re-exporting them so the product and the harness score over
+exactly one definition. Tests in `tests/test_robust.py`.
 
 ### [D4](https://github.com/brunopostle/centres/issues/24) · Correct the documentation
 **Blocked by:** #21
