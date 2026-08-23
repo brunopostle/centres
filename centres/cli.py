@@ -2,11 +2,13 @@ import argparse
 import json
 import sys
 import cv2
+import numpy as np
 
 from .pipeline import analyze, evolve
 from .graph import build_graph
 from .visualize import visualize
 from .properties import compute_all, normalize_all
+from .transforms import BENIGN
 
 
 _PROPERTY_LABELS = [
@@ -29,10 +31,18 @@ _PROPERTY_LABELS = [
 
 _BAR_WIDTH = 10
 _BAR_CHARS = " ▏▎▍▌▋▊▉█"
+_UNDEFINED = "—"
 
 
 def _bar(score):
-    """Render a score in [0, 10] as a fixed-width block bar."""
+    """Render a score in [0, 10] as a fixed-width block bar.
+
+    ``None`` — the property is undefined for this image — renders as a rule
+    rather than as a bar. A blank would be indistinguishable from a score of 0,
+    which is precisely the confusion this is here to avoid.
+    """
+    if score is None:
+        return "┄" * _BAR_WIDTH
     score = max(0.0, min(10.0, score))
     total_eighths = round(score * _BAR_WIDTH * 8 / 10)
     full = total_eighths // 8
@@ -47,9 +57,19 @@ def print_properties(raw_scores):
     print("  Alexander's 15 structural properties  (0–10, higher = more present)")
     print(f"  {'':>2}  {'property':<24}  {'score':>5}  {'':10}  raw value")
     print("  " + "─" * 68)
+    n_undefined = 0
     for n, (key, label) in enumerate(_PROPERTY_LABELS, 1):
         s = norm[key]
-        print(f"  {n:>2}  {label:<24}  {s:>5.1f}  {_bar(s)}  {raw_scores[key]:.4g}")
+        if s is None:
+            n_undefined += 1
+            score_txt, raw_txt = f"{_UNDEFINED:>5}", "undefined"
+        else:
+            score_txt, raw_txt = f"{s:>5.1f}", f"{raw_scores[key]:.4g}"
+        print(f"  {n:>2}  {label:<24}  {score_txt}  {_bar(s)}  {raw_txt}")
+    if n_undefined:
+        print()
+        print(f"  {n_undefined} of 15 undefined — the centres, graph edges or")
+        print("  parent-child pairs those measures need are not present here.")
     print()
 
 
@@ -66,29 +86,133 @@ def load_and_rescale(path: str, max_size: int):
     return img
 
 
+def properties_json(n_centers, energy, raw_scores):
+    """Serialisable summary. Undefined properties emit JSON ``null``, not 0.
+
+    ``energy`` is what ``analyze`` returns — the quantity ``evolve()``
+    minimises. What is *reported* is the degree of life, L = -E: zero for a
+    configuration with no structure, higher for more. See ``centres/energy.py``
+    and issue #28 for why the energy framing was the wrong one to report.
+    """
+    norm = normalize_all(raw_scores)
+    return {
+        "centres": n_centers,
+        "degree_of_life": round(-energy, 4),
+        "properties": {
+            key: {
+                "score": None if norm[key] is None else round(norm[key], 2),
+                "raw": None if raw_scores[key] is None else round(raw_scores[key], 6),
+            }
+            for key, _ in _PROPERTY_LABELS
+        },
+    }
+
+
 def _emit(args, n_centers, energy, raw_scores):
     """Print or emit JSON results depending on --json flag."""
-    norm = normalize_all(raw_scores)
     if args.json:
-        out = {
-            "centres": n_centers,
-            "structural_energy": round(energy, 4),
-            "properties": {
-                key: {"score": round(norm[key], 2), "raw": round(raw_scores[key], 6)}
-                for key, _ in _PROPERTY_LABELS
-            },
-        }
-        print(json.dumps(out, indent=2))
+        print(json.dumps(properties_json(n_centers, energy, raw_scores), indent=2))
     else:
         print(f"Centers: {n_centers}")
-        print(f"Structural energy: {energy:.4f}")
+        print(f"Degree of life: {-energy:.4f}")
         print_properties(raw_scores)
+
+
+def _median_spread(values):
+    """(median, half-range) over the defined values; (None, None) if none defined.
+
+    The half-range ``(max - min) / 2`` is the error bar: it brackets the values the
+    measure actually took across the transforms, so ``median ± err`` says "this is
+    the score, and this is how far a structure-preserving change moved it". A
+    measure that is genuinely invariant reports ± ~0; one that is fragile reports a
+    wide bar, which is the honest signal #23 is after.
+    """
+    vals = [v for v in values if v is not None]
+    if not vals:
+        return None, None
+    a = np.asarray(vals, dtype=float)
+    return float(np.median(a)), float((a.max() - a.min()) / 2.0)
+
+
+def robust_analyse(img, transforms=BENIGN):
+    """Score an image as the median over structure-preserving transforms (#23).
+
+    Applies each transform in ``transforms`` — mirror, rot90, gamma, JPEG, tone
+    inversion and the identity, none of which can change the composition — analyses
+    each result, and returns the median and half-range of every 0–10 property score
+    and of the degree of life. The median stabilises the estimate against the
+    detector's per-orientation jitter; the half-range is the error bar.
+
+    Returns ``(median_centres, (life_median, life_err), {property: (median, err)})``.
+    """
+    per = []
+    for fn in transforms.values():
+        t = fn(img)
+        field, centers, G, energy = analyze(t)
+        raw = compute_all(field, centers, G, cv2.cvtColor(t, cv2.COLOR_BGR2GRAY))
+        per.append((len(centers), -energy, normalize_all(raw)))
+    n_med = int(np.median([p[0] for p in per]))
+    life = _median_spread([p[1] for p in per])
+    props = {key: _median_spread([p[2][key] for p in per])
+             for key, _ in _PROPERTY_LABELS}
+    return n_med, life, props
+
+
+def _fmt_pm(value, err, width=5, prec=1):
+    if value is None:
+        return f"{_UNDEFINED:>{width}}  {'':>7}"
+    return f"{value:>{width}.{prec}f}  ± {err:.{prec}f}"
+
+
+def print_properties_robust(life, props, n_transforms):
+    (life_med, life_err) = life
+    print()
+    print(f"  Degree of life: {life_med:+.4f} ± {life_err:.4f}"
+          f"   (median over {n_transforms} benign transforms)")
+    print()
+    print("  Alexander's 15 structural properties  (0–10, median ± half-range)")
+    print(f"  {'':>2}  {'property':<24}  {'score':>11}  {'':10}")
+    print("  " + "─" * 68)
+    n_undefined = 0
+    for n, (key, label) in enumerate(_PROPERTY_LABELS, 1):
+        med, err = props[key]
+        if med is None:
+            n_undefined += 1
+            print(f"  {n:>2}  {label:<24}  {_UNDEFINED:>11}  {_bar(None)}")
+        else:
+            print(f"  {n:>2}  {label:<24}  {med:>5.1f} ± {err:<3.1f}  {_bar(med)}")
+    if n_undefined:
+        print()
+        print(f"  {n_undefined} of 15 undefined on the median.")
+    print()
+
+
+def robust_json(n_med, life, props, n_transforms):
+    life_med, life_err = life
+    return {
+        "centres": n_med,
+        "transforms": n_transforms,
+        "degree_of_life": {"median": round(life_med, 4), "error": round(life_err, 4)},
+        "properties": {
+            key: ({"score": None, "error": None} if props[key][0] is None
+                  else {"score": round(props[key][0], 2), "error": round(props[key][1], 2)})
+            for key, _ in _PROPERTY_LABELS
+        },
+    }
 
 
 def cmd_analyse(args):
     img = load_and_rescale(args.image, args.max_size)
+    if getattr(args, "robust", False):
+        n_med, life, props = robust_analyse(img)
+        if args.json:
+            print(json.dumps(robust_json(n_med, life, props, len(BENIGN)), indent=2))
+        else:
+            print(f"Centers (median): {n_med}")
+            print_properties_robust(life, props, len(BENIGN))
+        return
     field, centers, G, energy = analyze(img)
-    raw = compute_all(field, centers, G)
+    raw = compute_all(field, centers, G, cv2.cvtColor(img, cv2.COLOR_BGR2GRAY))
     _emit(args, len(centers), energy, raw)
     if not args.json and (not args.no_display or args.save):
         visualize(field, centers, G, img, save_path=args.save if args.save else None)
@@ -117,7 +241,7 @@ def cmd_evolve(args):
             return
         mark = "+" if accepted else " "
         print(
-            f"\r  [{mark}] {t:4d}/{total}  T={T:.3f}  E={energy:+.2f}",
+            f"\r  [{mark}] {t:4d}/{total}  T={T:.3f}  L={-energy:+.4f}",
             end="",
             flush=True,
         )
@@ -155,7 +279,7 @@ def main():
     # --- analyse ---
     p_analyse = subparsers.add_parser(
         "analyse",
-        help="Detect centres and measure structural energy of an existing image.",
+        help="Detect centres and measure the degree of life of an existing image.",
     )
     p_analyse.add_argument("image", help="Path to input image")
     p_analyse.add_argument(
@@ -177,6 +301,14 @@ def main():
         "--json",
         action="store_true",
         help="Emit results as JSON and suppress all other output.",
+    )
+    p_analyse.add_argument(
+        "--robust",
+        action="store_true",
+        help="Score as the median over structure-preserving transforms (mirror, "
+        "rot90, gamma, JPEG, invert), reporting each measure with an error bar. "
+        "Runs the analysis once per transform, so it is ~6x slower, and skips the "
+        "interactive visualisation.",
     )
     p_analyse.set_defaults(func=cmd_analyse)
 

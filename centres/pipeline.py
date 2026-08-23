@@ -1,7 +1,9 @@
 from .field import build_structural_field, reconstruct_field
 from .graph import build_graph, propagate_strength
+from .regions import segment_regions
 from .energy import total_energy
 from .centers import Center
+import cv2
 from skimage.feature import blob_log
 from scipy.spatial.distance import cdist
 import numpy as np
@@ -31,36 +33,75 @@ def detect_centers(field):
     return centers
 
 
-def assign_hierarchy(centers):
-    """Assign each centre its nearest larger centre within 3× that centre's radius.
+#: Containment radius for the hierarchy, in units of the parent's own extent.
+#: 1.0 is strict containment and fires for only 4% of centres; 1.5 reaches 74%
+#: while keeping the in-band separation strict containment achieves. See
+#: assign_hierarchy.
+CONTAINMENT = 1.5
 
-    Containment uses dist(i, j) < 3 * scale_j rather than the strict 1×
-    radius condition. The strict condition (k=1) almost never fires on real
-    images: LoG blobs at different scales detect different spatial features
-    whose centres are typically separated by several parent-radii. With k=3
-    the assignment still requires the child to be substantially closer to its
-    parent than to arbitrary large centres elsewhere, while capturing the
-    real spatial nesting that Alexander's hierarchy describes.
+
+def _extent(centre):
+    """A centre's true radius: the equivalent radius of the region it occupies.
+
+    ``Center.scale`` is the LoG blob scale, which systematically understates how
+    much space a centre actually takes up — measured at a median region radius of
+    1.28 times the blob scale. Containment tested against the blob scale is
+    therefore too tight, which is why the strict condition almost never fired and
+    why a fudge factor of 3 was needed to make the hierarchy populate at all.
+
+    Falls back to the blob scale when a centre has no region.
+    """
+    region = getattr(centre, "region", None)
+    if region is not None and region.area > 0:
+        return float(np.sqrt(region.area / np.pi))
+    return float(centre.scale)
+
+
+def assign_hierarchy(centers):
+    """Assign each centre to the smallest centre whose extent contains it.
+
+    Two changes from the previous version, which took the *nearest* larger centre
+    within three times its blob scale.
+
+    **Containment is tested against real extent.** The old test used
+    ``dist < 3 * scale_j``, and the multiplier of 3 was documented as necessary
+    because the strict condition "almost never fires" — measured at 4% of centres.
+    That is a symptom: the blob scale understates a centre's extent, so strict
+    containment against it is the wrong test rather than too strict a one. Against
+    the region's equivalent radius the strict condition reaches 29%, and 1.5 times
+    it reaches 74% while keeping the separation strict containment achieves.
+
+    **The parent is the smallest containing centre, not the nearest.** A hierarchy
+    is meant to record successive levels, and taking the nearest larger centre
+    lets a small centre beside a large one skip every level between them, so the
+    ratio recorded is not a step in the scaling hierarchy at all. This matters
+    directly for *levels of scale*, which reads those ratios.
+
+    Measured against a stimulus sweeping the constructed parent:child ratio, the
+    two changes together lift the separation between ratios inside the sourced
+    band of 2–5 and outside it from +0.050 to +0.091.
     """
     if not centers:
         return centers
     pos = np.array([[c.x, c.y] for c in centers])
-    scales = np.array([c.scale for c in centers])
+    extent = np.array([_extent(c) for c in centers])
     dist = cdist(pos, pos)
     for i, c in enumerate(centers):
-        contained = dist[i] < 3 * scales  # dist(i,j) < 3 * scale_j
-        larger = scales > c.scale
-        possible = np.where(contained & larger)[0]
-        if len(possible) == 0:
+        candidates = np.where(
+            (dist[i] < CONTAINMENT * extent) & (extent > extent[i] * (1.0 + 1e-9))
+        )[0]
+        if len(candidates) == 0:
             continue
-        j = possible[np.argmin(dist[i, possible])]
-        centers[i].parent = int(j)
+        centers[i].parent = int(candidates[np.argmin(extent[candidates])])
     return centers
 
 
 def analyze(image):
     field = build_structural_field(image)
     centers = detect_centers(field)
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    centers = assign_polarity(centers, gray)
+    centers = segment_regions(field, centers, gray)
     centers = assign_hierarchy(centers)
     G = build_graph(centers)
     G = propagate_strength(G)
@@ -89,8 +130,8 @@ def evolve(
     shape=(300, 300),
     iterations=200,
     n_centers=40,
-    T_start=1.0,
-    T_end=0.01,
+    T_start=0.1,
+    T_end=0.001,
     progress=None,
     initial_centers=None,
 ):
@@ -99,6 +140,13 @@ def evolve(
     Each iteration perturbs all centre positions and scales, evaluates energy,
     and accepts or rejects via the Metropolis criterion. Temperature decays
     exponentially from T_start to T_end.
+
+    The defaults were lowered ten-fold with the move to the degree of life (#28).
+    T_start=1.0 was sized against an objective spanning roughly 0.95 to 1.74; the
+    degree of life spans about 0.32 to 0.41 with per-move deltas near 0.005, so
+    the old schedule ran effectively hot throughout and accepted almost every
+    proposal. Measured over three seeds, the cooler schedule gains about +0.03 in
+    final degree of life (0.410 -> 0.443).
 
     initial_centers: if provided, seed the search from these centres rather
                      than from a random configuration. Useful for refining the
@@ -115,8 +163,21 @@ def evolve(
     else:
         centers = random_centers(n_centers, shape)
     centers = assign_hierarchy(centers)
-    G = build_graph(centers)
-    G = propagate_strength(G)
+    # propagate_strength maps intrinsic strengths to their stationary point, so
+    # it must always be fed the intrinsic values. Only x, y and scale are
+    # annealed below; strength is a fixed input, not part of the search state.
+    # Re-seeding each time keeps every iteration's propagation a pure function
+    # of the current geometry. (Without this, feeding a propagated vector back
+    # in amplifies it by up to 1/(1 - alpha) per iteration and the strengths
+    # drift geometrically across the anneal.)
+    intrinsic = [c.strength for c in centers]
+
+    def _propagate(centers):
+        for c, s in zip(centers, intrinsic):
+            c.strength = s
+        return propagate_strength(build_graph(centers))
+
+    G = _propagate(centers)
     field = reconstruct_field(shape, centers)
     current_energy = total_energy(field, centers, G)
 
@@ -130,8 +191,7 @@ def evolve(
             c.scale = float(np.clip(c.scale * np.exp(np.random.normal(0, 0.02)), 2, 80))
 
         centers = assign_hierarchy(centers)
-        G_new = build_graph(centers)
-        G_new = propagate_strength(G_new)
+        G_new = _propagate(centers)
         field_new = reconstruct_field(shape, centers)
         new_energy = total_energy(field_new, centers, G_new)
 
@@ -149,3 +209,58 @@ def evolve(
             progress(t + 1, iterations, current_energy, T, accepted)
 
     return field, centers
+
+
+#: Outer radius of the surround annulus, as a multiple of the centre's own scale.
+#: In units of the centre, not of the image, per the invariant in field.py.
+POLARITY_SURROUND = 2.0
+
+
+def assign_polarity(centers, gray):
+    """Label each centre with the signed contrast between it and its surround.
+
+    For each centre, the Michelson contrast between the mean intensity within its
+    own radius and the mean over the annulus from that radius out to
+    ``POLARITY_SURROUND`` times it:
+
+        polarity = (surround - interior) / (local range)
+
+    where the range is over the same patch. Positive means the interior is darker
+    than what surrounds it.
+
+    Normalising by the local range rather than by the local sum — Michelson
+    contrast, the obvious first choice — is what makes the measure exactly
+    antisymmetric under inversion. Michelson flips sign when an image is
+    inverted but does *not* preserve magnitude, so the same design rendered
+    light-on-dark would score differently from dark-on-light. Which polarity
+    counts as figure is a convention; the magnitude of the distinction should not
+    depend on that convention.
+
+    This is what lets anything downstream tell a motif from the gap between
+    motifs. The two are indistinguishable in the structural field itself, which
+    is a distance transform and carries no tone at all — see ``Center.polarity``
+    and #26.
+    """
+    if not centers:
+        return centers
+    h, w = gray.shape[:2]
+    img = gray.astype(np.float64)
+    for c in centers:
+        r = max(c.scale, 1.0)
+        outer = int(np.ceil(r * POLARITY_SURROUND))
+        x0, x1 = int(max(c.x - outer, 0)), int(min(c.x + outer + 1, w))
+        y0, y1 = int(max(c.y - outer, 0)), int(min(c.y + outer + 1, h))
+        patch = img[y0:y1, x0:x1]
+        if patch.size == 0:
+            continue
+        yy, xx = np.mgrid[y0:y1, x0:x1]
+        d2 = (xx - c.x) ** 2 + (yy - c.y) ** 2
+        inside = d2 <= r * r
+        ring = (d2 > r * r) & (d2 <= (r * POLARITY_SURROUND) ** 2)
+        if not inside.any() or not ring.any():
+            continue
+        interior = patch[inside].mean()
+        surround = patch[ring].mean()
+        spread = float(patch.max() - patch.min())
+        c.polarity = float((surround - interior) / spread) if spread > 1e-9 else 0.0
+    return centers

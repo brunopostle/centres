@@ -1,0 +1,34 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      MPLBACKEND: Agg          # headless: no display on the runner
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: System libraries for OpenCV
+        run: sudo apt-get update && sudo apt-get install -y libgl1 libglib2.0-0
+
+      - name: Install
+        run: |
+          pip install --upgrade pip
+          pip install . pytest
+
+      # The full suite, including the @slow audit-threshold guards in
+      # tests/test_invariance.py — the whole point of running here is that the
+      # thresholds AUDIT.md documents (the #29 separation, isometry invariance,
+      # the null controls) are checked on every push, not only in a manual
+      # `python -m audit`. Run from the checkout root so the `audit` package
+      # (the harness the tests import) is importable alongside `centres`.
+      - name: Run tests
+        run: pytest -q

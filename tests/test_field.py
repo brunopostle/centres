@@ -29,8 +29,25 @@ def test_range_zero_to_one():
 
 
 def test_max_is_one():
+    """Weak by construction: dividing by the maximum makes this tautological.
+
+    Kept as a guard on the normalisation actually applied, not as evidence that
+    the scale is meaningful. Dividing by the cap instead would give this test
+    content, but was reverted in #27 — see build_structural_field.
+    """
     field = build_structural_field(make_bgr_with_rect())
     assert field.max() == pytest.approx(1.0, abs=1e-6)
+
+
+def test_no_usable_medial_axis_gives_an_empty_field():
+    """An image with no edges at all has no structure and no scale to express.
+
+    distanceTransform fills such an image with FLT_MAX; the old code normalised
+    that to a constant 1.0, which is indistinguishable from a field saturated
+    with structure. Zero is the honest answer.
+    """
+    field = build_structural_field(make_bgr(100, 100, value=128))
+    assert field.max() == 0.0
 
 
 def test_field_peaks_inside_bounded_region():

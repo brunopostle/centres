@@ -27,3 +27,8 @@ centres-gui = "centres.gui:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["centres*"]
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: exercises the full pipeline on 1024 px inputs (the audit's regime); skip locally with -m 'not slow', run in CI",
+]

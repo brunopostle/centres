@@ -1,6 +1,6 @@
 # centres
 
-A computational implementation of Christopher Alexander's theory of *wholeness* from *The Nature of Order*. Given an image, it detects a multi-scale hierarchy of structural centres, builds a reinforcement graph between them, and computes a structural energy score measuring coherence.
+A computational implementation of Christopher Alexander's theory of *wholeness* from *The Nature of Order*. Given an image, it detects a multi-scale hierarchy of structural centres, builds a reinforcement graph between them, and computes a **degree of life** score measuring coherence.
 
 The theory formalises Alexander's claim that living structure — in carpets, paintings, buildings, cities, and nature — arises from a recursive system of mutually reinforcing centres at many scales. See [THEORY.md](THEORY.md) for the full mathematical formulation.
 
@@ -44,7 +44,7 @@ centres analyse path/to/image.jpg --max-size 800   # override rescale limit
 centres analyse path/to/image.jpg --json           # machine-readable JSON output
 ```
 
-Output is a structural energy score and a table of all 15 of Alexander's structural properties, each normalised to a 0–10 wholeness score (10 = most present, consistently — no mixed directions to interpret). A block bar gives an immediate visual read of each score. The raw computed value is shown alongside.
+Output is a degree-of-life score and a table of all 15 of Alexander's structural properties, each normalised to a 0–10 wholeness score (10 = most present, consistently — no mixed directions to interpret). A block bar gives an immediate visual read of each score. The raw computed value is shown alongside.
 
 The visualisation shows detected centres (cyan circles, radius proportional to scale), the parent hierarchy (white lines), and the reinforcement graph (lime lines, weight proportional to edge weight).
 
@@ -57,7 +57,7 @@ centres evolve --size 512 --n-centres 60 --iterations 500
 centres evolve --save generated.png --no-display
 ```
 
-Or seed the search from the centres detected in an existing image, letting annealing improve its structural energy while preserving approximate spatial character:
+Or seed the search from the centres detected in an existing image, letting annealing improve its degree of life while preserving approximate spatial character:
 ```
 centres evolve path/to/image.jpg --iterations 200
 centres evolve path/to/image.jpg --iterations 500 --save refined.png --no-display
@@ -70,6 +70,26 @@ Note: image-seeded runs are slower per iteration because they inherit all detect
 The structural field is built using a distance transform from detected edges, so it works best on images where structure is expressed through clear boundaries: carpets, textiles, ornamental patterns, paintings, and natural scenes. Architectural plans must be in figure-ground form (solid filled regions) rather than as line drawings.
 
 Large images are automatically downscaled to `--max-size` before processing. The blob detection sigma range (2–48 px) is calibrated for images around 1024 px; processing very large images at full resolution would both be slow and detect only very small-scale features.
+
+## Status of the measures
+
+This tool is under active reappraisal. [`AUDIT.md`](AUDIT.md) records an empirical
+audit of all 15 properties and of the degree-of-life score, and
+[`PLAN.md`](PLAN.md) tracks the repairs.
+
+Two findings you should know before relying on any number it prints:
+
+- **Uniform noise currently scores a higher degree of life than any of the six
+  reference carpets** (noise 0.49–0.52 against carpets 0.32–0.41). Random dense
+  points earn *more* hierarchy participation and *more* reinforcement than a
+  masterpiece does — 91% of white-noise centres get a parent against the Ardabil's
+  83%. This is a measure-validity failure, tracked at
+  [#29](https://github.com/brunopostle/centres/issues/29).
+- **Most of the 15 properties do not yet track the quantity they are named for**
+  when tested against synthetic images whose answer is known by construction.
+
+The scores are comparative and provisional. Treat them as a research instrument,
+not as a verdict on an artwork.
 
 ## Theory
 
