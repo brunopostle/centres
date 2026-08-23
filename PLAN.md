@@ -69,7 +69,7 @@ OPEN   A6 #13  detection exactly equivariant under isometry AND inversion (merge
               (isometry Δ 5.9->0.21, inversion Δ 0.18->0.043; both accepted, exactness optional)
 OPEN   A7 #27  field scale + detection threshold together  (attempt reverted)
 DONE   B3 #16  reference constants re-derived: rise() -> soft-sat 10*(1-e^-x/S), S=corpus_median/ln2 (no pinning, no flooring); clamping done earlier
-OPEN   B4 #17  wire audit thresholds into CI
+DONE   B4 #17  audit thresholds as tests (tests/test_invariance.py) + CI runs pytest (.github/workflows/tests.yml); slow marker for the 1024px guards
 DONE   D3 #23  error bars / median over benign transforms (analyse --robust: median ± half-range over BENIGN; transforms shared into centres/transforms.py)
 DONE   D4 #24  correct docs   (THEORY overclaims labelled ⚠; images/README intro updated + score-as-art-history "Comparative analysis" section withdrawn)
 DONE      #29  noise outscores every artwork   (FIXED: reported score gated by count-invariant wholeness excess=max_tree-C*n^B; audit rank sep 1.000 "complete", count-confound r=-0.41 w/controls; flat lattice now ~0 (deliberate theory change). #16 SCALE re-fit still open/orthogonal)
@@ -509,6 +509,26 @@ isometry invariance, null controls, hyperparameter independence. Mark the slow
 ones so they can be excluded locally but run in CI.
 
 **Acceptance:** deliberately reverting any one of A5, B1 or B2 makes the suite fail.
+
+**Done (2026-08-22).** Two parts:
+
+- **CI now runs pytest.** There was none — only `build-windows.yml` — so no guard in
+  the suite ever ran automatically (test_discrimination.py even noted this). Added
+  `.github/workflows/tests.yml`: on every push and PR it installs the package and
+  runs the *full* suite (including the slow guards) on Ubuntu.
+- **`tests/test_invariance.py`** asserts the audit's headline thresholds directly, at
+  the audit's 1024 px regime: the reported degree of life ranks a real artwork above
+  every noise generator and above a mechanical grid (#29 + interior-optimum), noise
+  and a blank canvas score ~0, and the degree of life and the property set are
+  invariant under mirror/rot90. The 1024 px guards carry `@pytest.mark.slow`
+  (registered in `pyproject.toml`); `pytest -m 'not slow'` skips them locally, CI runs
+  them.
+
+The acceptance holds through the existing suite, now that it runs in CI: reverting
+B1 (#14 intensivity) fails `test_energy`'s count-confound test, reverting B2 (#15
+undefined) fails `test_undefined`, and reverting A5 (#12 propagation fixed point)
+fails `test_graph`'s convergence tests. `test_invariance.py` adds the #29 and
+isometry guards those predate.
 
 ---
 
