@@ -39,13 +39,21 @@ CAP_SPACINGS = 8.0
 # when the artwork changes — in proportion, which is the point. What is not
 # acceptable is a scale set by the frame, or by a single outlier pixel.
 #
-# ONE PLACE STILL VIOLATES THIS, knowingly: build_structural_field divides by
-# field.max(), and detect_centers thresholds the result at an absolute 0.08.
-# Dividing by the cap instead was tried and reverted — it is near-identical
-# wherever the cap bites, and catastrophic wherever it does not, because the
-# absolute threshold then rejects almost every detection. The field's scale and
-# the detection threshold have to be fixed together, in the same units, or not at
-# all. Tracked on #27.
+# build_structural_field still divides by field.max(), so a single outlier pixel
+# still sets the field's amplitude. Two earlier fixes for that half of #27 were
+# tried and reverted: dividing by the cap instead is near-identical wherever the
+# cap bites and catastrophic wherever it does not (the field's amplitude then
+# falls well short of what an absolute detection threshold expects), and the
+# same failure mode blocks any other fixed normalisation.
+#
+# What actually decoupled the two: detect_centers no longer compares against an
+# absolute threshold at all. blob_log's threshold_rel takes a fraction of each
+# image's own peak LoG response — since the Laplacian is linear, that response
+# scales in direct proportion to whatever field.max() is, so a relative cutoff
+# selects the same detections whatever field.max() turns out to be. The
+# coupling this note used to warn about is now moot: rescaling the field can no
+# longer move the detection threshold, because there is no longer an absolute
+# number for it to move past. See detect_centers in pipeline.py and #27.
 #
 # A SUBTLER VIOLATION, measured on #9: edge_spacing itself is not as
 # resolution-invariant as this note assumes. It is pinned near ~4 px at every

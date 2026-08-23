@@ -9,6 +9,21 @@ from scipy.spatial.distance import cdist
 import numpy as np
 
 
+#: Fraction of the field's own peak LoG response a local maximum must reach to
+#: count as a detection. Relative rather than absolute (#27): the Laplacian is a
+#: linear filter, so the LoG response scales in direct proportion to whatever
+#: build_structural_field's amplitude turns out to be for a given image --
+#: which, via field.max(), depends on a single outlier pixel (a vignette, a
+#: crop, a mount). An absolute threshold compared against that response is
+#: exactly what let field.max() silently change what counts as a detection
+#: everywhere; a threshold relative to each image's own response range cannot
+#: be moved by rescaling the field, whatever the field's amplitude is set by.
+#: Calibrated against the #19 generator sweeps to land close to the counts the
+#: old absolute threshold=0.08 gave wherever it was already well-behaved (e.g.
+#: jitter: 481, 472, 478 for the first three sweep points, matching to the count).
+_DETECTION_THRESHOLD_REL = 0.2
+
+
 def detect_centers(field):
     """Detect multi-scale centres using Laplacian-of-Gaussian blob detection.
 
@@ -17,7 +32,8 @@ def detect_centers(field):
     blob_log applies its own NMS internally via the overlap parameter.
     """
     blobs = blob_log(
-        field, min_sigma=2, max_sigma=48, num_sigma=10, threshold=0.08, log_scale=True
+        field, min_sigma=2, max_sigma=48, num_sigma=10,
+        threshold=None, threshold_rel=_DETECTION_THRESHOLD_REL, log_scale=True,
     )
     centers = []
     for cid, (y, x, sigma) in enumerate(blobs):

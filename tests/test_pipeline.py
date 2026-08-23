@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 from centres.centers import Center
 from centres.pipeline import detect_centers, assign_hierarchy, analyze
 
@@ -46,6 +47,24 @@ def test_detect_centers_ids_sequential():
     centers = detect_centers(gaussian_field())
     ids = [c.id for c in centers]
     assert ids == list(range(len(ids)))
+
+
+def test_detect_centers_invariant_to_field_amplitude():
+    """Rescaling the whole field by a positive constant must not change what's
+    detected (#27). blob_log's threshold is a fraction of each field's own
+    peak response (threshold_rel), not an absolute number a rescaled field
+    could fall short of or blow past -- which is what let a single outlier
+    pixel (via field.max() in build_structural_field) silently change what
+    counted as a detection everywhere.
+    """
+    field = gaussian_field(yx=(50, 60), sigma=10)
+    base = detect_centers(field)
+    scaled = detect_centers(field * 0.05)
+    assert len(base) == len(scaled) and len(base) >= 1
+    for c1, c2 in zip(base, scaled):
+        assert c1.x == pytest.approx(c2.x)
+        assert c1.y == pytest.approx(c2.y)
+        assert c1.scale == pytest.approx(c2.scale)
 
 
 # --- assign_hierarchy ---
