@@ -71,7 +71,7 @@ OPEN   A7 #27  field scale + detection threshold together  (attempt reverted)
 DONE   B3 #16  reference constants re-derived: rise() -> soft-sat 10*(1-e^-x/S), S=corpus_median/ln2 (no pinning, no flooring); clamping done earlier
 OPEN   B4 #17  wire audit thresholds into CI
 DONE   D3 #23  error bars / median over benign transforms (analyse --robust: median ± half-range over BENIGN; transforms shared into centres/transforms.py)
-OPEN   D4 #24  correct docs   (THEORY.md done; images/README.md stale)
+DONE   D4 #24  correct docs   (THEORY overclaims labelled ⚠; images/README intro updated + score-as-art-history "Comparative analysis" section withdrawn)
 DONE      #29  noise outscores every artwork   (FIXED: reported score gated by count-invariant wholeness excess=max_tree-C*n^B; audit rank sep 1.000 "complete", count-confound r=-0.41 w/controls; flat lattice now ~0 (deliberate theory change). #16 SCALE re-fit still open/orthogonal)
 DONE      #30  tone inversion: detector + measures fixed (Δ 0.18->0.043, accepted); merged into #13
 OPEN   D2 #22  alternating repetition still fails (rho +0.049); 7 measures tried, none tracks — detector doesn't encode size alternation, graph filters it, image domain swamped. Needs a purpose-built periodicity detector robust on aperiodic art. See D2 note
@@ -667,3 +667,17 @@ exactly one definition. Tests in `tests/test_robust.py`.
   a renormalisation fixed point, which nothing in the implementation supports.
 - `THEORY.md` §9: the claim that all 15 properties "arise as stable patterns when
   E is minimised" is not demonstrated anywhere. Either demonstrate it or drop it.
+
+**Done (2026-08-22).** `images/README.md`: the intro now describes the full 44-image
+corpus (32 ornamental + 12 figurative), and the score-as-art-history "Structural
+analysis"/"Comparative analysis" section was **withdrawn** — its six-carpet score
+tables predated the #29 wholeness gate and #16 normalisers (so they no longer match
+the tool) and read resolution-unstable numbers as art history; replaced by a short
+"Per-image scores" pointer to `centres analyse [--robust]` and `python -m audit`.
+`THEORY.md`: every overclaim named here is now carried with an honest ⚠ label rather
+than silently asserted — §8.5/§8.6 constants ⚠ UNSOURCED, §9 emergence ⚠ UNSUPPORTED
+(updated with the #29 finding: the gate corrects the *score*, not the property set),
+§11 "15 levels" ⚠ CIRCULAR and the renormalisation fixed point ⚠ UNSUPPORTED — each
+cross-referenced to #24 in the status table. The constants are labelled rather than
+deleted because the energy still uses them (removing them is #21/#28 territory, not a
+doc fix).
