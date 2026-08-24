@@ -38,18 +38,18 @@ energy's global minimum.
 **Ten measures now track their ground truth** after controlling for centre count
 (partial ρ from §16, or a clean interior optimum), where one did at the start:
 
-| measure | count-controlled ρ | field SNR |
+| measure | count-controlled ρ | field SNR (44-image corpus) |
 |---|---:|---:|
-| contrast | +1.00 | 4.43 |
-| deep interlock | +1.00 | 4.26 |
-| gradients | +0.96 | 6.24 |
-| strong centres | +0.99 | 3.22 |
-| positive space | +0.90 | 1.55 |
-| echoes | **−0.89** | 0.68 |
-| not-separateness | **+0.83** | 1.08 |
-| simplicity | +0.71 | 3.72 |
-| levels of scale | interior optimum (peaks at 3) | 3.18 |
-| boundaries | interior optimum (peaks at 1/3) | 1.83 |
+| contrast | +1.00 | 6.91 |
+| deep interlock | +1.00 | 11.56 |
+| gradients | +0.96 | 7.86 |
+| strong centres | +0.99 | 16.94 |
+| positive space | +0.90 | 3.29 |
+| echoes | **−0.89** | 2.12 |
+| not-separateness | **+0.83** | 11.76 |
+| simplicity | +0.71 | 13.84 |
+| levels of scale | interior optimum (peaks at 3) | 5.71 |
+| boundaries | interior optimum (peaks at 1/3) | 22.32 |
 
 `echoes` and `not-separateness` moved into this group as a *side effect of the #30
 detector fix*: local contrast normalisation made the faint shape-vocabulary and
@@ -64,11 +64,17 @@ is substantially count-driven — so it is no longer a clean keep. **One fails:*
 alternating repetition (+0.14). **One is spurious:** the void (+0.80 raw, partial
 −0.07). See §13.
 
-**A new caveat from this run: field SNR is now the binding constraint, not
-tracking.** Four measures that track their ground truth (echoes, not-separateness,
-positive space, boundaries) have poor between-artwork SNR on the six carpets —
-they discriminate the constructed stimuli cleanly and separate real carpets
-weakly. (The image-domain `boundaries`/`deep_interlock` used to use a fixed
+**The field-SNR caveat from earlier runs is resolved on the widened corpus (#34).**
+The four measures that tracked their ground truth but separated real artworks
+weakly on the original six-carpet sample (echoes 0.68, not-separateness 1.08,
+positive space 1.55, boundaries 1.83) all clear the usable bar by a wide margin on
+the current 44-image corpus (32 ornamental patterns, 12 Beardsley illustrations):
+echoes 2.12, not-separateness 11.76, positive space 3.29, boundaries 22.32. Every
+one of the fifteen measures now reports "usable" or "marginal" (roughness, 1.74)
+on the full triage table (`python -m audit`'s "Triage" stage) — **none report
+NOISE**. This confirms the original diagnosis: the low SNR was n=6 sampling noise
+from too small and too uniform a corpus, not a property of the measures
+themselves. (The image-domain `boundaries`/`deep_interlock` used to use a fixed
 grey-128 threshold, so they shifted under gamma and JPEG, inflating their noise
 floor; #31 replaced it with a **symmetrised Otsu** threshold that adapts to the
 image's own histogram, cutting the gamma sensitivity of `boundaries` from 2.9 to
@@ -76,24 +82,22 @@ image's own histogram, cutting the gamma sensitivity of `boundaries` from 2.9 to
 exact tone-inversion invariance #30 established and the ground-truth sweeps
 unchanged — boundaries still peaks at 0.3, deep interlock still tracks at +1.000.)
 
-**Two findings are unchanged, and are the honest residual:**
+**Both findings below are now resolved; kept here as the record of what the
+residual was, with the current state noted against each:**
 
-1. **Noise still scores a higher degree of life than any of the six carpets**
+1. **Noise scored a higher degree of life than any of the six carpets**
    (section 2b, [#29](https://github.com/brunopostle/centres/issues/29)). The
-   redefined measures fixed *what each property measures*; they did not make the
-   *aggregate* rank art above noise. **Section 17 now says why, and what is
-   missing:** no *local* measure separates the two — noise wins eleven of the
-   fifteen individual properties, because dense noise is abundant in local
-   structure, not short of it — but a *global* redundancy statistic (the entropy
-   of the centre population) separates every carpet from every noise field cleanly
-   and stably. The missing ingredient is an organised-complexity term, blocked on
-   #9 and #34; the new `discrimination` audit stage now reports the separation on
-   every run.
-2. **The SNR sample is six carpets, all Persian.** A measure that separates
-   carpets need not separate paintings, and several that track their ground truth
-   still have poor between-artwork SNR (positive space 0.69, local symmetries
-   0.98, echoes 0.67) -- they work in the laboratory and are noisy on this field
-   sample.
+   redefined measures fixed *what each property measures*; they did not by
+   themselves make the *aggregate* rank art above noise — no *local* measure
+   separates the two, because dense noise is abundant in local structure, not
+   short of it. **Section 17 covers the fix in full**: a *global* redundancy
+   statistic (entropy, spatial coherence, or nesting — the OR rule) separates
+   every one of the 44 corpus images from noise, and the reported score is now
+   gated by the count-invariant wholeness excess it motivated. #29 is closed.
+2. **The SNR sample was six carpets, all Persian.** Widened to the current
+   44-image corpus (#34) — see the field-SNR table and note above, and §17's
+   "wider corpus" and "painting test" subsections for the redundancy side of the
+   same widening.
 
 A correction worth recording in its own right: `echoes` was reported at rho =
 +1.000 when validated on a six-point subsample of its sweep, and is +0.41 (partial
