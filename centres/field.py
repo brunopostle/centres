@@ -304,7 +304,24 @@ def _field_and_distance(image):
         # is empty rather than an arbitrary constant.
         return np.zeros(gray.shape, dtype=float), dist
     capped = np.minimum(dist, CAP_SPACINGS * spacing)
+    # gaussian_filter is linear, so blur(255-gray) = 255-blur(gray) exactly -- under
+    # tone inversion this term doesn't shift by a small residual, it *inverts*,
+    # everywhere in the image at once. That turned out to be the dominant driver
+    # of #13's inversion-equivariance residual, well past the edge map itself
+    # (which already differs by ~1 pixel in 135000 -- see _canny_symmetrised and
+    # the #30/#31 fixes). (blur - 0.5)^2, rescaled back to [0, 1], folds both
+    # polarities onto the same value, so the term no longer cares which tonal
+    # direction the image arrived in. A first attempt used min(blur, 1-blur),
+    # which works just as well on every real image tried but has a kink at
+    # blur=0.5 that injected spurious field structure and collapsed one point
+    # of the border_band sweep (539 -> 315 centres, neighbours untouched) --
+    # exactly the kind of discontinuity-amplification #27 already burned time
+    # on. The squared fold is smooth, so it doesn't create new field ridges.
+    # Measured: detection churn under inversion on 4 corpus images (ardabil,
+    # varamin, bidjar, pazyryk) drops from 15/25/20/7 candidates to 0/3/0/2,
+    # same as the kinked version, with no sweep collapses anywhere.
     blur = gaussian_filter(gray.astype(float) / 255.0, sigma=3)
+    blur = (blur - 0.5) ** 2 * 4.0
     field = capped + 0.1 * blur
     return field / (field.max() + 1e-8), dist
 
