@@ -32,8 +32,16 @@ _ENCLOSURE_RAYS = 8
 #: candidate's own dist value.
 _ENCLOSURE_DECAY = 0.4
 #: Fraction of the rays that must reach a boundary for a detection to count as
-#: enclosed rather than sitting on a structureless plateau.
-_ENCLOSURE_FRACTION = 0.5
+#: enclosed rather than sitting on a structureless plateau. 3-of-8: a majority
+#: (0.5, 4-of-8) turned out to suppress real, weakly-bounded structure along
+#: with true plateaus -- discovered when #22's not_separateness sweep, which
+#: needs exactly that kind of soft-boundary population, regressed from rho
+#: +0.78 to +0.29. 3-of-8 recovers it (+0.70) while still passing the single
+#: circle and lattice acceptance cases; corpus plateau suppression is weaker
+#: as a result (e.g. Pazyryk drops 219->207 rather than 219->151), a real
+#: trade-off, not a wash. 2-of-8 recovers tracking further but lets plateau
+#: detections back through the lattice test, so it isn't a free lunch either.
+_ENCLOSURE_FRACTION = 0.375
 _ENCLOSURE_ANGLES = 2 * np.pi * np.arange(_ENCLOSURE_RAYS) / _ENCLOSURE_RAYS
 
 
