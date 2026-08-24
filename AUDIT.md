@@ -29,58 +29,67 @@ computing a different quantity from the property named on them.
 After the phase A/B repairs and the #22 redefinitions against the sourced
 definitions (Salingaros 2025, in `docs/`):
 
-**The instrument is precise.** Scores are stable under isometries (worst delta
-0.21, was 5.9), independent of frame, resolution and iteration count, bounded, and
-`|r(score, centre count)| = 0.01` over the full ensemble (was 0.99). A blank
-canvas scores *undefined* on every property, not 10/10. Collapse is no longer the
-energy's global minimum.
+**The instrument is precise, in one respect more and one respect less than this
+section used to say.** Scores under mirror/rot90 are now *more* stable than
+recorded here (worst delta 0.06–0.14 on the corpus, was 0.21) — but #27's fix for
+cross-image consistency (below) turned out to have a cost under tone inversion,
+which regressed from the 0.043 once recorded here to 0.58–1.0 on the
+region-sensitive measures. See #13 for the investigation; not yet fixed.
+`|r(score, centre count)| = 0.01` over the full ensemble (was 0.99) is unaffected.
+A blank canvas scores *undefined* on every property, not 10/10. Collapse is no
+longer the energy's global minimum.
 
-**Ten measures now track their ground truth** after controlling for centre count
+**Nine measures now track their ground truth** after controlling for centre count
 (partial ρ from §16, or a clean interior optimum), where one did at the start:
 
 | measure | count-controlled ρ | field SNR (44-image corpus) |
 |---|---:|---:|
-| contrast | +1.00 | 6.91 |
+| contrast | +1.00 | 10.98 |
 | deep interlock | +1.00 | 11.56 |
-| gradients | +0.96 | 7.86 |
-| strong centres | +0.99 | 16.94 |
-| positive space | +0.90 | 3.29 |
-| echoes | **−0.89** | 2.12 |
-| not-separateness | **+0.83** | 11.76 |
-| simplicity | +0.71 | 13.84 |
-| levels of scale | interior optimum (peaks at 3) | 5.71 |
+| gradients | +0.96 | 15.35 |
+| strong centres | +0.99 | 27.52 |
+| positive space | +0.80 | 4.25 |
+| not-separateness | +0.72 | 6.95 |
+| simplicity | +0.63 | 8.74 |
+| levels of scale | interior optimum (peaks at 3) | 5.51 |
 | boundaries | interior optimum (peaks at 1/3) | 22.32 |
 
-`echoes` and `not-separateness` moved into this group as a *side effect of the #30
-detector fix*: local contrast normalisation made the faint shape-vocabulary and
-bleed stimuli detectable, taking echoes from |0.17| to |0.89| and not-separateness
-from +0.24 to +0.83. (echoes correctly runs *negative* — more distinct shapes
-means less echo — which the harness now reports as tracking-downward rather than
-mislabelling as a failure; #33.)
+`not-separateness` moved into this group as a *side effect of the #30 detector
+fix*: local contrast normalisation made the faint bleed stimulus detectable,
+taking it from +0.24 to +0.83 partial. It then regressed to +0.29 as an
+unintended side effect of #8's enclosure filter (rejecting the weakly-bounded
+structure this measure specifically depends on) and was recovered to +0.72 by
+loosening that filter (`ac5293b`; see #22). `echoes` made the same #30-driven
+jump (to −0.89 partial) but, unlike not-separateness, was *not* recovered by the
+enclosure-filter fix — its regression traces mainly to #27's `threshold_rel`
+itself, which has no cheap fix found so far (swept five values, none helped; see
+#13, #22). It now sits at −0.46 partial, moved to the "moderate" group below.
 
-**Three track moderately:** roughness (+0.51), local symmetries (−0.46), good
-shape (+0.39). `good_shape` weakened under count control this run — its raw +0.91
-is substantially count-driven — so it is no longer a clean keep. **One fails:**
-alternating repetition (+0.14). **One is spurious:** the void (+0.80 raw, partial
-−0.07). See §13.
+**Four track moderately:** echoes (−0.46, see above), roughness (+0.20, was
++0.51 — also #27/#8-affected, not separately chased), local symmetries (−0.84),
+good shape (+0.49, essentially unchanged). **One fails:** alternating repetition
+(+0.29, was +0.14 — a small improvement but still not tracking). **One is
+spurious:** the void (−0.08 raw and partial, both near zero rather than the
+positive raw / near-zero-partial split originally recorded — the "spurious"
+verdict itself is unchanged). See §13 of this document (not issue #13) for the
+original diagnosis.
 
 **The field-SNR caveat from earlier runs is resolved on the widened corpus (#34).**
-The four measures that tracked their ground truth but separated real artworks
-weakly on the original six-carpet sample (echoes 0.68, not-separateness 1.08,
-positive space 1.55, boundaries 1.83) all clear the usable bar by a wide margin on
-the current 44-image corpus (32 ornamental patterns, 12 Beardsley illustrations):
-echoes 2.12, not-separateness 11.76, positive space 3.29, boundaries 22.32. Every
-one of the fifteen measures now reports "usable" or "marginal" (roughness, 1.74)
-on the full triage table (`python -m audit`'s "Triage" stage) — **none report
-NOISE**. This confirms the original diagnosis: the low SNR was n=6 sampling noise
-from too small and too uniform a corpus, not a property of the measures
-themselves. (The image-domain `boundaries`/`deep_interlock` used to use a fixed
-grey-128 threshold, so they shifted under gamma and JPEG, inflating their noise
-floor; #31 replaced it with a **symmetrised Otsu** threshold that adapts to the
-image's own histogram, cutting the gamma sensitivity of `boundaries` from 2.9 to
-0.25 and of `deep_interlock` from 1.7 to 0.46 on the 0–10 scale while keeping the
-exact tone-inversion invariance #30 established and the ground-truth sweeps
-unchanged — boundaries still peaks at 0.3, deep interlock still tracks at +1.000.)
+The measures that tracked their ground truth but separated real artworks weakly
+on the original six-carpet sample all clear the usable-or-marginal bar on the
+current 44-image corpus (32 ornamental patterns, 12 Beardsley illustrations) —
+**none report NOISE**, though which measures land in "marginal" has shifted with
+the front-end changes above: currently `echoes` (SNR 1.58) and `local_symmetries`
+(SNR 2.00) are marginal, everything else usable. This confirms the original
+diagnosis: the low SNR was n=6 sampling noise from too small and too uniform a
+corpus, not a property of the measures themselves. (The image-domain
+`boundaries`/`deep_interlock` used to use a fixed grey-128 threshold, so they
+shifted under gamma and JPEG, inflating their noise floor; #31 replaced it with a
+**symmetrised Otsu** threshold that adapts to the image's own histogram, cutting
+the gamma sensitivity of `boundaries` from 2.9 to 0.25 and of `deep_interlock`
+from 1.7 to 0.46 on the 0–10 scale while keeping the exact tone-inversion
+invariance #30 established and the ground-truth sweeps unchanged — boundaries
+still peaks at 0.3, deep interlock still tracks at +1.000.)
 
 **Both findings below are now resolved; kept here as the record of what the
 residual was, with the current state noted against each:**
@@ -488,31 +497,40 @@ their ideal is in the middle of the sweep, so the right check is where the score
 | interlock_depth → deep interlock | monotone | **+1.00 / +1.00** |
 | dominance → strong centres | monotone | **+0.99 / +0.99** |
 | zone_width → gradients | monotone | **+0.96 / +0.96** |
-| ground_solidity → positive space | monotone | **+0.91 / +0.90** |
-| shape_vocabulary → echoes | monotone (↓) | **−0.85 / −0.89** |
-| bleed → not-separateness | monotone | **+0.78 / +0.83** |
-| element_kinds → simplicity | monotone | +0.72 / +0.71 |
+| ground_solidity → positive space | monotone | +0.85 / +0.80 |
+| bleed → not-separateness | monotone | +0.70 / +0.72 |
+| element_kinds → simplicity | monotone | +0.60 / +0.63 |
 | border_band → boundaries | optimum(0.3) | score peaks at 0.3 ✓ |
 | scale_ratio → levels of scale | optimum(3) | score peaks at 3 ✓ |
-| jitter → roughness | monotone | +0.66 / +0.51 |
-| bilateral_asymmetry → local symmetries | monotone (↓) | −0.72 / −0.46 |
-| motif_circularity → good shape | monotone | +0.91 / **+0.39** |
-| alternation → alternating repetition | monotone | +0.05 / +0.14 |
-| void_size → the void | monotone | +0.80 / **−0.07** *(spurious, §16)* |
+| bilateral_asymmetry → local symmetries | monotone (↓) | −0.88 / −0.84 |
+| motif_circularity → good shape | monotone | +0.99 / +0.49 |
+| shape_vocabulary → echoes | monotone (↓) | −0.05 / **−0.46** |
+| jitter → roughness | monotone | +0.66 / +0.20 |
+| alternation → alternating repetition | monotone | +0.30 / +0.29 |
+| void_size → the void | monotone | −0.08 / −0.12 *(spurious, §16)* |
 
-The two "(↓)" rows correctly run *negative*: more distinct shapes means less echo,
-more shear means less symmetry. Each sweep now declares the direction it should
-move, so the harness reports these as tracking-downward rather than failing (#33);
-the count-controlled magnitude (0.89, 0.46) is what counts.
+*Table updated after this session's #27/#8 front-end changes and their #22
+follow-up fix (`ac5293b`); see the note below and §0. Several rows moved --
+`echoes` and `not-separateness` are the ones worth reading closely.*
 
-**Ten measures track in the right direction, eight of them at |ρ| ≥ 0.7 or as a
-clean interior optimum.** At the start of the audit exactly one did. `echoes` and
-`not-separateness` joined this group only after the #30 local-contrast detector
-fix made their faint stimuli detectable; `good_shape` left the clean-keep group
-this run, its raw +0.91 revealed as substantially count-driven (partial +0.39). The gain came
-from two things: repairing the front end so the centre set is a stable estimate,
-and — for the eleven measures that were computing the wrong quantity entirely —
-redefining them against the sourced definitions on the region layer (§13, #22).
+The "(↓)" rows correctly run *negative*: more distinct shapes means less echo,
+more shear means less symmetry. Each sweep declares the direction it should move,
+so the harness reports these as tracking-downward rather than failing (#33); the
+count-controlled magnitude is what counts.
+
+**Nine measures track in the right direction, seven of them at |ρ| ≥ 0.6 or as a
+clean interior optimum.** At the start of the audit exactly one did. This
+session's own front-end work (#27, then #8) moved several rows here, not always
+for the better: `echoes` regressed from a clean −0.89 to a weak −0.46 partial, and
+has not been recovered (#13's `threshold_rel` sensitivity; no cheap fix found).
+`not-separateness` took the same hit from #8 specifically and *was* recovered, to
++0.72, by loosening the enclosure filter (`ac5293b`, #22). `good_shape`'s raw rho
+improved to +0.99 but its partial (+0.49) shows the same count-driven pattern as
+before. The lesson from the original gain still holds -- repairing the front end
+so the centre set is a stable estimate, and redefining measures against the
+sourced definitions on the region layer (§13, #22) -- but "repaired" is not a
+one-time state: this table needs re-checking after any further front-end change,
+the same standing rule PLAN.md already states for the corpus and generators.
 
 ### The interior-optimum measures
 

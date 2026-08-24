@@ -36,12 +36,15 @@ shot, and what the file was resized to. `edge_spacing` is a property of the thin
 photographed.
 
 Every frame-derived constant this pipeline has carried turned out to be a bug:
-Canny's absolute 50/150 thresholds (#10), the `min(h, w) / 10` distance cap (#11),
-and dividing by `field.max()` (#27, still open — the fix was reverted because the
-field's scale and the detection threshold have to be corrected together). A
-*global* scale estimate is correct and intended — the characteristic scale of an artwork is a global property of it, so
-measures in those units move in proportion when the artwork changes. What is not
-acceptable is a scale set by the frame or by a single outlier pixel.
+Canny's absolute 50/150 thresholds (#10), the `min(h, w) / 10` distance cap
+(#11), and dividing by `field.max()` against an absolute detection threshold
+(#27, done — not by fixing the divisor, which two attempts at showed can't be
+done without breaking sparse images, but by making the *threshold* relative
+instead, so what the divisor is no longer matters; see A7 note). A *global*
+scale estimate is correct and intended — the characteristic scale of an artwork
+is a global property of it, so measures in those units move in proportion when
+the artwork changes. What is not acceptable is a scale set by the frame or by a
+single outlier pixel.
 
 ## How to pick up work
 
@@ -63,22 +66,36 @@ DONE   C3 #20  sensitivity matrix             D1 #21  triage the fifteen
 DONE  D2b #26  figure/ground polarity         -- #28  degree of life
 DONE   D2 #22  region layer + 8 of 11 measures redefined against the source
 
-OPEN   A1  #8  suppress plateau/structureless detections   (not started)
+DONE   A1  #8  plateau detections suppressed via an enclosure test (ray-cast from each
+              detection's own raw distance value; needed a second pass, see A1 note)
 OPEN   A2  #9  detection-count stability across resolution   (root cause found: edge_spacing pinned ~4px by fixed edge density, not artwork; ladder+blur fixes both fail; score now count-robust via wholeness, so reprioritised. See A2 note)
 OPEN   A6 #13  detection exactly equivariant under isometry AND inversion (merges #30)
-              (isometry Δ 5.9->0.21, inversion Δ 0.18->0.043; both accepted, exactness optional)
-OPEN   A7 #27  field scale + detection threshold together  (attempt reverted)
+              (isometry now BETTER than target, Δ 0.21->0.06-0.14; inversion regressed
+              WORSE, Δ 0.043->0.58-1.0, a side effect of A7/#27; no cheap fix found.
+              See A6 note)
+DONE   A7 #27  field scale + detection threshold decoupled via blob_log's threshold_rel
+              (not by fixing the divisor — see A7 note. Traded an inversion-equivariance
+              regression for it, tracked on A6/#13)
 DONE   B3 #16  reference constants re-derived: rise() -> soft-sat 10*(1-e^-x/S), S=corpus_median/ln2 (no pinning, no flooring); clamping done earlier
 DONE   B4 #17  audit thresholds as tests (tests/test_invariance.py) + CI runs pytest (.github/workflows/tests.yml); slow marker for the 1024px guards
-DONE   D3 #23  error bars / median over benign transforms (analyse --robust: median ± half-range over BENIGN; transforms shared into centres/transforms.py)
+DONE   D3 #23  error bars / median over benign transforms (analyse --robust in the CLI,
+              plus a "Robust (±)" mode in the GUI table; transforms shared into centres/transforms.py)
 DONE   D4 #24  correct docs   (THEORY overclaims labelled ⚠; images/README intro updated + score-as-art-history "Comparative analysis" section withdrawn)
 DONE      #29  noise outscores every artwork   (FIXED: reported score gated by count-invariant wholeness excess=max_tree-C*n^B; audit rank sep 1.000 "complete", count-confound r=-0.41 w/controls; flat lattice now ~0 (deliberate theory change). #16 SCALE re-fit still open/orthogonal)
-DONE      #30  tone inversion: detector + measures fixed (Δ 0.18->0.043, accepted); merged into #13
-OPEN   D2 #22  alternating repetition still fails (rho +0.049); 7 measures tried, none tracks — detector doesn't encode size alternation, graph filters it, image domain swamped. Needs a purpose-built periodicity detector robust on aperiodic art. See D2 note
+DONE      #30  tone inversion: detector + measures fixed (Δ 0.18->0.043, accepted then
+              regressed by A7/#27 -- see A6/#13); merged into #13
+OPEN   D2 #22  2 of 3 originally-failing measures resolved: not_separateness fixed
+              (A1/#8's enclosure filter loosened, rho +0.29->+0.72); echoes improved but
+              not fixed (+0.14->-0.46 partial, blocked on the same A6/#13 issue, not a
+              representational gap after all). alternating_repetition unchanged and still
+              correctly scoped -- needs periodicity, no region cue. See D2 note
 DONE      #31  boundaries/deep_interlock tone-robust: fixed 128 -> symmetrised Otsu (gamma spread 2.9->0.25, 1.7->0.46)
-DONE      #32  render stimuli as contact sheets (python -m audit.render -> docs/stimuli/)
+DONE      #32  render stimuli as contact sheets (python -m audit.render -> docs/stimuli/),
+              embedded inline in docs/stimuli/README.md
 DONE      #33  sweep verdicts direction-aware (↓ measures track, not fail) + peak-vs-valley optimum
-DONE      #34  corpus widened to 44 (32 ornament + 12 Beardsley paintings); painting test run, passes at native res (still: locate the organised-complexity optimum)
+DONE      #34  corpus widened to 44 (32 ornament + 12 Beardsley paintings); painting test
+              run, passes at native res; SNR/triage and redundancy analyses re-run on the
+              full 44-image corpus -- no measure reports NOISE
 DONE      #35  removed dead interface_complexity/boundary_ratio + _describe_interfaces
 ```
 
@@ -140,45 +157,55 @@ score.**
    which needs #9's reverted ladder change; what it needs is detection-count
    stability, which is upstream of the ladder.)
 
-Then: the tone-robustness bug #31 (a clean, well-specified fix), the visualisation
-#32 and harness label #33 (both small), one measure that still fails (`alternating
-repetition`, needs periodicity), the optional detector-exactness push #13, and the
-housekeeping in #16/#17/#23/#24/#35.
+All of that is now done: the tone-robustness bug #31, the visualisation #32 and
+harness label #33, and the housekeeping in #16/#17/#23/#24/#35. What's left is
+`alternating_repetition` (still needs periodicity, unchanged), `echoes` (a
+smaller, different problem than originally scoped — see D2 note), and the
+detector-exactness push #13, no longer purely optional now that its harder half
+(tone inversion) has regressed past what this project had accepted.
 
 ### Where the instrument stands
 
 | | before | now | target |
 |---|---:|---:|---:|
 | worst property Δ under vignette | 7.4 | **1.38** | ≤1.5 ✅ |
-| worst property Δ under mirror / rot90 | 5.9 | **0.21** | exact optional (#13) |
-| worst property Δ under tone inversion | 0.18 | **0.043** | accepted (#13) |
-| measures tracking their ground truth | 1 | **10 of 15** | — |
+| worst property Δ under mirror / rot90 | 5.9 | **0.06–0.14** | exact optional (#13) ✅ better than target |
+| worst property Δ under tone inversion | 0.18 | **0.58–1.0** | accepted at 0.043; regressed by #27, see A6 note ❌ |
+| measures tracking their ground truth | 1 | **9 of 15** | — |
 | crop15% like-for-like, worst | +246% | **+32%** | — |
 | step-count dependence of strong_centres | 1.0 → 10.0 | **1e-6** | ✅ |
 | r(score, centre count) | +0.99 | **+0.13** | \|r\| < 0.5 ✅ |
 | empty canvas | 7 properties at 10/10 | **15/15 undefined** | ✅ |
 | structureless configuration | the global optimum | **0.000, and collapse loses by 1.3** | ✅ |
 
-Triage of the fifteen measures, signal against measurement noise:
+Triage of the fifteen measures, signal against measurement noise (44-image
+corpus, #34):
 
 | | usable | marginal | NOISE |
 |---|---:|---:|---:|
-| original audit | 10 | 3 | 2 |
+| original audit (6-carpet corpus) | 10 | 3 | 2 |
 | after the kernel fix (#28) | 7 | 6 | 2 |
-| after edge symmetrisation (#13) | **11** | **3** | **1** |
+| after edge symmetrisation (#13, 6-carpet) | 11 | 3 | 1 |
+| after the corpus widening (#34, 44-image) | **13** | **2** | **0** |
 
-Merged: #10 #11 #12 #14 #15 #18 #19 #20 #21 #22 #25 #26 #28, plus the reinforcement
-kernel and the eight measure redefinitions. #27 attempted and reverted; #13
-partial (0.21 vs 0.05 target). Closed on the tracker to match.
+Merged: #8 #10 #11 #12 #14 #15 #16 #17 #18 #19 #20 #21 #22 #23 #24 #25 #26 #27
+#28 #29 #30 #31 #32 #33 #34 #35, plus the reinforcement kernel and the measure
+redefinitions. Still open: #9 (reprioritised, not a blocker) and #13 (isometry
+exceeds target, inversion now the harder residual — see A6 note); #22 partially
+open (echoes and alternating_repetition, see D2 note).
 
-**Precision, then validity.** Every phase-A/B repair improved the instrument's
-*precision* — scores are now stable, bounded, and independent of frame, resolution
-and iteration count. The #22 redefinitions then improved *validity*: eight of
-fifteen measures now track their ground truth, where one did — ten after the #30
-detector fix lifted echoes and not-separateness. **What has not moved is the
-aggregate**: the degree of life still ranks noise above every carpet
-(#29). Valid individual measures have not yet composed into a valid overall score,
-and that is the whole remaining problem.
+**Precision, then validity, then composition.** Every phase-A/B repair improved
+the instrument's *precision* — scores are now stable, bounded, and independent
+of frame, resolution and iteration count. The #22 redefinitions then improved
+*validity*: eight of fifteen measures track their ground truth, where one did
+— ten after the #30 detector fix lifted echoes and not-separateness, back down
+to nine after this session's #27/#8 round trip left echoes short of the bar
+again (see D2 note; not-separateness was recovered). **The aggregate has since
+moved too**: #29 is fixed — the reported degree of life now ranks every one of
+the 44 corpus images above noise (rank separation 1.000, "complete"), via the
+count-invariant wholeness gate. Valid individual measures composing into a
+valid overall score was the whole remaining problem when this paragraph was
+written; it no longer is.
 
 A methodological caveat on the sweeps, measured: with only five sample points a
 single adjacent rank swap moves Spearman ρ by 0.1, so ρ ≥ 0.9 tests for
@@ -216,8 +243,20 @@ turned out to be misattributed. Recorded here so the history is legible:
 Nothing downstream is trustworthy until these land. Re-run `python -m audit`
 after each one; record the before/after in the commit message.
 
-### [A1](https://github.com/brunopostle/centres/issues/8) · Suppress detections in structureless saturated regions
+### [A1](https://github.com/brunopostle/centres/issues/8) · ✅ Suppress detections in structureless saturated regions
 **Blocks:** #18 — blockers #11 and #25 are both done, so this is ready
+
+**Done, in two passes.** `centres/pipeline.py`'s `detect_centers` casts 8 rays
+outward from each detection, of length equal to its own raw distance-to-edge
+value; a real bounded region finds a boundary in most directions, a plateau
+point finds one in at most a few. First shipped requiring a majority (4-of-8)
+of rays to find a boundary — passed both acceptance cases below, but a
+follow-up investigation (via #22) found it was also rejecting real,
+weakly-bounded structure that `not_separateness` depends on, regressing that
+measure's ground-truth tracking from rho +0.78 to +0.29. Loosened to 3-of-8,
+which recovers the tracking (+0.70) while still passing both acceptance cases;
+corpus-level plateau suppression is correspondingly weaker (e.g. Pazyryk
+219→207 rather than 219→151) — a real trade-off, not a free fix.
 
 *Rewritten. This task originally asked for deduplication; there is none — see the
 note above and §1 of AUDIT.md.*
@@ -257,16 +296,18 @@ sampling lattice. Make the lattice a function of the target ratio rather than
 hard-coding either; whether 3 is right at all is a #21 question.
 
 **Measured, and not worth shipping (2026-08-22).** The two measures this would
-target already track their ground truth on the current ladder: `scale_ratio →
-levels_of_scale` peaks correctly at 3 ("maximum at 3, claimed 3") and
-`shape_vocabulary → echoes` runs at rho −0.85 (tracks, with the expected sign).
-Snapping the ladder to 3^(1/3) = 1.442 (from the current 24^(1/9) = 1.415, a ~6 %
-mismatch over three rungs) would not move the levels-of-scale peak off 3, and it
-changes the sigma ladder for **every** detection — so it perturbs all fifteen
-measures for a refinement of two that are already passing. Per the same
-"don't ship complexity for no measured gain" reasoning that reverted the ladder
-change, left as-is. The rung ratio would matter only if a front-end redesign
-(#9) changed the detector's scale behaviour.
+target already tracked their ground truth on the current ladder at the time:
+`scale_ratio → levels_of_scale` peaked correctly at 3 and `shape_vocabulary →
+echoes` ran at rho −0.85 (tracking, expected sign). Snapping the ladder to
+3^(1/3) = 1.442 (from the current 24^(1/9) = 1.415, a ~6% mismatch over three
+rungs) would not move the levels-of-scale peak off 3, and it changes the sigma
+ladder for **every** detection — so it perturbs all fifteen measures for a
+refinement of two that were already passing. Per the same "don't ship
+complexity for no measured gain" reasoning that reverted the ladder change,
+left as-is. The rung ratio would matter only if a front-end redesign (#9)
+changed the detector's scale behaviour. *(Echoes has since moved — see D2 note
+— for reasons unrelated to this ladder; the "already passing" reasoning above
+is a historical snapshot, not a claim about the current state.)*
 
 **Acceptance:** a circle of radius r is detected at scale ≈ r (within 25%) for
 r ∈ {30, 60, 120, 200} px; scores for a corpus image at `--max-size` 512 vs 1024
@@ -412,7 +453,23 @@ order-dependent tracking stage.
 **Acceptance:** `mirror` and `rot90` reproduce the `identity` scores for every
 property to within 0.05 on the 0–10 scale. Add as a test.
 
-### [A7](https://github.com/brunopostle/centres/issues/27) · Fix the field's scale and the detection threshold together, or not at all
+**Status: mixed, and the harder half moved from "accepted" to "open."** Isometry
+(mirror/rot90) is now *better* than this task ever measured — worst-property Δ
+0.06–0.14, against the 0.21 recorded when this card was written, close to but
+not yet inside the 0.05 target. But A7/#27's fix for cross-image consistency
+(`threshold_rel` instead of an absolute threshold) turned out to regress tone
+inversion badly: the 0.043 residual this project had accepted as sub-perceptual
+is now 0.58–1.0 on the region-sensitive measures (`good_shape`,
+`local_symmetries`, `levels_of_scale`). Root-caused but not fixed: swept
+`threshold_rel` from 0.1–0.4, churn rate stays ~3–5% throughout regardless of
+value, so it's not a bad choice of cutoff — a rank-based threshold is
+structurally more exposed to which candidate sits at the boundary than an
+absolute one was. The two paths this card's acceptance criteria implicitly
+allow — accept a further-reduced isometry residual, or find a detection
+mechanism that isn't rank-sensitive under small perturbations — are both still
+open. See #13 and #22 for the investigation.
+
+### [A7](https://github.com/brunopostle/centres/issues/27) · ✅ Fix the field's scale and the detection threshold together, or not at all
 **Blocks:** #8
 
 `build_structural_field` ends with `field / (field.max() + 1e-8)`, and
@@ -441,6 +498,23 @@ against the generators as well as the corpus.
 **Acceptance:** the corpus *and* every generator in `audit/stimuli.py` keep
 comparable centre counts; `field.max()` no longer divides a field read by an
 absolute threshold. Run the full `python -m audit`, not `--quick`.
+
+**Done, but not the way this card specifies — and the acceptance criterion
+turned out to be slightly wrong.** `field.max()` *still* divides the field;
+what changed is `detect_centers`, which now compares against `threshold_rel`
+(a fraction of each image's own peak LoG response) instead of an absolute
+number. Since the LoG response is linear in the field, rescaling the field by
+any constant rescales every response by the same constant — so which
+detections survive is provably invariant to whatever sets `field.max()`,
+without needing to fix what that divisor is. Validated against the corpus (all
+6 reference carpets, counts move 0.67–1.11×), a direct vignette reproduction
+(470→449 centres, not the collapse this task was filed against), and all 15
+generator sweeps at full range (no collapse). The literal acceptance bullet
+("`field.max()` no longer divides...") isn't met on its letter, only its
+intent — recorded as the honest gap. **Cost discovered later:** this fix
+regressed tone-inversion equivariance (see A6/#13) and, via a related
+mechanism, two ground-truth sweeps that #22 depended on (see D2 note) — one
+recovered by a follow-up fix to #8's enclosure filter, one (`echoes`) not.
 
 ### [G](https://github.com/brunopostle/centres/issues/25) · ✅ Fix build_graph node/edge key mismatch
 **Blocks:** #8, #26
@@ -486,7 +560,15 @@ GUI and JSON output render that as `—` rather than a number.
 **Acceptance:** all three null controls report no numeric score for any property
 whose inputs are empty. Add as a test.
 
-### [B3](https://github.com/brunopostle/centres/issues/16) · Clamp the normalisers and re-derive the reference constants
+### [B3](https://github.com/brunopostle/centres/issues/16) · ✅ Clamp the normalisers and re-derive the reference constants
+
+**Done.** `normalize_all` clamps to [0, 10]; the soft-saturating `rise()`
+replaced the old linear clip, with each reference set to `corpus_median / ln2`
+over the 44-image corpus (measured and dated in `centres/properties.py`).
+Verified directly rather than by inference: ran the full corpus through
+`analyze()` and checked every property of every image for a value pinned at
+exactly 0.0 or 10.0 — zero pins found, better than this card's own "no more
+than one" bar.
 
 `rise(x, 0.02)` for not-separateness pins three of six carpets at exactly 10.0;
 `rise(x, 0.2)` for alternating repetition pins four of six. `boundaries` uses
@@ -498,7 +580,7 @@ observed distribution over a corpus, documenting the corpus used.
 
 **Acceptance:** no property has more than one corpus image at exactly 0.0 or 10.0.
 
-### [B4](https://github.com/brunopostle/centres/issues/17) · Wire the audit thresholds into the test suite
+### [B4](https://github.com/brunopostle/centres/issues/17) · ✅ Wire the audit thresholds into the test suite
 **Blocked by:** #14, #15, #16
 
 The 87 existing tests all pass on the current code and would keep passing under
@@ -588,7 +670,7 @@ fifteen indefensible ones.
 **Acceptance:** a table in AUDIT.md with a verdict and one-line justification per
 measure, and agreement from the repository owner before D2–D4 proceed.
 
-### [D2](https://github.com/brunopostle/centres/issues/22) · Widen the representation for the properties that need it
+### [D2](https://github.com/brunopostle/centres/issues/22) · Widen the representation for the properties that need it (partially open)
 **Blocked by:** #21
 
 Every property is currently derived from `(x, y, scale, strength)` tuples, which
@@ -634,6 +716,23 @@ shipping a measure that also does not track. The least-wrong principled directio
 negative spatial autocorrelation of scale over position-kNN (+0.53), if a future
 front end encodes motif size faithfully (see #9).
 
+**echoes and not-separateness — a round trip, not new work (2026-08-23/24).**
+Both had already left this card's scope: the #30 detector fix (local-contrast
+normalisation) made their faint ground-truth stimuli detectable, and they
+tracked cleanly (echoes rho −0.89 partial, not-separateness +0.83). This
+session's A7/#27 fix then regressed both as a side effect (echoes to +0.14
+wrong-signed, not-separateness to +0.29) — not a re-emergence of the original
+representational gap, a detection-level regression. not-separateness was
+recovered to +0.72 by loosening A1/#8's enclosure filter (`ac5293b`), which was
+over-rejecting the weakly-bounded structure this measure depends on. echoes was
+only partially recovered, to −0.46 partial (right-signed, still below the
+tracking bar) — swept `threshold_rel` 0.1–0.3 looking for a value that helps
+further, best found was −0.46, no material improvement. Its residual is the
+same open architectural question as A6/#13, not a "needs a shape codebook" gap.
+**Net: this card's original three-measures scope is now one measure**
+(`alternating_repetition`, unchanged, correctly scoped above) plus a smaller,
+different problem shared with #13.
+
 ### [D2b](https://github.com/brunopostle/centres/issues/26) · Give centres figure/ground polarity
 **Blocked by:** #21 · groups with #22
 
@@ -652,7 +751,7 @@ shifts with motif-to-gap ratio, crop and scale.
 **Acceptance:** on `jittered_lattice(0.0)` the 225 motif and 256 gap detections are
 labelled with ≥95% accuracy; each property declares which population it consumes.
 
-### [D3](https://github.com/brunopostle/centres/issues/23) · Report error bars, and score as a median over benign transforms
+### [D3](https://github.com/brunopostle/centres/issues/23) · ✅ Report error bars, and score as a median over benign transforms
 **Blocked by:** #21
 
 The invariance harness already estimates each measure's noise floor, so the tool
@@ -671,9 +770,11 @@ not_separateness ± 0.0; local_symmetries ± 2.0, positive_space ± 1.2). Opt-in
 because it is ~6× slower; text and `--json` both supported. The transform
 definitions moved to `centres/transforms.py` as the single source of truth, with
 `audit/transforms.py` re-exporting them so the product and the harness score over
-exactly one definition. Tests in `tests/test_robust.py`.
+exactly one definition. Tests in `tests/test_robust.py`. The GUI table gained a
+matching "Robust (±)" checkbox (`f34d60c`), so all three surfaces — CLI,
+`--json`, GUI — now report the same uncertainty.
 
-### [D4](https://github.com/brunopostle/centres/issues/24) · Correct the documentation
+### [D4](https://github.com/brunopostle/centres/issues/24) · ✅ Correct the documentation
 **Blocked by:** #21
 
 - `images/README.md`: withdraw the comparative analysis. It reads artefacts as art
