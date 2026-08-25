@@ -144,21 +144,28 @@ def _flat_field(gray):
     contrast, and dividing by the local std restores the contrast in the dark
     corners — and it does two further things the division did not.
 
-    It is **exactly equivariant under tone inversion**: ``g - local_mean`` flips
-    sign when the image is inverted while ``local_std`` is unchanged, so the
-    output reflects about 128 (measured: identical to within one grey level, and
-    the edge map differs by one pixel in half a million). A photographic negative
-    of a design is the same design, so its scores should match; the previous
-    multiplicative division did not commute with inversion and shifted the centre
-    set by ~8% (#30).
+    It is **exactly equivariant under tone inversion in real arithmetic**: with
+    ``g' = 255 - g``, linearity of the Gaussian blur gives ``mean' = 255 - mean``
+    and ``var' = var`` (the cross term in ``(255-g)^2`` cancels against
+    ``(255-mean)^2``), so ``normalized' = 256 - normalized`` exactly. Since
+    ``_FLATFIELD_TARGET = 128`` makes that constant (256) even, quantising with
+    ``floor`` — what ``.astype(np.uint8)`` does — gives
+    ``floor(r) + floor(256 - r) = 255`` for *every* non-integer ``r``, with no
+    special-casing needed (#13, #9's ladder work first surfaced this identity).
 
-    And it is contrast-*normalising* rather than contrast-preserving, so faint and
-    strong regions are brought to a common amplitude before the percentile edge
-    threshold in :func:`_detect_edges` sees them — which is what that threshold
-    assumes.
+    That guarantee needs real-valued ``mean``/``var``, though, and this used to
+    compute them in float32: two float32 roundings (the blur, then the variance's
+    subtraction of two close numbers) broke the identity on about 0.02% of
+    pixels, letting a photographic negative's edge map differ from the original's
+    by a handful of pixels — small, but exactly the sort of order-sensitive
+    difference the dihedral-vote in :func:`_canny_symmetrised` exists to guard
+    against, and it wasn't guarding against this one. Computing in float64 (the
+    quantisation step is still ``uint8``, so this costs one pass at double
+    precision, not double the pipeline) measured exact — 0 differing pixels
+    across a 608,256-pixel image and its inverse, versus 13 before.
     """
     h, w = gray.shape[:2]
-    g = gray.astype(np.float32)
+    g = gray.astype(np.float64)
     sigma = _FLATFIELD_SIGMA * min(h, w)
     mean = cv2.GaussianBlur(g, (0, 0), sigmaX=sigma)
     var = cv2.GaussianBlur(g * g, (0, 0), sigmaX=sigma) - mean * mean
@@ -217,6 +224,25 @@ def _detect_edges(gray):
     :func:`build_structural_field` for why. The detection itself is symmetrised
     over the dihedral group so that the result does not depend on which way up
     the image happens to be stored — see :func:`_canny_symmetrised`.
+
+    ``_flat_field``'s output is now exactly antisymmetric under inversion (its
+    own docstring), which took this pre-blur's own inversion residual from 13
+    differing pixels (out of 608,256) to 1, and the worst per-property
+    inversion delta on a 44-image corpus check from ~0.75-1.0 to 0.93 (#13).
+
+    Recomputing this blur itself in float64 too, chasing that last pixel, was
+    tried and reverted. It closed the corpus residual further (44-image worst
+    0.93 -> 0.19) -- cv2's default ``uint8``-in/``uint8``-out blur is evidently
+    not just less precise but numerically *different* here, since the kernel
+    weights are dtype-independent so this is about intermediate rounding, not
+    the kernel -- but it also shifted detection counts by dozens on some
+    synthetic sweep stimuli, wrongly signing `echoes`' ground-truth tracking
+    and collapsing `not_separateness`' (both confirmed to trace to this change
+    alone, isolated from the ``_flat_field`` fix above, which is harmless to
+    both). Threshold recalibration (`_DETECTION_THRESHOLD_REL` 0.1-0.35) could
+    not recover both at once. Reverted rather than trade working ground-truth
+    tracking for a bigger but still-incomplete equivariance gain; the residual
+    this leaves is real and open, see #13.
     """
     blurred = cv2.GaussianBlur(_flat_field(gray), (0, 0), sigmaX=2)
     # Canny's default gradient is the L1 norm of a 3x3 Sobel; match it so the

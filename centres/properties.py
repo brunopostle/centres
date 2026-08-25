@@ -241,7 +241,20 @@ def boundaries(field, centers, G, gray=None):
     # Which tone is "the boundary" is a convention that inverting the image would
     # flip, so it must not change the answer: the boundary is the thinner
     # population and what it bounds is the thicker, whichever is dark (#30).
-    if float(np.median(dark[0])) <= float(np.median(light[0])):
+    #
+    # Width alone can tie exactly -- measured on persian_carpet_tabriz_ninara,
+    # where dark and light median widths agree to the full float64 mantissa
+    # (1.7573593253385704 both ways). `<=` breaks a tie towards "dark", which is
+    # a different physical population depending on which way the image's tone
+    # arrived, exactly the #13 bug already fixed for good_shape/local_symmetries
+    # via `_figure_polarity`. Comparing median diameter too, as a tiebreaker,
+    # resolves it the same way both times: diameter is computed from the same
+    # regions as width and inherits the width comparison's own tone-symmetry,
+    # so `(width, diameter)` picks the same physical population as "boundary"
+    # under inversion even when width alone cannot decide.
+    dark_key = (float(np.median(dark[0])), float(np.median(dark[1])))
+    light_key = (float(np.median(light[0])), float(np.median(light[1])))
+    if dark_key <= light_key:
         boundary, bounded = dark, light
     else:
         boundary, bounded = light, dark
