@@ -95,7 +95,9 @@ this session's #13 work, though the sweep's own raw ρ (§12) is unmoved by the
 figure/ground fix specifically and unpicked from the blur-fix's contribution).
 **One fails:**
 alternating repetition (+0.29, was +0.14 — a small improvement but still not
-tracking). **One is spurious:** the void (−0.08 raw / −0.12 partial, both near
+tracking; ten replacement candidates tried across two sessions, all fail or —
+one case — are invalidated by a null-stimulus control before shipping; see
+PLAN.md's D2 note). **One is spurious:** the void (−0.08 raw / −0.12 partial, both near
 zero rather than the positive raw / near-zero-partial split originally recorded
 — the "spurious" verdict itself is unchanged). See §13 of this document (not
 issue #13) for the original diagnosis.

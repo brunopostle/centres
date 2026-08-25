@@ -271,10 +271,15 @@ def alternating_repetition(G):
     fixes it: the detection pipeline does not encode motif-size alternation in centre
     attributes, the reinforcement graph's scale term actively drops the alternating
     (dissimilar-scale) adjacencies, and image-domain periodicity is either swamped
-    (autocorrelation decays) or dominated by the base lattice (FFT). Seven candidates
-    were tried; none clears the tracking bar. A real fix needs a purpose-built
-    periodicity detector robust on aperiodic real art, so this is left honest-and-
-    failing rather than swapped for another measure that also does not track.
+    (autocorrelation decays) or dominated by the base lattice (FFT). Ten candidates
+    have now been tried (seven in an earlier session, three more chasing #13 — see
+    PLAN D2 note for all of them); none clears the tracking bar, and one that looked
+    like it had (region-area Moran's I, rho +0.66) turned out to score a *uniform*
+    grid of identical circles at −0.18 — a watershed-tiling artifact, not alternation
+    — caught by a null-stimulus control before it could ship as a subtly-wrong
+    measure. A real fix needs a purpose-built periodicity detector robust on
+    aperiodic real art, so this is left honest-and-failing rather than swapped for
+    another measure that also does not track.
 
     Undefined (``None``) when no centre has at least two neighbours: the
     quantity averaged is a standard deviation *across a centre's neighbours*,

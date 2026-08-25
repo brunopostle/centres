@@ -95,8 +95,10 @@ OPEN   D2 #22  2 of 3 originally-failing measures resolved: not_separateness fix
               (A1/#8's enclosure filter loosened, rho +0.29->+0.72); echoes improved but
               not fixed (+0.14->-0.46->-0.25 partial, drifted further with this session's
               blur fix, blocked on the same A6/#13 issue, not a representational gap after
-              all). alternating_repetition unchanged and still correctly scoped -- needs
-              periodicity, no region cue. See D2 note
+              all). alternating_repetition unchanged -- three more candidates tried 2026-08-25
+              (region-area Moran's I, edge autocorrelation), all fail or are invalidated
+              by a null-stimulus control; still correctly scoped, needs periodicity,
+              no region cue. See D2 note
 DONE      #31  boundaries/deep_interlock tone-robust: fixed 128 -> symmetrised Otsu (gamma spread 2.9->0.25, 1.7->0.46)
 DONE      #32  render stimuli as contact sheets (python -m audit.render -> docs/stimuli/),
               embedded inline in docs/stimuli/README.md
@@ -770,9 +772,43 @@ geometry-dominated). A real fix needs a purpose-built periodicity / bipartite-pa
 detector that is robust on *aperiodic* real art — a standalone measure, not a
 redefinition in the mould of the other eight — and none of the reasonable candidates
 clears the tracking bar. Left as-is (honestly failing at rho +0.049) rather than
-shipping a measure that also does not track. The least-wrong principled direction is
-negative spatial autocorrelation of scale over position-kNN (+0.53), if a future
-front end encodes motif size faithfully (see #9).
+shipping a measure that also does not track.
+
+**Three more measures tried, all fail (2026-08-25) — and the "least-wrong direction"
+above is retracted.** Picked up as "next issue" after #13; extends the search above
+rather than repeating it.
+
+  - **watershed region-area Moran's I over position-kNN** — the standout on the sweep
+    alone, rho **+0.66** at k=5 (beats every one of the seven above), which is *why*
+    this needed a control before shipping. On a uniform grid of identical circles —
+    zero true alternation, by construction — it scores **−0.18**: watershed's own
+    tiling of a square lattice gives adjacent regions unequal areas (coefficient of
+    variation 187% on *identical* circles) with a real, non-random negative spatial
+    pattern, and that artifact happens to correlate with the sweep parameter for
+    reasons that have nothing to do with size alternation. This is the accidentally-
+    correlated trap AUDIT.md's own history warns about, caught by testing a null
+    stimulus before trusting a sweep number — retracts the previous "least-wrong
+    direction" note above, since this is the same "scale/area Moran's I over
+    position-kNN" family it pointed at, just using region area (post-#22) rather
+    than blob-implied area, and it fails the same way.
+  - **edge-map autocorrelation, diagonal vs. axial lag** — a different design from
+    the raw-autocorrelation attempt above: estimate the lattice's fundamental period
+    from the autocorrelation's own first peak, then compare the *normalised*
+    correlation at a diagonal lag (same checkerboard phase) against an axial lag
+    (opposite phase), which should cancel the lattice's own geometric autocorrelation
+    and isolate the size-modulation component. Rho **+0.259** — weak, and *also*
+    invalidated by the uniform-grid control: a square lattice's true diagonal spacing
+    is `period × √2`, not `period`, so sampling at `(period, period)` lands on an
+    arbitrary phase whose value depends on circle *radius* (score −0.07 to −0.16
+    across radius 15→30 with zero alternation) rather than on alternation. Also
+    breaks down at high amplitude, where the checkerboard's own period-doubling gets
+    picked up as "the" fundamental period instead of the base lattice spacing.
+
+Ten candidates now, spanning the centre domain, the region layer, and two image-
+domain spectral designs. Nothing found a periodicity signal that survives a null
+control. Left exactly as before — honestly failing at rho +0.049 — with no
+principled direction left to recommend; a real fix needs either a materially
+different technique (this session didn't find one) or #9's front-end redesign.
 
 **echoes and not-separateness — a round trip, not new work (2026-08-23/24).**
 Both had already left this card's scope: the #30 detector fix (local-contrast
