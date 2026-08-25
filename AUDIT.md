@@ -34,19 +34,41 @@ section used to say.** Scores under mirror/rot90 are now *more* stable than
 recorded here (worst delta 0.06–0.14 on ardabil, was 0.21) — but #27's fix for
 cross-image consistency (below) turned out to have a cost under tone inversion,
 which regressed from the 0.043 once recorded here to 0.58–1.0 on the
-region-sensitive measures. **Since narrowed, not closed.** Two independent fixes
-cut it further: the field's blur term is now symmetrised under tone inversion
-(`c18363b`), and `good_shape`/`local_symmetries` now pick which polarity is
+region-sensitive measures. **Since narrowed twice, not closed.** Three
+independent fixes have cut it: the field's blur term is symmetrised under tone
+inversion (`c18363b`); `good_shape`/`local_symmetries` pick which polarity is
 "figure" by a structural signal (whichever population is more compact) rather
 than a fixed sign (`0d2a920`) — the fixed sign read a *different physical
 population* depending on which way the image arrived, since inverting an image
-swaps every centre's polarity. Worst inversion delta on a 6-carpet check is now
-**0.68** (bidjar, `local_symmetries`), down from 0.58–1.0. Diagnosed directly:
-the same physical region population is now selected under inversion on that
-image (region count matches exactly both ways), so the residual there is no
-longer figure/ground — it's the region *shapes* watershed produces differing
-under tone, the same detection/segmentation order-sensitivity #13 already names
-as its harder remaining fix. See #13 for both investigations; still open.
+swaps every centre's polarity; and `_flat_field`'s own claimed exact
+tone-inversion equivariance, previously only measured "to within one grey
+level," is now genuinely exact — float32 rounding in its Gaussian blur and
+variance computation broke that guarantee on ~0.02% of pixels, amplified by
+watershed into region-area differences of up to 197x on otherwise-identical
+seeds; recomputing in float64 fixes it exactly (`3bdbedc`), and the same
+commit found and fixed a second, unrelated tie-break bug in `boundaries()`
+that defaulted to the tone-dependent population on an exact width tie.
+
+**Measured on the 44-image corpus after all three fixes:** 34 of 44 images now
+show *exactly* 0.000 worst-property inversion delta; worst overall is **0.93**
+(`beardsley_ascension_saint_rose_of_lima`, `local_symmetries`) — still real,
+still open, but down from 0.58–1.0. Diagnosed on bidjar and pazyryk (now both
+exact): the same physical region population was already selected under
+inversion (region count matched exactly both ways) even before the float64
+fix, so *that* residual was never figure/ground — it was float32 rounding
+noise, amplified by watershed, and the float64 fix closes it completely on
+images where it's the whole story. On `beardsley_ascension` and the handful of
+others still nonzero, more remains: the detection/segmentation order-
+sensitivity #13 already names as its harder, structurally different residual.
+**Chased further and reverted:** recomputing `_detect_edges`'s second Gaussian
+blur in float64 too closes the corpus residual much further (worst 0.93 →
+0.19) but wrongly signs `echoes`' ground-truth tracking and collapses
+`not_separateness`'; three recalibration levers were tried against that
+trade-off (`_DETECTION_THRESHOLD_REL`, `_EDGE_PERCENTILE`,
+`_ENCLOSURE_FRACTION`) and none recovers both without reintroducing a
+different, already-fixed regression (a plateau-detection bug at
+`_ENCLOSURE_FRACTION=0.25`, caught by the fast suite). See #13 for the full
+investigation; still open.
 
 *A separate, pre-existing caveat surfaced while re-measuring, unrelated to
 either fix above (confirmed identical under the old fixed-polarity code):*
@@ -84,16 +106,16 @@ jump (to −0.89 partial) but, unlike not-separateness, was *not* recovered by t
 enclosure-filter fix — its regression traces mainly to #27's `threshold_rel`
 itself, which has no cheap fix found so far (swept five values, none helped; see
 #13, #22). It moved further still with this session's field-blur symmetrisation
-(`c18363b`) — partial dropped from −0.46 to **−0.25**, a side effect of that fix
-changing segmentation, not independently chased. It stays in the "moderate"
-group below.
+(`c18363b`) and again with the float64 exactness fix (`3bdbedc`) — partial now
+**−0.30** (was −0.46, then −0.25), a side effect of both fixes changing
+segmentation, not independently chased. It stays in the "moderate" group below.
 
-**Four track moderately:** echoes (−0.25, see above), roughness (+0.18, was
+**Four track moderately:** echoes (−0.30, see above), roughness (+0.18, was
 +0.51 — also #27/#8-affected, not separately chased), local symmetries (−0.79,
-was −0.84 — essentially unchanged), good shape (+0.68, was +0.49 — improved by
-this session's #13 work, though the sweep's own raw ρ (§12) is unmoved by the
-figure/ground fix specifically and unpicked from the blur-fix's contribution).
-**One fails:**
+was −0.84 — essentially unchanged across all of this session's #13 fixes), good
+shape (+0.68, was +0.49 — improved by this session's #13 work, though the
+sweep's own raw ρ (§12) is unmoved by the figure/ground fix specifically and
+unpicked from the blur-fix's contribution). **One fails:**
 alternating repetition (+0.29, was +0.14 — a small improvement but still not
 tracking; ten replacement candidates tried across two sessions, all fail or —
 one case — are invalidated by a null-stimulus control before shipping; see
@@ -107,10 +129,13 @@ The measures that tracked their ground truth but separated real artworks weakly
 on the original six-carpet sample all clear the usable-or-marginal bar on the
 current 44-image corpus (32 ornamental patterns, 12 Beardsley illustrations) —
 **none report NOISE**, though which measures land in "marginal" has shifted with
-the front-end changes above: currently `echoes` (SNR 1.24, down from 1.58 — the
-blur-fix's side effect on tracking above, not separately chased) is marginal;
-`local_symmetries` (SNR 2.14, up from 2.00) crossed into usable with this
-session's #13 fix. Everything else usable. This confirms the original
+the front-end changes above: currently `echoes` (SNR 1.23, essentially
+unchanged from 1.24/1.58 across this session's #13 fixes, not independently
+chased) and `local_symmetries` (SNR 1.59) are marginal — `local_symmetries`
+crossed into usable (2.14) after the figure/ground fix, then back to marginal
+after the float64 exactness fix moved the corpus's own noise floor; a
+zero-sum side effect of a fix aimed at inversion equivariance, not tracking,
+and not independently chased. Everything else usable. This confirms the original
 diagnosis: the low SNR was n=6 sampling noise from too small and too uniform a
 corpus, not a property of the measures themselves. (The image-domain
 `boundaries`/`deep_interlock` used to use a fixed grey-128 threshold, so they
@@ -534,16 +559,17 @@ their ideal is in the middle of the sweep, so the right check is where the score
 | scale_ratio → levels of scale | optimum(3) | score peaks at 3 ✓ |
 | bilateral_asymmetry → local symmetries | monotone (↓) | −0.71 / −0.79 |
 | motif_circularity → good shape | monotone | +0.81 / +0.68 |
-| shape_vocabulary → echoes | monotone (↓) | −0.10 / **−0.25** |
+| shape_vocabulary → echoes | monotone (↓) | −0.13 / **−0.30** |
 | jitter → roughness | monotone | +0.65 / +0.18 |
 | alternation → alternating repetition | monotone | +0.30 / +0.29 |
 | void_size → the void | monotone | −0.08 / −0.12 *(spurious, §16)* |
 
-*Refreshed 2026-08-25 after this session's field-blur symmetrisation (`c18363b`)
-and figure/ground fix (`0d2a920`) for #13. Both changed the field and/or
-segmentation, so most rows moved a little even where neither fix targeted that
-measure; `good_shape` and `local_symmetries` are the two #13 targeted, `echoes`
-moved as an unchased side effect (see §0).*
+*Refreshed 2026-08-25 after this session's full #13 sequence: field-blur
+symmetrisation (`c18363b`), figure/ground fix (`0d2a920`), and the float64
+tone-inversion exactness fix (`3bdbedc`). All three changed the field and/or
+segmentation, so most rows moved a little even where none of the three
+targeted that measure; `good_shape` and `local_symmetries` are the ones #13
+targeted, `echoes` moved as an unchased side effect across all three (see §0).*
 
 The "(↓)" rows correctly run *negative*: more distinct shapes means less echo,
 more shear means less symmetry. Each sweep declares the direction it should move,
@@ -552,12 +578,14 @@ count-controlled magnitude is what counts.
 
 **Nine measures track in the right direction, seven of them at |ρ| ≥ 0.6 or as a
 clean interior optimum.** At the start of the audit exactly one did. Front-end
-work across this and earlier sessions (#27, then #8, then this session's blur
-symmetrisation and figure/ground fix for #13) moved several rows here, not always
-for the better: `echoes` regressed from a clean −0.89 to −0.46 partial after
-#27/#8, and has drifted further to −0.25 with this session's blur fix, not
-independently chased (#13's `threshold_rel` sensitivity remains the suspected
-root cause; no cheap fix found). `not-separateness` took the same #8 hit and
+work across this and earlier sessions (#27, then #8, then this session's full
+#13 sequence — blur symmetrisation, figure/ground fix, float64 exactness fix)
+moved several rows here, not always for the better: `echoes` regressed from a
+clean −0.89 to −0.46 partial after #27/#8, and has drifted further to −0.30
+across this session's #13 fixes, not independently chased (#13's
+`threshold_rel` sensitivity remains the suspected root cause; no cheap fix
+found — three recalibration levers tried this session, none recover it without
+reintroducing a different regression). `not-separateness` took the same #8 hit and
 *was* recovered, to +0.72, by loosening the enclosure filter (`ac5293b`, #22).
 `good_shape`'s partial improved to +0.68 (was +0.49) with this session's #13
 work — its own raw rho on this sweep is unmoved by the figure/ground fix

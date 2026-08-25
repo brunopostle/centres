@@ -70,16 +70,22 @@ DONE   A1  #8  plateau detections suppressed via an enclosure test (ray-cast fro
               detection's own raw distance value; needed a second pass, see A1 note)
 OPEN   A2  #9  detection-count stability across resolution   (root cause found: edge_spacing pinned ~4px by fixed edge density, not artwork; ladder+blur fixes both fail; score now count-robust via wholeness, so reprioritised. Re-confirmed 2026-08-25: re-derived the ladder-relative-to-size fix independently, hit the same wall (field's own CAP_SPACINGS*edge_spacing cap already truncates real corpus structure below even the old ladder ceiling, so widening the ladder changes nothing on real images), synced this finding to the GitHub issue since it lived only here before. See A2 note)
 OPEN   A6 #13  detection exactly equivariant under isometry AND inversion (merges #30)
-              (inversion residual cut by two independent fixes this session: field-blur
-              symmetrisation (c18363b) plus a structural, not fixed-sign, figure/ground
-              pick for good_shape/local_symmetries (0d2a920) -- worst inversion Δ now
-              0.68 (bidjar), down from 0.58-1.0, and diagnosed as pure segmentation-order
-              sensitivity now, not figure/ground (same physical region population
-              selected both ways). Isometry unaffected by today's fixes but re-measured:
-              local_symmetries is gravity-relative by design, so rot90 moves it up to
-              1.70 on some carpets (pazyryk) -- pre-existing, not a regression, and not
-              reflected in the 0.06-0.14 figure below, which was checked on ardabil
-              alone. See A6 note)
+              (inversion residual cut by three independent fixes this session: field-blur
+              symmetrisation (c18363b), a structural, not fixed-sign, figure/ground
+              pick for good_shape/local_symmetries (0d2a920), and a float64 fix for
+              _flat_field's tone-inversion exactness plus a boundaries() tie-break bug
+              it surfaced (3bdbedc) -- 44-image corpus worst inversion Δ now 0.93
+              (beardsley_ascension, local_symmetries), down from 0.58-1.0, with 34/44
+              images now exactly 0.000. Three more recalibration levers tried chasing
+              it further (_DETECTION_THRESHOLD_REL, _EDGE_PERCENTILE,
+              _ENCLOSURE_FRACTION) -- a fourth fix (float64 in _detect_edges' second
+              blur) closes it to 0.19 but breaks echoes/not_separateness tracking, and
+              none of the three levers recovers both without reintroducing a
+              previously-fixed plateau-detection regression. Isometry unaffected by
+              this session's fixes but re-measured: local_symmetries is gravity-relative
+              by design, so rot90 moves it up to 1.70 on some carpets (pazyryk) --
+              pre-existing, not a regression, and not reflected in the 0.06-0.14 figure
+              below, which was checked on ardabil alone. See A6 note)
 DONE   A7 #27  field scale + detection threshold decoupled via blob_log's threshold_rel
               (not by fixing the divisor — see A7 note. Traded an inversion-equivariance
               regression for it, tracked on A6/#13)
@@ -93,9 +99,9 @@ DONE      #30  tone inversion: detector + measures fixed (Δ 0.18->0.043, accept
               regressed by A7/#27 -- see A6/#13); merged into #13
 OPEN   D2 #22  2 of 3 originally-failing measures resolved: not_separateness fixed
               (A1/#8's enclosure filter loosened, rho +0.29->+0.72); echoes improved but
-              not fixed (+0.14->-0.46->-0.25 partial, drifted further with this session's
-              blur fix, blocked on the same A6/#13 issue, not a representational gap after
-              all). alternating_repetition unchanged -- three more candidates tried 2026-08-25
+              not fixed (+0.14->-0.46->-0.25->-0.30 partial, drifted further with this
+              session's #13 fixes, blocked on the same A6/#13 issue, not a representational
+              gap after all). alternating_repetition unchanged -- three more candidates tried 2026-08-25
               (region-area Moran's I, edge autocorrelation), all fail or are invalidated
               by a null-stimulus control; still correctly scoped, needs periodicity,
               no region cue. See D2 note
@@ -180,7 +186,7 @@ detector-exactness push #13, no longer purely optional now that its harder half
 |---|---:|---:|---:|
 | worst property Δ under vignette | 7.4 | **1.38** | ≤1.5 ✅ |
 | worst property Δ under mirror / rot90 (ardabil)¹ | 5.9 | **0.06–0.14** | exact optional (#13) ✅ better than target |
-| worst property Δ under tone inversion (6-carpet) | 0.18 | **0.68** (bidjar) | accepted at 0.043; improved from 0.58–1.0, not yet met, see A6 note ❌ |
+| worst property Δ under tone inversion (44-image corpus) | 0.18 | **0.93** (beardsley_ascension) | accepted at 0.043; improved from 0.58–1.0, 34/44 images exact, not yet met, see A6 note ❌ |
 | measures tracking their ground truth | 1 | **9 of 15** | — |
 | crop15% like-for-like, worst | +246% | **+32%** | — |
 | step-count dependence of strong_centres | 1.0 → 10.0 | **1e-6** | ✅ |
@@ -203,18 +209,22 @@ corpus, #34):
 | after the kernel fix (#28) | 7 | 6 | 2 |
 | after edge symmetrisation (#13, 6-carpet) | 11 | 3 | 1 |
 | after the corpus widening (#34, 44-image) | 13 | 2 | 0 |
-| after this session's #13 fix (2026-08-25, 44-image) | **14** | **1** | **0** |
+| after the figure/ground + blur fixes (2026-08-25, 44-image) | 14 | 1 | 0 |
+| after the float64 exactness fix (2026-08-25, 44-image) | **13** | **2** | **0** |
 
-`local_symmetries` crossed marginal → usable (SNR 2.00 → 2.14); `echoes` is the
-one remaining marginal measure, and moved the other way (SNR 1.58 → 1.24) as an
-unchased side effect of the blur-fix half of today's #13 work.
+`local_symmetries` crossed marginal → usable (SNR 2.00 → 2.14) after the
+figure/ground and blur-symmetrisation fixes, then back to marginal (SNR 1.59)
+after the float64 exactness fix moved the corpus's own noise floor -- a
+zero-sum side effect of a fix aimed at inversion equivariance, not tracking.
+`echoes` stays the other marginal measure throughout (SNR 1.58 → 1.24 → 1.23),
+an unchased side effect of the same sequence of #13 fixes.
 
 Merged: #8 #10 #11 #12 #14 #15 #16 #17 #18 #19 #20 #21 #22 #23 #24 #25 #26 #27
 #28 #29 #30 #31 #32 #33 #34 #35, plus the reinforcement kernel and the measure
 redefinitions. Still open: #9 (reprioritised, not a blocker; re-confirmed
-2026-08-25) and #13 (inversion residual much reduced today but not closed, now
-isolated to segmentation-order sensitivity rather than figure/ground — see A6
-note); #22 partially open (echoes and alternating_repetition, see D2 note).
+2026-08-25) and #13 (worst 44-image inversion delta 0.58–1.0 → 0.93, 34/44
+images now exact, three further recalibration levers tried and rejected — see
+A6 note); #22 partially open (echoes and alternating_repetition, see D2 note).
 
 **Precision, then validity, then composition.** Every phase-A/B repair improved
 the instrument's *precision* — scores are now stable, bounded, and independent
@@ -526,8 +536,52 @@ figure/ground convention is no longer the source. What differs is the region
 detection/segmentation order-sensitivity this card's "what closing this to zero
 requires" section already names as the harder remaining fix (detect across all 16
 dihedral×polarity combinations and combine, or a cheaper equivalent) — not
-something a figure/ground convention change can reach. Still open, narrowed to
-that residual. See #13 for both investigations.
+something a figure/ground convention change can reach.
+
+**2026-08-25, third fix: the "detection/segmentation order-sensitivity" turned
+out to include a cheap, real bug, not only the expensive 16x-detection fix.**
+Picked up "the expensive exact-equivariance detector" this card names, and
+found detection wasn't the bottleneck: on bidjar, centre *positions* already
+matched exactly under inversion (0.000px, 349/349), but matched regions' areas
+differed by up to 197x. Root cause: `_flat_field`'s docstring already claimed
+exact tone-inversion equivariance, but only ever measured it "to within one
+grey level." The maths is exact in real arithmetic (`_FLATFIELD_TARGET=128`
+makes `floor(r) + floor(256-r) = 255` for any real `r`), but computed in
+float32, two independent roundings (the blur, then the variance's subtraction
+of two close numbers) broke that identity on ~0.02% of pixels — small, but
+watershed amplifies tiny residuals into large ones by design. Recomputing in
+float64 (`3bdbedc`) makes the identity exact (0 of 608,256 pixels differ, was
+13) and collapses bidjar's 197x area discrepancy to exactly 0.000. The same
+investigation surfaced a second, unrelated bug: `boundaries()` picked "the
+boundary" by comparing median widths with `<=`, defaulting to the tone-
+dependent "dark" population on an exact tie — caught on
+`persian_carpet_tabriz_ninara`, whose two populations tied to the full float64
+mantissa. Fixed by breaking ties on median diameter too (itself tone-
+symmetric).
+
+**Measured on the 44-image corpus: 34/44 images now exactly 0.000, worst
+overall 0.93** (`beardsley_ascension_saint_rose_of_lima`, `local_symmetries`),
+down from 0.58–1.0. **Chased further and reverted:** recomputing
+`_detect_edges`'s second Gaussian blur in float64 too closes the corpus
+residual much further (0.93 → 0.19) — cv2's default `uint8` blur pipeline is
+evidently not just less precise but numerically different here — but it
+shifts detection counts by dozens on synthetic sweep stimuli, wrongly signing
+`echoes`' tracking and collapsing `not_separateness`' (confirmed via isolation
+to trace to that change alone). Three recalibration levers tried against that
+trade-off: `_DETECTION_THRESHOLD_REL` (0.1–0.35, fully swept, no value
+recovers both), `_EDGE_PERCENTILE` (88–96, partial sweep, no measurable
+effect), `_ENCLOSURE_FRACTION` (0.25/0.375/0.5) — 0.25 recovers both measures
+(`not_separateness` +0.75, better than the pre-regression +0.70; `echoes`
+correctly-signed) and drops a 4-image corpus check to 0.06, but reintroduces
+a real, previously-fixed regression: `test_circle_lattice_has_no_corner_or_
+margin_detections` fails, exactly the plateau-detection bug this constant's
+own comment already warned 2-of-8 would let back in. Reverted; the second-blur
+fix and all three recalibration attempts stay out of the shipped code.
+
+Still open, narrowed to a residual that is real but smaller: the corpus worst
+is 0.93 (was 0.58–1.0), 34/44 images exact, and what remains needs either a
+fourth lever this session didn't find or the expensive 16-combination detector
+this card already names. See #13 for the full investigation.
 
 ### [A7](https://github.com/brunopostle/centres/issues/27) · ✅ Fix the field's scale and the detection threshold together, or not at all
 **Blocks:** #8
@@ -822,8 +876,9 @@ over-rejecting the weakly-bounded structure this measure depends on. echoes was
 only partially recovered, to −0.46 partial (right-signed, still below the
 tracking bar) — swept `threshold_rel` 0.1–0.3 looking for a value that helps
 further, best found was −0.46, no material improvement. This session's
-field-blur symmetrisation (`c18363b`, for A6/#13) moved it further still, to
-−0.25 partial — a side effect, not independently chased. Its residual is the
+field-blur symmetrisation (`c18363b`) and the float64 exactness fix (`3bdbedc`,
+both for A6/#13) moved it further still, to −0.30 partial — a side effect, not
+independently chased. Its residual is the
 same open architectural question as A6/#13, not a "needs a shape codebook" gap.
 **Net: this card's original three-measures scope is now one measure**
 (`alternating_repetition`, unchanged, correctly scoped above) plus a smaller,
