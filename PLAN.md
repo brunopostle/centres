@@ -68,11 +68,18 @@ DONE   D2 #22  region layer + 8 of 11 measures redefined against the source
 
 DONE   A1  #8  plateau detections suppressed via an enclosure test (ray-cast from each
               detection's own raw distance value; needed a second pass, see A1 note)
-OPEN   A2  #9  detection-count stability across resolution   (root cause found: edge_spacing pinned ~4px by fixed edge density, not artwork; ladder+blur fixes both fail; score now count-robust via wholeness, so reprioritised. See A2 note)
+OPEN   A2  #9  detection-count stability across resolution   (root cause found: edge_spacing pinned ~4px by fixed edge density, not artwork; ladder+blur fixes both fail; score now count-robust via wholeness, so reprioritised. Re-confirmed 2026-08-25: re-derived the ladder-relative-to-size fix independently, hit the same wall (field's own CAP_SPACINGS*edge_spacing cap already truncates real corpus structure below even the old ladder ceiling, so widening the ladder changes nothing on real images), synced this finding to the GitHub issue since it lived only here before. See A2 note)
 OPEN   A6 #13  detection exactly equivariant under isometry AND inversion (merges #30)
-              (isometry now BETTER than target, Δ 0.21->0.06-0.14; inversion regressed
-              WORSE, Δ 0.043->0.58-1.0, a side effect of A7/#27; no cheap fix found.
-              See A6 note)
+              (inversion residual cut by two independent fixes this session: field-blur
+              symmetrisation (c18363b) plus a structural, not fixed-sign, figure/ground
+              pick for good_shape/local_symmetries (0d2a920) -- worst inversion Δ now
+              0.68 (bidjar), down from 0.58-1.0, and diagnosed as pure segmentation-order
+              sensitivity now, not figure/ground (same physical region population
+              selected both ways). Isometry unaffected by today's fixes but re-measured:
+              local_symmetries is gravity-relative by design, so rot90 moves it up to
+              1.70 on some carpets (pazyryk) -- pre-existing, not a regression, and not
+              reflected in the 0.06-0.14 figure below, which was checked on ardabil
+              alone. See A6 note)
 DONE   A7 #27  field scale + detection threshold decoupled via blob_log's threshold_rel
               (not by fixing the divisor — see A7 note. Traded an inversion-equivariance
               regression for it, tracked on A6/#13)
@@ -86,9 +93,10 @@ DONE      #30  tone inversion: detector + measures fixed (Δ 0.18->0.043, accept
               regressed by A7/#27 -- see A6/#13); merged into #13
 OPEN   D2 #22  2 of 3 originally-failing measures resolved: not_separateness fixed
               (A1/#8's enclosure filter loosened, rho +0.29->+0.72); echoes improved but
-              not fixed (+0.14->-0.46 partial, blocked on the same A6/#13 issue, not a
-              representational gap after all). alternating_repetition unchanged and still
-              correctly scoped -- needs periodicity, no region cue. See D2 note
+              not fixed (+0.14->-0.46->-0.25 partial, drifted further with this session's
+              blur fix, blocked on the same A6/#13 issue, not a representational gap after
+              all). alternating_repetition unchanged and still correctly scoped -- needs
+              periodicity, no region cue. See D2 note
 DONE      #31  boundaries/deep_interlock tone-robust: fixed 128 -> symmetrised Otsu (gamma spread 2.9->0.25, 1.7->0.46)
 DONE      #32  render stimuli as contact sheets (python -m audit.render -> docs/stimuli/),
               embedded inline in docs/stimuli/README.md
@@ -169,14 +177,20 @@ detector-exactness push #13, no longer purely optional now that its harder half
 | | before | now | target |
 |---|---:|---:|---:|
 | worst property Δ under vignette | 7.4 | **1.38** | ≤1.5 ✅ |
-| worst property Δ under mirror / rot90 | 5.9 | **0.06–0.14** | exact optional (#13) ✅ better than target |
-| worst property Δ under tone inversion | 0.18 | **0.58–1.0** | accepted at 0.043; regressed by #27, see A6 note ❌ |
+| worst property Δ under mirror / rot90 (ardabil)¹ | 5.9 | **0.06–0.14** | exact optional (#13) ✅ better than target |
+| worst property Δ under tone inversion (6-carpet) | 0.18 | **0.68** (bidjar) | accepted at 0.043; improved from 0.58–1.0, not yet met, see A6 note ❌ |
 | measures tracking their ground truth | 1 | **9 of 15** | — |
 | crop15% like-for-like, worst | +246% | **+32%** | — |
 | step-count dependence of strong_centres | 1.0 → 10.0 | **1e-6** | ✅ |
 | r(score, centre count) | +0.99 | **+0.13** | \|r\| < 0.5 ✅ |
 | empty canvas | 7 properties at 10/10 | **15/15 undefined** | ✅ |
 | structureless configuration | the global optimum | **0.000, and collapse loses by 1.3** | ✅ |
+
+¹ *A caveat found 2026-08-25, re-measuring for the sync above: `local_symmetries`
+is gravity-relative by design (vertical axis only), so `rot90` is not expected to
+preserve it — measured at up to Δ1.70 on pazyryk, present identically under the
+pre-#13-fix code (not a regression from today's work). This row's figure was
+checked on ardabil alone and does not reflect it; not chased further.*
 
 Triage of the fifteen measures, signal against measurement noise (44-image
 corpus, #34):
@@ -186,13 +200,19 @@ corpus, #34):
 | original audit (6-carpet corpus) | 10 | 3 | 2 |
 | after the kernel fix (#28) | 7 | 6 | 2 |
 | after edge symmetrisation (#13, 6-carpet) | 11 | 3 | 1 |
-| after the corpus widening (#34, 44-image) | **13** | **2** | **0** |
+| after the corpus widening (#34, 44-image) | 13 | 2 | 0 |
+| after this session's #13 fix (2026-08-25, 44-image) | **14** | **1** | **0** |
+
+`local_symmetries` crossed marginal → usable (SNR 2.00 → 2.14); `echoes` is the
+one remaining marginal measure, and moved the other way (SNR 1.58 → 1.24) as an
+unchased side effect of the blur-fix half of today's #13 work.
 
 Merged: #8 #10 #11 #12 #14 #15 #16 #17 #18 #19 #20 #21 #22 #23 #24 #25 #26 #27
 #28 #29 #30 #31 #32 #33 #34 #35, plus the reinforcement kernel and the measure
-redefinitions. Still open: #9 (reprioritised, not a blocker) and #13 (isometry
-exceeds target, inversion now the harder residual — see A6 note); #22 partially
-open (echoes and alternating_repetition, see D2 note).
+redefinitions. Still open: #9 (reprioritised, not a blocker; re-confirmed
+2026-08-25) and #13 (inversion residual much reduced today but not closed, now
+isolated to segmentation-order sensitivity rather than figure/ground — see A6
+note); #22 partially open (echoes and alternating_repetition, see D2 note).
 
 **Precision, then validity, then composition.** Every phase-A/B repair improved
 the instrument's *precision* — scores are now stable, bounded, and independent
@@ -375,7 +395,16 @@ was measured and left as-is: the two measures it would target (`levels_of_scale`
 `echoes`) already track on the current ladder, so a global detection change is not
 justified (see the rung-ratio note under A2 above).
 
-### [A3](https://github.com/brunopostle/centres/issues/10) · ✅ Replace fixed Canny thresholds with locally adaptive edge detection
+**Re-confirmed 2026-08-25.** Picked up as "next issue" without first reading this
+card; independently re-derived the same conclusion from scratch (a single circle
+at r ∈ {30, 60, 120, 200}, widening `max_sigma` to `min(h,w)/3` and `num_sigma`
+to match, still undershot r by a consistent ~50% regardless of ladder width — the
+field's own `CAP_SPACINGS × edge_spacing` cap was the real ceiling, not the
+ladder: on `ardabil.jpg` at 1024, `edge_spacing = 3.51px` gives a cap of ≈28px,
+tighter than even the *old* `max_sigma=48` (68px)) before finding it already
+recorded here. This comment exists because that finding was in this file but
+had never been carried back to the GitHub issue itself, which still described
+the original, since-reverted plan; synced a summary there.
 **Blocks:** #18
 
 `build_structural_field` in `centres/field.py` uses `cv2.Canny(…, 50, 150)` —
@@ -453,21 +482,50 @@ order-dependent tracking stage.
 **Acceptance:** `mirror` and `rot90` reproduce the `identity` scores for every
 property to within 0.05 on the 0–10 scale. Add as a test.
 
-**Status: mixed, and the harder half moved from "accepted" to "open."** Isometry
-(mirror/rot90) is now *better* than this task ever measured — worst-property Δ
-0.06–0.14, against the 0.21 recorded when this card was written, close to but
-not yet inside the 0.05 target. But A7/#27's fix for cross-image consistency
-(`threshold_rel` instead of an absolute threshold) turned out to regress tone
+**Status: mixed, and the harder half moved from "accepted" to "open," then partly
+recovered.** Isometry (mirror/rot90) is now *better* than this task ever
+measured — worst-property Δ 0.06–0.14 on ardabil, against the 0.21 recorded when
+this card was written, close to but not yet inside the 0.05 target. (Caveat found
+2026-08-25: that figure was checked on ardabil alone; `local_symmetries` is
+gravity-relative by design, so `rot90` moves it up to 1.70 on pazyryk — not a
+regression, present identically before today's fixes, just not previously
+measured against this card's acceptance bar.) But A7/#27's fix for cross-image
+consistency (`threshold_rel` instead of an absolute threshold) had regressed tone
 inversion badly: the 0.043 residual this project had accepted as sub-perceptual
-is now 0.58–1.0 on the region-sensitive measures (`good_shape`,
-`local_symmetries`, `levels_of_scale`). Root-caused but not fixed: swept
-`threshold_rel` from 0.1–0.4, churn rate stays ~3–5% throughout regardless of
-value, so it's not a bad choice of cutoff — a rank-based threshold is
+went to 0.58–1.0 on the region-sensitive measures (`good_shape`,
+`local_symmetries`, `levels_of_scale`). Root-caused but, at the time, not fixed:
+swept `threshold_rel` from 0.1–0.4, churn rate stayed ~3–5% throughout regardless
+of value, so it wasn't a bad choice of cutoff — a rank-based threshold is
 structurally more exposed to which candidate sits at the boundary than an
-absolute one was. The two paths this card's acceptance criteria implicitly
-allow — accept a further-reduced isometry residual, or find a detection
-mechanism that isn't rank-sensitive under small perturbations — are both still
-open. See #13 and #22 for the investigation.
+absolute one was.
+
+**2026-08-25: two fixes landed, closing most of the regression.** First, the
+field's blur term — `gaussian_filter(gray)` — is linear, so under tone inversion
+it doesn't shift by a small residual, it *inverts*, everywhere at once; that
+turned out to be the dominant driver, past the edge map itself. Symmetrising it
+with a smooth fold, `(blur - 0.5)^2 * 4` (`c18363b`), cut detection churn under
+inversion on four corpus images from 15/25/20/7 candidates to 0/3/0/2. Second,
+`good_shape` and `local_symmetries` picked "figure" as `polarity > 0` outright —
+but inverting an image swaps every centre's polarity, so that fixed sign read a
+*different physical population* depending on which way the image arrived.
+`_figure_polarity` (`0d2a920`) now picks whichever polarity's regions are more
+compact, the same reasoning `boundaries` already uses to assign its role
+structurally rather than by tone; it falls back to `polarity=+1` whenever either
+population is empty, since resolving that case by elimination corrupted the
+`motif_circularity` sweep (rho +0.809 → +0.392) without the fallback. Measured
+over 44 corpus images: mean inversion residual 0.038 → 0.005 (`good_shape`), 0.089
+→ 0.014 (`local_symmetries`), ground-truth tracking unchanged. **Worst residual on
+a 6-carpet check is now 0.68** (bidjar, `local_symmetries`), down from 0.58–1.0
+but still well outside the 0.05 target. Diagnosed directly on bidjar and pazyryk:
+`_figure_polarity` now selects the *same physical region population* under
+inversion on both (region count matches exactly, 252/252 and 139/139) — the
+figure/ground convention is no longer the source. What differs is the region
+*shapes* watershed produces for that population depending on tone, which is the
+detection/segmentation order-sensitivity this card's "what closing this to zero
+requires" section already names as the harder remaining fix (detect across all 16
+dihedral×polarity combinations and combine, or a cheaper equivalent) — not
+something a figure/ground convention change can reach. Still open, narrowed to
+that residual. See #13 for both investigations.
 
 ### [A7](https://github.com/brunopostle/centres/issues/27) · ✅ Fix the field's scale and the detection threshold together, or not at all
 **Blocks:** #8
@@ -727,7 +785,9 @@ recovered to +0.72 by loosening A1/#8's enclosure filter (`ac5293b`), which was
 over-rejecting the weakly-bounded structure this measure depends on. echoes was
 only partially recovered, to −0.46 partial (right-signed, still below the
 tracking bar) — swept `threshold_rel` 0.1–0.3 looking for a value that helps
-further, best found was −0.46, no material improvement. Its residual is the
+further, best found was −0.46, no material improvement. This session's
+field-blur symmetrisation (`c18363b`, for A6/#13) moved it further still, to
+−0.25 partial — a side effect, not independently chased. Its residual is the
 same open architectural question as A6/#13, not a "needs a shape codebook" gap.
 **Net: this card's original three-measures scope is now one measure**
 (`alternating_repetition`, unchanged, correctly scoped above) plus a smaller,
