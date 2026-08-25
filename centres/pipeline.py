@@ -1,4 +1,4 @@
-from .field import build_structural_field, reconstruct_field
+from .field import reconstruct_field, _field_and_distance
 from .graph import build_graph, propagate_strength
 from .regions import segment_regions
 from .energy import total_energy
@@ -9,25 +9,99 @@ from scipy.spatial.distance import cdist
 import numpy as np
 
 
-def detect_centers(field):
+#: Fraction of the field's own peak LoG response a local maximum must reach to
+#: count as a detection. Relative rather than absolute (#27): the Laplacian is a
+#: linear filter, so the LoG response scales in direct proportion to whatever
+#: build_structural_field's amplitude turns out to be for a given image --
+#: which, via field.max(), depends on a single outlier pixel (a vignette, a
+#: crop, a mount). An absolute threshold compared against that response is
+#: exactly what let field.max() silently change what counts as a detection
+#: everywhere; a threshold relative to each image's own response range cannot
+#: be moved by rescaling the field, whatever the field's amplitude is set by.
+#: Calibrated against the #19 generator sweeps to land close to the counts the
+#: old absolute threshold=0.08 gave wherever it was already well-behaved (e.g.
+#: jitter: 481, 472, 478 for the first three sweep points, matching to the count).
+_DETECTION_THRESHOLD_REL = 0.2
+
+#: Directions rays are cast in when testing whether a detection is enclosed
+#: (#8). Real bounded regions are not exotic shapes at this test's scale, so
+#: few directions already separate them cleanly from a plateau -- see
+#: _enclosure_fraction.
+_ENCLOSURE_RAYS = 8
+#: A ray counts as reaching a boundary once dist drops to this fraction of the
+#: candidate's own dist value.
+_ENCLOSURE_DECAY = 0.4
+#: Fraction of the rays that must reach a boundary for a detection to count as
+#: enclosed rather than sitting on a structureless plateau. 3-of-8: a majority
+#: (0.5, 4-of-8) turned out to suppress real, weakly-bounded structure along
+#: with true plateaus -- discovered when #22's not_separateness sweep, which
+#: needs exactly that kind of soft-boundary population, regressed from rho
+#: +0.78 to +0.29. 3-of-8 recovers it (+0.70) while still passing the single
+#: circle and lattice acceptance cases; corpus plateau suppression is weaker
+#: as a result (e.g. Pazyryk drops 219->207 rather than 219->151), a real
+#: trade-off, not a wash. 2-of-8 recovers tracking further but lets plateau
+#: detections back through the lattice test, so it isn't a free lunch either.
+_ENCLOSURE_FRACTION = 0.375
+_ENCLOSURE_ANGLES = 2 * np.pi * np.arange(_ENCLOSURE_RAYS) / _ENCLOSURE_RAYS
+
+
+def _enclosure_fraction(y, x, dist):
+    """Of the rays cast outward from (y, x), what fraction reach a boundary?
+
+    ``dist`` is the *raw*, uncapped distance-to-edge transform -- the true
+    distance to the single nearest edge in the closest direction, which is
+    exactly what a distance transform gives for free. A point at the centre of
+    a real bounded region is roughly equidistant from an edge in most
+    directions, however far that distance is; a point on a structureless
+    plateau (the far corner of a mostly-blank canvas, say) has an edge nearby
+    in at most a few directions and open space in the rest, which is what made
+    it "far from an edge" in the first place. Casting rays of length equal to
+    the candidate's own dist value and checking whether each still finds an
+    edge nearby tells the two apart without reference to any per-image scale
+    estimate (#8's own root-cause note: the plateau is defined by an absence
+    of structure, not by a distance relative to one), and without depending on
+    the LoG's reported scale, which for a plateau detection is an artefact of
+    the ladder's ceiling rather than a real one (#9).
+    """
+    h, w = dist.shape
+    d0 = float(dist[y, x])
+    if d0 <= 1e-6:
+        return 1.0
+    ys = np.clip(np.round(y + d0 * np.sin(_ENCLOSURE_ANGLES)).astype(int), 0, h - 1)
+    xs = np.clip(np.round(x + d0 * np.cos(_ENCLOSURE_ANGLES)).astype(int), 0, w - 1)
+    return float(np.count_nonzero(dist[ys, xs] <= _ENCLOSURE_DECAY * d0)) / _ENCLOSURE_RAYS
+
+
+def detect_centers(field, dist=None):
     """Detect multi-scale centres using Laplacian-of-Gaussian blob detection.
 
     A single blob_log call with log-spaced sigma values avoids duplicate
     detections that occurred when running four separate overlapping scale ranges.
     blob_log applies its own NMS internally via the overlap parameter.
+
+    ``dist``, if given, is the raw distance-to-edge transform ``field`` was
+    built from (see ``centres.field._field_and_distance``). When present, a
+    detection sitting on a structureless plateau -- no enclosing boundary
+    nearby in most directions -- is dropped rather than reported as a centre
+    (#8). Optional so callers detecting on a hand-built field (most of the
+    unit tests) get the plain detector.
     """
     blobs = blob_log(
-        field, min_sigma=2, max_sigma=48, num_sigma=10, threshold=0.08, log_scale=True
+        field, min_sigma=2, max_sigma=48, num_sigma=10,
+        threshold=None, threshold_rel=_DETECTION_THRESHOLD_REL, log_scale=True,
     )
     centers = []
-    for cid, (y, x, sigma) in enumerate(blobs):
+    for y, x, sigma in blobs:
+        yi, xi = int(y), int(x)
+        if dist is not None and _enclosure_fraction(yi, xi, dist) < _ENCLOSURE_FRACTION:
+            continue
         centers.append(
             Center(
-                id=cid,
+                id=len(centers),
                 x=float(x),
                 y=float(y),
                 scale=float(sigma * np.sqrt(2)),
-                strength=float(field[int(y), int(x)]),
+                strength=float(field[yi, xi]),
             )
         )
     return centers
@@ -97,8 +171,8 @@ def assign_hierarchy(centers):
 
 
 def analyze(image):
-    field = build_structural_field(image)
-    centers = detect_centers(field)
+    field, dist = _field_and_distance(image)
+    centers = detect_centers(field, dist)
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     centers = assign_polarity(centers, gray)
     centers = segment_regions(field, centers, gray)

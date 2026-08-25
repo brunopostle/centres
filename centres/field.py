@@ -39,13 +39,21 @@ CAP_SPACINGS = 8.0
 # when the artwork changes — in proportion, which is the point. What is not
 # acceptable is a scale set by the frame, or by a single outlier pixel.
 #
-# ONE PLACE STILL VIOLATES THIS, knowingly: build_structural_field divides by
-# field.max(), and detect_centers thresholds the result at an absolute 0.08.
-# Dividing by the cap instead was tried and reverted — it is near-identical
-# wherever the cap bites, and catastrophic wherever it does not, because the
-# absolute threshold then rejects almost every detection. The field's scale and
-# the detection threshold have to be fixed together, in the same units, or not at
-# all. Tracked on #27.
+# build_structural_field still divides by field.max(), so a single outlier pixel
+# still sets the field's amplitude. Two earlier fixes for that half of #27 were
+# tried and reverted: dividing by the cap instead is near-identical wherever the
+# cap bites and catastrophic wherever it does not (the field's amplitude then
+# falls well short of what an absolute detection threshold expects), and the
+# same failure mode blocks any other fixed normalisation.
+#
+# What actually decoupled the two: detect_centers no longer compares against an
+# absolute threshold at all. blob_log's threshold_rel takes a fraction of each
+# image's own peak LoG response — since the Laplacian is linear, that response
+# scales in direct proportion to whatever field.max() is, so a relative cutoff
+# selects the same detections whatever field.max() turns out to be. The
+# coupling this note used to warn about is now moot: rescaling the field can no
+# longer move the detection threshold, because there is no longer an absolute
+# number for it to move past. See detect_centers in pipeline.py and #27.
 #
 # A SUBTLER VIOLATION, measured on #9: edge_spacing itself is not as
 # resolution-invariant as this note assumes. It is pinned near ~4 px at every
@@ -136,21 +144,28 @@ def _flat_field(gray):
     contrast, and dividing by the local std restores the contrast in the dark
     corners — and it does two further things the division did not.
 
-    It is **exactly equivariant under tone inversion**: ``g - local_mean`` flips
-    sign when the image is inverted while ``local_std`` is unchanged, so the
-    output reflects about 128 (measured: identical to within one grey level, and
-    the edge map differs by one pixel in half a million). A photographic negative
-    of a design is the same design, so its scores should match; the previous
-    multiplicative division did not commute with inversion and shifted the centre
-    set by ~8% (#30).
+    It is **exactly equivariant under tone inversion in real arithmetic**: with
+    ``g' = 255 - g``, linearity of the Gaussian blur gives ``mean' = 255 - mean``
+    and ``var' = var`` (the cross term in ``(255-g)^2`` cancels against
+    ``(255-mean)^2``), so ``normalized' = 256 - normalized`` exactly. Since
+    ``_FLATFIELD_TARGET = 128`` makes that constant (256) even, quantising with
+    ``floor`` — what ``.astype(np.uint8)`` does — gives
+    ``floor(r) + floor(256 - r) = 255`` for *every* non-integer ``r``, with no
+    special-casing needed (#13, #9's ladder work first surfaced this identity).
 
-    And it is contrast-*normalising* rather than contrast-preserving, so faint and
-    strong regions are brought to a common amplitude before the percentile edge
-    threshold in :func:`_detect_edges` sees them — which is what that threshold
-    assumes.
+    That guarantee needs real-valued ``mean``/``var``, though, and this used to
+    compute them in float32: two float32 roundings (the blur, then the variance's
+    subtraction of two close numbers) broke the identity on about 0.02% of
+    pixels, letting a photographic negative's edge map differ from the original's
+    by a handful of pixels — small, but exactly the sort of order-sensitive
+    difference the dihedral-vote in :func:`_canny_symmetrised` exists to guard
+    against, and it wasn't guarding against this one. Computing in float64 (the
+    quantisation step is still ``uint8``, so this costs one pass at double
+    precision, not double the pipeline) measured exact — 0 differing pixels
+    across a 608,256-pixel image and its inverse, versus 13 before.
     """
     h, w = gray.shape[:2]
-    g = gray.astype(np.float32)
+    g = gray.astype(np.float64)
     sigma = _FLATFIELD_SIGMA * min(h, w)
     mean = cv2.GaussianBlur(g, (0, 0), sigmaX=sigma)
     var = cv2.GaussianBlur(g * g, (0, 0), sigmaX=sigma) - mean * mean
@@ -209,6 +224,25 @@ def _detect_edges(gray):
     :func:`build_structural_field` for why. The detection itself is symmetrised
     over the dihedral group so that the result does not depend on which way up
     the image happens to be stored — see :func:`_canny_symmetrised`.
+
+    ``_flat_field``'s output is now exactly antisymmetric under inversion (its
+    own docstring), which took this pre-blur's own inversion residual from 13
+    differing pixels (out of 608,256) to 1, and the worst per-property
+    inversion delta on a 44-image corpus check from ~0.75-1.0 to 0.93 (#13).
+
+    Recomputing this blur itself in float64 too, chasing that last pixel, was
+    tried and reverted. It closed the corpus residual further (44-image worst
+    0.93 -> 0.19) -- cv2's default ``uint8``-in/``uint8``-out blur is evidently
+    not just less precise but numerically *different* here, since the kernel
+    weights are dtype-independent so this is about intermediate rounding, not
+    the kernel -- but it also shifted detection counts by dozens on some
+    synthetic sweep stimuli, wrongly signing `echoes`' ground-truth tracking
+    and collapsing `not_separateness`' (both confirmed to trace to this change
+    alone, isolated from the ``_flat_field`` fix above, which is harmless to
+    both). Threshold recalibration (`_DETECTION_THRESHOLD_REL` 0.1-0.35) could
+    not recover both at once. Reverted rather than trade working ground-truth
+    tracking for a bigger but still-incomplete equivariance gain; the residual
+    this leaves is real and open, see #13.
     """
     blurred = cv2.GaussianBlur(_flat_field(gray), (0, 0), sigmaX=2)
     # Canny's default gradient is the L1 norm of a 3x3 Sobel; match it so the
@@ -263,29 +297,27 @@ def build_structural_field(image):
        edge spacing leaves the field on the retained region essentially
        unchanged (see AUDIT.md and the A4 notes in PLAN.md).
 
-    3. Normalisation — the field is divided by its own maximum, which is a known
-       weakness rather than a design choice.
+    3. Normalisation — the field is divided by its own maximum, which means a
+       single pixel, whichever happens to be furthest from an edge, sets the
+       amplitude of the whole image. That used to matter because detect_centers
+       compared the result to an absolute LoG threshold; it no longer does, so
+       rescaling the field can no longer change what gets detected. See the
+       project invariant note above and #27.
+    """
+    field, _ = _field_and_distance(image)
+    return field
 
-       It means a single pixel, whichever happens to be furthest from an edge,
-       sets the amplitude of the whole image, while detect_centers applies an
-       absolute LoG threshold to the result. That coupling is how vignetting used
-       to do its damage: corners lost edges, the distance transform there ran to
-       the cap, field.max() jumped (varamin 32 to 69), and every centre count
-       moved. Correction 2 defuses most of it — where the cap bites, field.max()
-       *is* the cap, which is a property of the artwork.
 
-       Dividing by the cap directly was tried and reverted (#27). It is
-       near-identical on the corpus, where the cap always bites, but it breaks
-       wherever the cap does not: on a sparse lattice CAP_SPACINGS * spacing is
-       270 px against a largest actual distance of 74, so the field peaks at 0.27
-       and the absolute 0.08 threshold rejects nearly every detection. Centre
-       counts on the synthetic generators collapsed from hundreds to single
-       figures.
+def _field_and_distance(image):
+    """Shared implementation behind build_structural_field.
 
-       The lesson is that the field's scale and the detection threshold cannot be
-       fixed independently: whatever sets the amplitude has to be the same
-       quantity the threshold is expressed in. Left coupled and honest until both
-       are addressed together.
+    Returns ``(field, dist)`` where ``dist`` is the *raw*, uncapped Euclidean
+    distance-to-edge transform the field is built from. ``build_structural_field``
+    exposes only ``field``; ``detect_centers`` additionally needs ``dist`` itself
+    to tell a real bounded centre from a local maximum on a structureless plateau
+    (#8) -- the distinction the capped, normalised field has already discarded.
+    Split out so both can share one (8x-orientation) edge detection pass rather
+    than paying for it twice.
     """
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     edges = _detect_edges(gray)
@@ -296,11 +328,28 @@ def build_structural_field(image):
         # No usable medial axis: no edges at all, or every pixel an edge. There
         # is no structure to measure and no scale to express it in, so the field
         # is empty rather than an arbitrary constant.
-        return np.zeros(gray.shape, dtype=float)
-    dist = np.minimum(dist, CAP_SPACINGS * spacing)
+        return np.zeros(gray.shape, dtype=float), dist
+    capped = np.minimum(dist, CAP_SPACINGS * spacing)
+    # gaussian_filter is linear, so blur(255-gray) = 255-blur(gray) exactly -- under
+    # tone inversion this term doesn't shift by a small residual, it *inverts*,
+    # everywhere in the image at once. That turned out to be the dominant driver
+    # of #13's inversion-equivariance residual, well past the edge map itself
+    # (which already differs by ~1 pixel in 135000 -- see _canny_symmetrised and
+    # the #30/#31 fixes). (blur - 0.5)^2, rescaled back to [0, 1], folds both
+    # polarities onto the same value, so the term no longer cares which tonal
+    # direction the image arrived in. A first attempt used min(blur, 1-blur),
+    # which works just as well on every real image tried but has a kink at
+    # blur=0.5 that injected spurious field structure and collapsed one point
+    # of the border_band sweep (539 -> 315 centres, neighbours untouched) --
+    # exactly the kind of discontinuity-amplification #27 already burned time
+    # on. The squared fold is smooth, so it doesn't create new field ridges.
+    # Measured: detection churn under inversion on 4 corpus images (ardabil,
+    # varamin, bidjar, pazyryk) drops from 15/25/20/7 candidates to 0/3/0/2,
+    # same as the kinked version, with no sweep collapses anywhere.
     blur = gaussian_filter(gray.astype(float) / 255.0, sigma=3)
-    field = dist + 0.1 * blur
-    return field / (field.max() + 1e-8)
+    blur = (blur - 0.5) ** 2 * 4.0
+    field = capped + 0.1 * blur
+    return field / (field.max() + 1e-8), dist
 
 
 def reconstruct_field(shape, centers):

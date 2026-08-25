@@ -9,6 +9,7 @@ from PyQt6.QtCore import Qt, QSettings
 from PyQt6.QtGui import QAction, QColor
 from PyQt6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QFileDialog,
     QHeaderView,
     QLabel,
@@ -94,7 +95,7 @@ class CentresMainWindow(QMainWindow):
         self.resize(1100, 680)
         self._image: np.ndarray | None = None
         self._image_path: str | None = None
-        self._last_result: tuple | None = None  # (field, centers, G, energy, raw)
+        self._last_result: tuple | None = None  # (field, centers, G, energy, raw, robust)
         self._worker: AnalyseWorker | None = None
         self._settings = QSettings("centres", "gui")
         self._build_ui()
@@ -122,10 +123,16 @@ class CentresMainWindow(QMainWindow):
         self._btn_open = _make_button("Open Image…", self._open_image)
         self._btn_analyse = _make_button("Analyse", self._run_analyse)
         self._btn_analyse.setEnabled(False)
+        self._chk_robust = QCheckBox("Robust (±)")
+        self._chk_robust.setToolTip(
+            "Score as the median over structure-preserving transforms (mirror, "
+            "rot90, gamma, JPEG, invert), reporting each measure with an error "
+            "bar (#23). Runs the analysis once per transform, so it is ~6x slower."
+        )
         self._lbl_status = QLabel("Ready")
         self._lbl_status.setContentsMargins(8, 0, 0, 0)
 
-        for w in (self._btn_open, self._btn_analyse, self._lbl_status):
+        for w in (self._btn_open, self._btn_analyse, self._chk_robust, self._lbl_status):
             tb.addWidget(w)
 
         # Central area
@@ -200,7 +207,8 @@ class CentresMainWindow(QMainWindow):
         if self._image is None:
             return
         self._set_running()
-        self._worker = AnalyseWorker(self._image, parent=self)
+        self._worker = AnalyseWorker(
+            self._image, robust=self._chk_robust.isChecked(), parent=self)
         self._worker.finished.connect(self._on_finished)
         self._worker.error.connect(self._on_error)
         self._worker.start()
@@ -229,10 +237,14 @@ class CentresMainWindow(QMainWindow):
         )
         if not path:
             return
-        _, centers, _, energy, raw = self._last_result
-        from .cli import properties_json
+        _, centers, _, energy, raw, robust = self._last_result
+        from .cli import properties_json, robust_json
 
-        out = properties_json(len(centers), energy, raw)
+        if robust is None:
+            out = properties_json(len(centers), energy, raw)
+        else:
+            n_med, life, props, n_transforms = robust
+            out = robust_json(n_med, life, props, n_transforms)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(out, f, indent=2)
 
@@ -240,13 +252,21 @@ class CentresMainWindow(QMainWindow):
     # Worker slots
     # ------------------------------------------------------------------
 
-    def _on_finished(self, field, centers, G, energy, raw):
-        self._last_result = (field, centers, G, energy, raw)
+    def _on_finished(self, field, centers, G, energy, raw, robust):
+        self._last_result = (field, centers, G, energy, raw, robust)
         self._canvas.update_field(field, centers, G, self._image)
-        self._update_table(raw)
-        self._lbl_summary.setText(
-            f"<b>{len(centers)}</b> centres  |  degree of life <b>{-energy:.4f}</b>"
-        )
+        self._update_table(raw, robust)
+        if robust is None:
+            self._lbl_summary.setText(
+                f"<b>{len(centers)}</b> centres  |  degree of life <b>{-energy:.4f}</b>"
+            )
+        else:
+            n_med, (life_med, life_err), _, n_transforms = robust
+            self._lbl_summary.setText(
+                f"<b>{n_med}</b> centres (median)  |  degree of life "
+                f"<b>{life_med:+.4f} ± {life_err:.4f}</b>  "
+                f"(median over {n_transforms} benign transforms)"
+            )
         self._set_idle()
 
     def _on_error(self, msg: str):
@@ -257,17 +277,34 @@ class CentresMainWindow(QMainWindow):
     # Properties table
     # ------------------------------------------------------------------
 
-    def _update_table(self, raw: dict):
+    def _update_table(self, raw: dict, robust=None):
         """Fill the table. A ``None`` score means the property is undefined for
         this image; it is shown as an em dash on a neutral grey ground, never as
-        a number and never coloured on the red/amber/green scale."""
-        norm = normalize_all(raw)
+        a number and never coloured on the red/amber/green scale.
+
+        ``robust``, if given, is ``(n_med, life, props, n_transforms)`` from
+        ``cli.robust_analyse``: each score is shown as its median across the
+        benign transforms with a ``±`` error bar (#23), and the single-pass
+        ``raw`` column — which has no median analogue, same as the CLI's
+        ``--robust`` table — is left blank.
+        """
+        props = robust[2] if robust is not None else None
+        self._table.setHorizontalHeaderLabels(
+            ["Property", "Score (median ± ½ range)" if robust else "Score (0–10)", "Raw"])
         for row, (key, _) in enumerate(_PROPERTY_LABELS):
-            score = norm[key]
+            if robust is None:
+                score, err = normalize_all(raw)[key], None
+            else:
+                score, err = props[key]
             raw_val = raw[key]
             undefined = score is None
-            score_item = QTableWidgetItem(
-                _UNDEFINED if undefined else f"{score:.1f}")
+            if undefined:
+                score_txt = _UNDEFINED
+            elif err is None:
+                score_txt = f"{score:.1f}"
+            else:
+                score_txt = f"{score:.1f} ± {err:.1f}"
+            score_item = QTableWidgetItem(score_txt)
             score_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             if undefined:
                 score_item.setBackground(QColor("#e0e0e0"))
@@ -281,8 +318,8 @@ class CentresMainWindow(QMainWindow):
                     else QColor("#ffcdd2")
                 )
             self._table.setItem(row, 1, score_item)
-            raw_item = QTableWidgetItem(
-                _UNDEFINED if raw_val is None else f"{raw_val:.4g}")
+            raw_txt = _UNDEFINED if (robust is not None or raw_val is None) else f"{raw_val:.4g}"
+            raw_item = QTableWidgetItem(raw_txt)
             raw_item.setTextAlignment(Qt.AlignmentFlag.AlignRight |
                                       Qt.AlignmentFlag.AlignVCenter)
             self._table.setItem(row, 2, raw_item)
@@ -294,6 +331,7 @@ class CentresMainWindow(QMainWindow):
     def _set_running(self):
         self._btn_open.setEnabled(False)
         self._btn_analyse.setEnabled(False)
+        self._chk_robust.setEnabled(False)
         import os
         name = os.path.basename(self._image_path) if self._image_path else ""
         self._lbl_status.setText(f"Analysing {name}…")
@@ -301,6 +339,7 @@ class CentresMainWindow(QMainWindow):
     def _set_idle(self):
         self._btn_open.setEnabled(True)
         self._btn_analyse.setEnabled(self._image is not None)
+        self._chk_robust.setEnabled(True)
         import os
         self._lbl_status.setText(
             os.path.basename(self._image_path) if self._image_path else "Ready"

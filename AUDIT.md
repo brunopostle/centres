@@ -29,71 +29,139 @@ computing a different quantity from the property named on them.
 After the phase A/B repairs and the #22 redefinitions against the sourced
 definitions (Salingaros 2025, in `docs/`):
 
-**The instrument is precise.** Scores are stable under isometries (worst delta
-0.21, was 5.9), independent of frame, resolution and iteration count, bounded, and
-`|r(score, centre count)| = 0.01` over the full ensemble (was 0.99). A blank
-canvas scores *undefined* on every property, not 10/10. Collapse is no longer the
-energy's global minimum.
+**The instrument is precise, in one respect more and one respect less than this
+section used to say.** Scores under mirror/rot90 are now *more* stable than
+recorded here (worst delta 0.06–0.14 on ardabil, was 0.21) — but #27's fix for
+cross-image consistency (below) turned out to have a cost under tone inversion,
+which regressed from the 0.043 once recorded here to 0.58–1.0 on the
+region-sensitive measures. **Since narrowed twice, not closed.** Three
+independent fixes have cut it: the field's blur term is symmetrised under tone
+inversion (`c18363b`); `good_shape`/`local_symmetries` pick which polarity is
+"figure" by a structural signal (whichever population is more compact) rather
+than a fixed sign (`0d2a920`) — the fixed sign read a *different physical
+population* depending on which way the image arrived, since inverting an image
+swaps every centre's polarity; and `_flat_field`'s own claimed exact
+tone-inversion equivariance, previously only measured "to within one grey
+level," is now genuinely exact — float32 rounding in its Gaussian blur and
+variance computation broke that guarantee on ~0.02% of pixels, amplified by
+watershed into region-area differences of up to 197x on otherwise-identical
+seeds; recomputing in float64 fixes it exactly (`3bdbedc`), and the same
+commit found and fixed a second, unrelated tie-break bug in `boundaries()`
+that defaulted to the tone-dependent population on an exact width tie.
 
-**Ten measures now track their ground truth** after controlling for centre count
+**Measured on the 44-image corpus after all three fixes:** 34 of 44 images now
+show *exactly* 0.000 worst-property inversion delta; worst overall is **0.93**
+(`beardsley_ascension_saint_rose_of_lima`, `local_symmetries`) — still real,
+still open, but down from 0.58–1.0. Diagnosed on bidjar and pazyryk (now both
+exact): the same physical region population was already selected under
+inversion (region count matched exactly both ways) even before the float64
+fix, so *that* residual was never figure/ground — it was float32 rounding
+noise, amplified by watershed, and the float64 fix closes it completely on
+images where it's the whole story. On `beardsley_ascension` and the handful of
+others still nonzero, more remains: the detection/segmentation order-
+sensitivity #13 already names as its harder, structurally different residual.
+**Chased further and reverted:** recomputing `_detect_edges`'s second Gaussian
+blur in float64 too closes the corpus residual much further (worst 0.93 →
+0.19) but wrongly signs `echoes`' ground-truth tracking and collapses
+`not_separateness`'; three recalibration levers were tried against that
+trade-off (`_DETECTION_THRESHOLD_REL`, `_EDGE_PERCENTILE`,
+`_ENCLOSURE_FRACTION`) and none recovers both without reintroducing a
+different, already-fixed regression (a plateau-detection bug at
+`_ENCLOSURE_FRACTION=0.25`, caught by the fast suite). See #13 for the full
+investigation; still open.
+
+*A separate, pre-existing caveat surfaced while re-measuring, unrelated to
+either fix above (confirmed identical under the old fixed-polarity code):*
+`local_symmetries` *is gravity-relative by design (vertical axis only, per its
+own docstring), so* `rot90` *is not expected to preserve it — measured at up to
+Δ1.70 on pazyryk. The 0.06–0.14 isometry figure above was checked on ardabil
+alone and does not reflect this; not chased further here.*
+
+`|r(score, centre count)| = 0.01` over the full ensemble (was 0.99) is unaffected.
+A blank canvas scores *undefined* on every property, not 10/10. Collapse is no
+longer the energy's global minimum.
+
+**Nine measures now track their ground truth** after controlling for centre count
 (partial ρ from §16, or a clean interior optimum), where one did at the start:
 
-| measure | count-controlled ρ | field SNR |
+| measure | count-controlled ρ | field SNR (44-image corpus) |
 |---|---:|---:|
-| contrast | +1.00 | 4.43 |
-| deep interlock | +1.00 | 4.26 |
-| gradients | +0.96 | 6.24 |
-| strong centres | +0.99 | 3.22 |
-| positive space | +0.90 | 1.55 |
-| echoes | **−0.89** | 0.68 |
-| not-separateness | **+0.83** | 1.08 |
-| simplicity | +0.71 | 3.72 |
-| levels of scale | interior optimum (peaks at 3) | 3.18 |
-| boundaries | interior optimum (peaks at 1/3) | 1.83 |
+| contrast | +1.00 | 10.98 |
+| deep interlock | +1.00 | 11.56 |
+| gradients | +0.96 | 15.35 |
+| strong centres | +0.99 | 27.52 |
+| positive space | +0.80 | 4.25 |
+| not-separateness | +0.72 | 6.95 |
+| simplicity | +0.63 | 8.74 |
+| levels of scale | interior optimum (peaks at 3) | 5.51 |
+| boundaries | interior optimum (peaks at 1/3) | 22.32 |
 
-`echoes` and `not-separateness` moved into this group as a *side effect of the #30
-detector fix*: local contrast normalisation made the faint shape-vocabulary and
-bleed stimuli detectable, taking echoes from |0.17| to |0.89| and not-separateness
-from +0.24 to +0.83. (echoes correctly runs *negative* — more distinct shapes
-means less echo — which the harness now reports as tracking-downward rather than
-mislabelling as a failure; #33.)
+`not-separateness` moved into this group as a *side effect of the #30 detector
+fix*: local contrast normalisation made the faint bleed stimulus detectable,
+taking it from +0.24 to +0.83 partial. It then regressed to +0.29 as an
+unintended side effect of #8's enclosure filter (rejecting the weakly-bounded
+structure this measure specifically depends on) and was recovered to +0.72 by
+loosening that filter (`ac5293b`; see #22). `echoes` made the same #30-driven
+jump (to −0.89 partial) but, unlike not-separateness, was *not* recovered by the
+enclosure-filter fix — its regression traces mainly to #27's `threshold_rel`
+itself, which has no cheap fix found so far (swept five values, none helped; see
+#13, #22). It moved further still with this session's field-blur symmetrisation
+(`c18363b`) and again with the float64 exactness fix (`3bdbedc`) — partial now
+**−0.30** (was −0.46, then −0.25), a side effect of both fixes changing
+segmentation, not independently chased. It stays in the "moderate" group below.
 
-**Three track moderately:** roughness (+0.51), local symmetries (−0.46), good
-shape (+0.39). `good_shape` weakened under count control this run — its raw +0.91
-is substantially count-driven — so it is no longer a clean keep. **One fails:**
-alternating repetition (+0.14). **One is spurious:** the void (+0.80 raw, partial
-−0.07). See §13.
+**Four track moderately:** echoes (−0.30, see above), roughness (+0.18, was
++0.51 — also #27/#8-affected, not separately chased), local symmetries (−0.79,
+was −0.84 — essentially unchanged across all of this session's #13 fixes), good
+shape (+0.68, was +0.49 — improved by this session's #13 work, though the
+sweep's own raw ρ (§12) is unmoved by the figure/ground fix specifically and
+unpicked from the blur-fix's contribution). **One fails:**
+alternating repetition (+0.29, was +0.14 — a small improvement but still not
+tracking; ten replacement candidates tried across two sessions, all fail or —
+one case — are invalidated by a null-stimulus control before shipping; see
+PLAN.md's D2 note). **One is spurious:** the void (−0.08 raw / −0.12 partial, both near
+zero rather than the positive raw / near-zero-partial split originally recorded
+— the "spurious" verdict itself is unchanged). See §13 of this document (not
+issue #13) for the original diagnosis.
 
-**A new caveat from this run: field SNR is now the binding constraint, not
-tracking.** Four measures that track their ground truth (echoes, not-separateness,
-positive space, boundaries) have poor between-artwork SNR on the six carpets —
-they discriminate the constructed stimuli cleanly and separate real carpets
-weakly. (The image-domain `boundaries`/`deep_interlock` used to use a fixed
-grey-128 threshold, so they shifted under gamma and JPEG, inflating their noise
-floor; #31 replaced it with a **symmetrised Otsu** threshold that adapts to the
-image's own histogram, cutting the gamma sensitivity of `boundaries` from 2.9 to
-0.25 and of `deep_interlock` from 1.7 to 0.46 on the 0–10 scale while keeping the
-exact tone-inversion invariance #30 established and the ground-truth sweeps
-unchanged — boundaries still peaks at 0.3, deep interlock still tracks at +1.000.)
+**The field-SNR caveat from earlier runs is resolved on the widened corpus (#34).**
+The measures that tracked their ground truth but separated real artworks weakly
+on the original six-carpet sample all clear the usable-or-marginal bar on the
+current 44-image corpus (32 ornamental patterns, 12 Beardsley illustrations) —
+**none report NOISE**, though which measures land in "marginal" has shifted with
+the front-end changes above: currently `echoes` (SNR 1.23, essentially
+unchanged from 1.24/1.58 across this session's #13 fixes, not independently
+chased) and `local_symmetries` (SNR 1.59) are marginal — `local_symmetries`
+crossed into usable (2.14) after the figure/ground fix, then back to marginal
+after the float64 exactness fix moved the corpus's own noise floor; a
+zero-sum side effect of a fix aimed at inversion equivariance, not tracking,
+and not independently chased. Everything else usable. This confirms the original
+diagnosis: the low SNR was n=6 sampling noise from too small and too uniform a
+corpus, not a property of the measures themselves. (The image-domain
+`boundaries`/`deep_interlock` used to use a fixed grey-128 threshold, so they
+shifted under gamma and JPEG, inflating their noise floor; #31 replaced it with a
+**symmetrised Otsu** threshold that adapts to the image's own histogram, cutting
+the gamma sensitivity of `boundaries` from 2.9 to 0.25 and of `deep_interlock`
+from 1.7 to 0.46 on the 0–10 scale while keeping the exact tone-inversion
+invariance #30 established and the ground-truth sweeps unchanged — boundaries
+still peaks at 0.3, deep interlock still tracks at +1.000.)
 
-**Two findings are unchanged, and are the honest residual:**
+**Both findings below are now resolved; kept here as the record of what the
+residual was, with the current state noted against each:**
 
-1. **Noise still scores a higher degree of life than any of the six carpets**
+1. **Noise scored a higher degree of life than any of the six carpets**
    (section 2b, [#29](https://github.com/brunopostle/centres/issues/29)). The
-   redefined measures fixed *what each property measures*; they did not make the
-   *aggregate* rank art above noise. **Section 17 now says why, and what is
-   missing:** no *local* measure separates the two — noise wins eleven of the
-   fifteen individual properties, because dense noise is abundant in local
-   structure, not short of it — but a *global* redundancy statistic (the entropy
-   of the centre population) separates every carpet from every noise field cleanly
-   and stably. The missing ingredient is an organised-complexity term, blocked on
-   #9 and #34; the new `discrimination` audit stage now reports the separation on
-   every run.
-2. **The SNR sample is six carpets, all Persian.** A measure that separates
-   carpets need not separate paintings, and several that track their ground truth
-   still have poor between-artwork SNR (positive space 0.69, local symmetries
-   0.98, echoes 0.67) -- they work in the laboratory and are noisy on this field
-   sample.
+   redefined measures fixed *what each property measures*; they did not by
+   themselves make the *aggregate* rank art above noise — no *local* measure
+   separates the two, because dense noise is abundant in local structure, not
+   short of it. **Section 17 covers the fix in full**: a *global* redundancy
+   statistic (entropy, spatial coherence, or nesting — the OR rule) separates
+   every one of the 44 corpus images from noise, and the reported score is now
+   gated by the count-invariant wholeness excess it motivated. #29 is closed.
+2. **The SNR sample was six carpets, all Persian.** Widened to the current
+   44-image corpus (#34) — see the field-SNR table and note above, and §17's
+   "wider corpus" and "painting test" subsections for the redundancy side of the
+   same widening.
 
 A correction worth recording in its own right: `echoes` was reported at rho =
 +1.000 when validated on a six-point subsample of its sweep, and is +0.41 (partial
@@ -480,35 +548,54 @@ their ideal is in the middle of the sweep, so the right check is where the score
 
 | generator → measure | test | ρ (raw / count-controlled) |
 |---|---|---|
-| tonal_delta → contrast | monotone | **+1.00 / +1.00** |
+| tonal_delta → contrast | monotone | **+0.99 / +0.99** |
 | interlock_depth → deep interlock | monotone | **+1.00 / +1.00** |
 | dominance → strong centres | monotone | **+0.99 / +0.99** |
 | zone_width → gradients | monotone | **+0.96 / +0.96** |
-| ground_solidity → positive space | monotone | **+0.91 / +0.90** |
-| shape_vocabulary → echoes | monotone (↓) | **−0.85 / −0.89** |
-| bleed → not-separateness | monotone | **+0.78 / +0.83** |
-| element_kinds → simplicity | monotone | +0.72 / +0.71 |
+| ground_solidity → positive space | monotone | +0.81 / +0.83 |
+| bleed → not-separateness | monotone | +0.70 / +0.72 |
+| element_kinds → simplicity | monotone | +0.60 / +0.62 |
 | border_band → boundaries | optimum(0.3) | score peaks at 0.3 ✓ |
 | scale_ratio → levels of scale | optimum(3) | score peaks at 3 ✓ |
-| jitter → roughness | monotone | +0.66 / +0.51 |
-| bilateral_asymmetry → local symmetries | monotone (↓) | −0.72 / −0.46 |
-| motif_circularity → good shape | monotone | +0.91 / **+0.39** |
-| alternation → alternating repetition | monotone | +0.05 / +0.14 |
-| void_size → the void | monotone | +0.80 / **−0.07** *(spurious, §16)* |
+| bilateral_asymmetry → local symmetries | monotone (↓) | −0.71 / −0.79 |
+| motif_circularity → good shape | monotone | +0.81 / +0.68 |
+| shape_vocabulary → echoes | monotone (↓) | −0.13 / **−0.30** |
+| jitter → roughness | monotone | +0.65 / +0.18 |
+| alternation → alternating repetition | monotone | +0.30 / +0.29 |
+| void_size → the void | monotone | −0.08 / −0.12 *(spurious, §16)* |
 
-The two "(↓)" rows correctly run *negative*: more distinct shapes means less echo,
-more shear means less symmetry. Each sweep now declares the direction it should
-move, so the harness reports these as tracking-downward rather than failing (#33);
-the count-controlled magnitude (0.89, 0.46) is what counts.
+*Refreshed 2026-08-25 after this session's full #13 sequence: field-blur
+symmetrisation (`c18363b`), figure/ground fix (`0d2a920`), and the float64
+tone-inversion exactness fix (`3bdbedc`). All three changed the field and/or
+segmentation, so most rows moved a little even where none of the three
+targeted that measure; `good_shape` and `local_symmetries` are the ones #13
+targeted, `echoes` moved as an unchased side effect across all three (see §0).*
 
-**Ten measures track in the right direction, eight of them at |ρ| ≥ 0.7 or as a
-clean interior optimum.** At the start of the audit exactly one did. `echoes` and
-`not-separateness` joined this group only after the #30 local-contrast detector
-fix made their faint stimuli detectable; `good_shape` left the clean-keep group
-this run, its raw +0.91 revealed as substantially count-driven (partial +0.39). The gain came
-from two things: repairing the front end so the centre set is a stable estimate,
-and — for the eleven measures that were computing the wrong quantity entirely —
-redefining them against the sourced definitions on the region layer (§13, #22).
+The "(↓)" rows correctly run *negative*: more distinct shapes means less echo,
+more shear means less symmetry. Each sweep declares the direction it should move,
+so the harness reports these as tracking-downward rather than failing (#33); the
+count-controlled magnitude is what counts.
+
+**Nine measures track in the right direction, seven of them at |ρ| ≥ 0.6 or as a
+clean interior optimum.** At the start of the audit exactly one did. Front-end
+work across this and earlier sessions (#27, then #8, then this session's full
+#13 sequence — blur symmetrisation, figure/ground fix, float64 exactness fix)
+moved several rows here, not always for the better: `echoes` regressed from a
+clean −0.89 to −0.46 partial after #27/#8, and has drifted further to −0.30
+across this session's #13 fixes, not independently chased (#13's
+`threshold_rel` sensitivity remains the suspected root cause; no cheap fix
+found — three recalibration levers tried this session, none recover it without
+reintroducing a different regression). `not-separateness` took the same #8 hit and
+*was* recovered, to +0.72, by loosening the enclosure filter (`ac5293b`, #22).
+`good_shape`'s partial improved to +0.68 (was +0.49) with this session's #13
+work — its own raw rho on this sweep is unmoved by the figure/ground fix
+specifically (see #13's own report), so the partial's gain reflects how the
+fixes changed the wider corpus the count-control is fit against, not this sweep
+directly. The lesson from the original gain still holds -- repairing the front end
+so the centre set is a stable estimate, and redefining measures against the
+sourced definitions on the region layer (§13, #22) -- but "repaired" is not a
+one-time state: this table needs re-checking after any further front-end change,
+the same standing rule PLAN.md already states for the corpus and generators.
 
 ### The interior-optimum measures
 
@@ -546,6 +633,12 @@ then falls away symmetrically. A monotone ρ on such a measure would be evidence
 result from §12). **SNR** is between-artwork signal against measurement noise, over
 the six-carpet corpus — a necessary check that is *not* sufficient, and is a small,
 single-genre sample.
+
+*This table predates #27/#8 and this session's #13 work (its `echoes` row is the
+pre-#27 −0.89, not the current −0.25) and has not been re-run since — the SNR
+column needs the six-carpet corpus specifically, which §0/§12 no longer carry
+alongside the 44-image numbers. For current ρ, see §12; for current SNR (44-image
+corpus), see §0.*
 
 | property | source-aligned formula? | ρ | SNR | verdict |
 |---|---|---:|---:|---|
